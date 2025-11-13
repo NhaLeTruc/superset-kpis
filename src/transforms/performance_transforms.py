@@ -70,8 +70,8 @@ def calculate_percentiles(
         # Filter to this group
         group_df = df.filter(filter_condition)
 
-        # Calculate percentiles for this group
-        percentile_values = group_df.approxQuantile(value_column, percentiles, 0.01)
+        # Calculate percentiles for this group with higher accuracy
+        percentile_values = group_df.approxQuantile(value_column, percentiles, 0.0001)
 
         # Create a row with group keys + percentile values
         row_dict = {col: group_row[col] for col in group_by_columns}
@@ -143,7 +143,7 @@ def calculate_device_correlation(
     for device_row in device_groups:
         device = device_row["device_type"]
         device_df = joined_df.filter(F.col("device_type") == device)
-        p95_value = device_df.approxQuantile("duration_ms", [0.95], 0.01)[0]
+        p95_value = device_df.approxQuantile("duration_ms", [0.95], 0.0001)[0]
         p95_results.append((device, float(p95_value)))
 
     from pyspark.sql.types import StructType, StructField, StringType, DoubleType
@@ -180,6 +180,12 @@ def detect_anomalies_statistical(
 
     Anomaly: |value - μ| > z_threshold * σ
 
+    The baseline (mean and stddev) is calculated iteratively:
+    1. Calculate initial baseline with all data
+    2. Identify preliminary anomalies
+    3. Recalculate baseline excluding preliminary anomalies
+    4. Calculate final z-scores and return anomalies
+
     Args:
         df: Input DataFrame
         value_column: Column to analyze for anomalies
@@ -192,16 +198,16 @@ def detect_anomalies_statistical(
     if group_by_columns is None:
         group_by_columns = []
 
-    # Calculate baseline statistics (mean and stddev)
+    # Step 1: Calculate initial baseline statistics with all data
     if group_by_columns:
         # Calculate per-group statistics
         window_spec = Window.partitionBy(*group_by_columns)
 
-        df_with_stats = df.withColumn(
-            "baseline_mean",
+        df_with_initial_stats = df.withColumn(
+            "initial_mean",
             F.avg(value_column).over(window_spec)
         ).withColumn(
-            "baseline_stddev",
+            "initial_stddev",
             F.stddev(value_column).over(window_spec)
         )
     else:
@@ -211,14 +217,46 @@ def detect_anomalies_statistical(
             F.stddev(value_column).alias("stddev")
         ).collect()[0]
 
-        baseline_mean = stats["mean"]
-        baseline_stddev = stats["stddev"]
+        initial_mean = stats["mean"]
+        initial_stddev = stats["stddev"]
 
-        df_with_stats = df.withColumn("baseline_mean", F.lit(baseline_mean))
-        df_with_stats = df_with_stats.withColumn("baseline_stddev", F.lit(baseline_stddev))
+        df_with_initial_stats = df.withColumn("initial_mean", F.lit(initial_mean))
+        df_with_initial_stats = df_with_initial_stats.withColumn("initial_stddev", F.lit(initial_stddev))
 
-    # Calculate Z-score
-    df_with_zscore = df_with_stats.withColumn(
+    # Step 2: Calculate initial z-scores and identify non-anomalous data
+    df_with_initial_zscore = df_with_initial_stats.withColumn(
+        "initial_z_score",
+        ((F.col(value_column) - F.col("initial_mean")) / F.col("initial_stddev")).cast("double")
+    )
+
+    # Filter to non-anomalous data (|z| <= threshold)
+    non_anomalous_df = df_with_initial_zscore.filter(F.abs(F.col("initial_z_score")) <= z_threshold)
+
+    # Step 3: Recalculate baseline excluding preliminary anomalies
+    if group_by_columns:
+        # Calculate refined per-group statistics on non-anomalous data
+        refined_stats = non_anomalous_df.groupBy(*group_by_columns).agg(
+            F.avg(value_column).alias("baseline_mean"),
+            F.stddev(value_column).alias("baseline_stddev")
+        )
+
+        # Join refined baseline back to original data
+        df_with_refined_stats = df.join(refined_stats, on=group_by_columns, how="left")
+    else:
+        # Calculate refined global statistics on non-anomalous data
+        refined_stats = non_anomalous_df.agg(
+            F.avg(value_column).alias("mean"),
+            F.stddev(value_column).alias("stddev")
+        ).collect()[0]
+
+        baseline_mean = refined_stats["mean"]
+        baseline_stddev = refined_stats["stddev"]
+
+        df_with_refined_stats = df.withColumn("baseline_mean", F.lit(baseline_mean))
+        df_with_refined_stats = df_with_refined_stats.withColumn("baseline_stddev", F.lit(baseline_stddev))
+
+    # Step 4: Calculate final z-scores using refined baseline
+    df_with_zscore = df_with_refined_stats.withColumn(
         "z_score",
         ((F.col(value_column) - F.col("baseline_mean")) / F.col("baseline_stddev")).cast("double")
     )

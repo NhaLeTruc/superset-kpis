@@ -494,7 +494,7 @@ class TestOptimizedJoin:
 
         # 500 interactions for u001 (hot key) + 500 for others
         hot_key_data = [("u001", i) for i in range(500)]
-        other_data = [(f"u{i:03d}", 500 + i) for i in range(2, 11) for _ in range(55)]
+        other_data = [(f"u{i:03d}", 500 + i) for i in range(2, 11) for _ in range(56)]
         large_data = hot_key_data + other_data[:500]  # Total 1000 rows
         large_df = spark.createDataFrame(large_data, schema=large_schema)
 
