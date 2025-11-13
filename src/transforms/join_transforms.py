@@ -37,8 +37,8 @@ def identify_hot_keys(
     key_counts = df.groupBy(key_column).count()
 
     # Calculate the threshold value at the given percentile
-    # Using approxQuantile with relative error 0.01
-    threshold_value = key_counts.approxQuantile("count", [threshold_percentile], 0.01)[0]
+    # Using approxQuantile with higher accuracy (0.0001 for precision)
+    threshold_value = key_counts.approxQuantile("count", [threshold_percentile], 0.0001)[0]
 
     # Filter to only keys strictly above the threshold (> to exclude uniform distributions)
     hot_keys = key_counts.filter(F.col("count") > threshold_value)
