@@ -21,8 +21,13 @@ if ! docker ps | grep -q goodnote-spark-dev; then
 fi
 
 # Run pytest with coverage
+# Set environment variables to ensure writable temp directory for coverage data
 echo -e "${GREEN}📊 Running pytest with coverage...${NC}"
-docker exec goodnote-spark-dev pytest tests/ -v --cov=src --cov-report=term-missing "$@"
+docker exec \
+    -e TMPDIR=/tmp \
+    -e COVERAGE_FILE=/tmp/.coverage \
+    goodnote-spark-dev \
+    pytest tests/ -v --cov=src --cov-report=term-missing "$@"
 
 EXIT_CODE=$?
 

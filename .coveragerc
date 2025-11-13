@@ -1,0 +1,37 @@
+# Coverage.py configuration for Docker environment
+# Fixes SQLite permission issues by using /tmp directory
+
+[run]
+# Write coverage data to /tmp (always writable in containers)
+data_file = /tmp/.coverage
+
+# Source code to measure
+source = src
+
+# Omit test files and cache from coverage
+omit =
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */.pytest_cache/*
+
+[report]
+# Show 2 decimal places
+precision = 2
+
+# Show lines that weren't covered
+show_missing = True
+
+# Don't skip covered files in report
+skip_covered = False
+
+# Fail if coverage is below threshold (optional)
+# fail_under = 80
+
+[html]
+# HTML coverage report directory
+directory = /tmp/htmlcov
+
+[xml]
+# XML coverage report for CI/CD
+output = /tmp/coverage.xml
