@@ -19,38 +19,46 @@ This branch contains **comprehensive documentation** for implementing the GoodNo
 
 ### Core Documentation
 
-1. **[IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)** ⭐
+1. **[TDD_SPEC.md](./docs/TDD_SPEC.md)** 🔴🟢 **NEW - Start Here for Implementation!**
+   - **Complete Test-Driven Development specifications**
+   - All function signatures with input/output contracts
+   - Given-When-Then test cases for every function
+   - Edge cases and acceptance criteria
+   - Test fixtures and factory functions
+   - **Required reading before writing any code**
+
+2. **[IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)** ⭐
    - Complete task-by-task implementation guide
    - Spark optimization techniques explained
    - 5-phase development approach
    - Estimated timelines and success metrics
 
-2. **[ARCHITECTURE.md](./ARCHITECTURE.md)**
+3. **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)**
    - System architecture diagrams
    - Component descriptions and interactions
    - Data flow and processing pipeline
    - Production deployment strategies
    - Performance benchmarks
 
-3. **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)**
+4. **[PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)**
    - Complete directory tree
    - File naming conventions
    - Code organization principles
    - Getting started guide
 
-4. **[SETUP_GUIDE.md](./SETUP_GUIDE.md)**
+5. **[SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)**
    - Prerequisites and system requirements
    - Quick start (5 minutes)
    - Detailed setup instructions
    - Troubleshooting common issues
 
-5. **[SUPERSET_DASHBOARDS.md](./SUPERSET_DASHBOARDS.md)**
+6. **[SUPERSET_DASHBOARDS.md](./docs/SUPERSET_DASHBOARDS.md)**
    - 4 interactive dashboard designs
    - Chart specifications with SQL queries
    - Dashboard customization guide
    - Best practices
 
-6. **[challenge/GoodNoteChallenge.md](./challenge/GoodNoteChallenge.md)**
+7. **[challenge/TheChallenge.md](./challenge/TheChallenge.md)**
    - Original challenge requirements
    - Dataset descriptions
    - Task definitions (1-6)
@@ -329,15 +337,17 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed diagrams.
 ## 📖 Documentation Structure
 
 ```
-insight-engineer-challenge/
+claude-superset-demo/
 ├── README.md                      ⬅️ You are here
-├── IMPLEMENTATION_PLAN.md         → Comprehensive implementation guide
-├── ARCHITECTURE.md                → System architecture and design
-├── PROJECT_STRUCTURE.md           → Directory organization
-├── SETUP_GUIDE.md                 → Installation and setup
-├── SUPERSET_DASHBOARDS.md         → Dashboard specifications
+├── docs/
+│   ├── TDD_SPEC.md                → 🔴🟢 Test-Driven Development specifications
+│   ├── IMPLEMENTATION_PLAN.md     → Comprehensive implementation guide
+│   ├── ARCHITECTURE.md            → System architecture and design
+│   ├── PROJECT_STRUCTURE.md       → Directory organization
+│   ├── SETUP_GUIDE.md             → Installation and setup
+│   └── SUPERSET_DASHBOARDS.md     → Dashboard specifications
 └── challenge/
-    └── GoodNoteChallenge.md       → Original challenge requirements
+    └── TheChallenge.md            → Original challenge requirements
 ```
 
 ---
@@ -387,6 +397,44 @@ insight-engineer-challenge/
 
 ---
 
+## 🧪 Test-Driven Development (TDD) Approach
+
+This project **REQUIRES strict TDD**. Every component must be developed test-first:
+
+### TDD Workflow
+
+```bash
+# 1. Read function specification from TDD_SPEC.md
+# 2. Write failing test
+# 3. Run test (should fail - RED)
+pytest tests/unit/test_engagement_transforms.py::test_calculate_dau_basic -v
+# ❌ FAIL
+
+# 4. Implement minimum code to pass
+# 5. Run test again (should pass - GREEN)
+pytest tests/unit/test_engagement_transforms.py::test_calculate_dau_basic -v
+# ✅ PASS
+
+# 6. Refactor while keeping tests green
+# 7. Move to next function
+```
+
+### TDD Benefits for This Project
+
+- ✅ **Independent Development** - Each function can be built and tested in isolation
+- ✅ **Clear Requirements** - Every function has explicit input/output contracts
+- ✅ **Confidence** - Tests prove correctness before integration
+- ✅ **Regression Prevention** - Tests catch breaking changes immediately
+- ✅ **Documentation** - Tests serve as executable examples
+
+### Required Reading Order
+
+1. **[TDD_SPEC.md](./docs/TDD_SPEC.md)** - Read this FIRST! Contains all test specifications
+2. **[IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)** - High-level implementation strategy
+3. **[PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)** - Where to put your code
+
+---
+
 ## 🛠️ Development Workflow
 
 ### Phase 1: Setup (1 hour)
@@ -396,32 +444,45 @@ insight-engineer-challenge/
 4. Configure Superset
 5. Generate sample data
 
-### Phase 2: Core Development (3-4 hours)
-1. Implement Job 1: Data processing with optimized join
-2. Implement Job 2: User engagement metrics
-3. Implement Job 3: Performance analytics
-4. Implement Job 4: Session analysis
-5. Write unit tests (>80% coverage)
+### Phase 2: Core Development with TDD (4-6 hours)
+1. **For each function:**
+   - Read specification from TDD_SPEC.md
+   - Write test cases (RED)
+   - Implement function (GREEN)
+   - Refactor (keep GREEN)
+2. **Modules to implement:**
+   - `src/transforms/join_transforms.py` (Task 1)
+   - `src/transforms/engagement_transforms.py` (Task 2)
+   - `src/transforms/performance_transforms.py` (Task 3)
+   - `src/transforms/session_transforms.py` (Task 4)
+   - `src/utils/data_quality.py` (Task 5)
+3. **Target:** >80% test coverage
 
-### Phase 3: Dashboards (2-3 hours)
+### Phase 3: Integration & Jobs (2-3 hours)
+1. Implement Spark job orchestration in `src/jobs/`
+2. Write integration tests
+3. Test end-to-end pipeline
+4. Write results to PostgreSQL
+
+### Phase 4: Dashboards (2-3 hours)
 1. Create PostgreSQL datasets in Superset
 2. Build 30+ charts across 4 dashboards
 3. Configure filters and cross-filtering
 4. Export dashboard JSONs for version control
 
-### Phase 4: Optimization (2 hours)
+### Phase 5: Optimization (2 hours)
 1. Run Spark jobs and capture UI screenshots
 2. Identify 3+ bottlenecks
 3. Implement optimizations (salting, AQE, etc.)
 4. Validate performance improvements
 
-### Phase 5: Documentation (1-2 hours)
+### Phase 6: Documentation (1-2 hours)
 1. Write comprehensive REPORT.md
 2. Update README and architecture docs
 3. Add code comments and docstrings
 4. Create architecture diagrams
 
-**Total Estimated Time:** 8-12 hours
+**Total Estimated Time:** 10-15 hours (with TDD)
 
 ---
 
