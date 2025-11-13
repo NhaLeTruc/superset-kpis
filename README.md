@@ -27,38 +27,45 @@ This branch contains **comprehensive documentation** for implementing the GoodNo
    - Test fixtures and factory functions
    - **Required reading before writing any code**
 
-2. **[IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)** ⭐
+2. **[TDD_ENFORCEMENT_GUIDE.md](./docs/TDD_ENFORCEMENT_GUIDE.md)** 🔒 **How to Ensure TDD Compliance**
+   - 5-layer enforcement system explained
+   - Session start templates for AI assistants
+   - User commands to challenge violations
+   - Git hooks and automated prevention
+   - Quick reference card and troubleshooting
+
+3. **[IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)** ⭐
    - Complete task-by-task implementation guide
    - Spark optimization techniques explained
    - 5-phase development approach
    - Estimated timelines and success metrics
 
-3. **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)**
+4. **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)**
    - System architecture diagrams
    - Component descriptions and interactions
    - Data flow and processing pipeline
    - Production deployment strategies
    - Performance benchmarks
 
-4. **[PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)**
+5. **[PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)**
    - Complete directory tree
    - File naming conventions
    - Code organization principles
    - Getting started guide
 
-5. **[SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)**
+6. **[SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)**
    - Prerequisites and system requirements
    - Quick start (5 minutes)
    - Detailed setup instructions
    - Troubleshooting common issues
 
-6. **[SUPERSET_DASHBOARDS.md](./docs/SUPERSET_DASHBOARDS.md)**
+7. **[SUPERSET_DASHBOARDS.md](./docs/SUPERSET_DASHBOARDS.md)**
    - 4 interactive dashboard designs
    - Chart specifications with SQL queries
    - Dashboard customization guide
    - Best practices
 
-7. **[challenge/TheChallenge.md](./challenge/TheChallenge.md)**
+8. **[challenge/TheChallenge.md](./challenge/TheChallenge.md)**
    - Original challenge requirements
    - Dataset descriptions
    - Task definitions (1-6)
@@ -338,16 +345,17 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed diagrams.
 
 ```
 claude-superset-demo/
-├── README.md                      ⬅️ You are here
+├── README.md                          ⬅️ You are here
 ├── docs/
-│   ├── TDD_SPEC.md                → 🔴🟢 Test-Driven Development specifications
-│   ├── IMPLEMENTATION_PLAN.md     → Comprehensive implementation guide
-│   ├── ARCHITECTURE.md            → System architecture and design
-│   ├── PROJECT_STRUCTURE.md       → Directory organization
-│   ├── SETUP_GUIDE.md             → Installation and setup
-│   └── SUPERSET_DASHBOARDS.md     → Dashboard specifications
+│   ├── TDD_SPEC.md                    → 🔴🟢 Test-Driven Development specifications
+│   ├── TDD_ENFORCEMENT_GUIDE.md       → 🔒 TDD enforcement system guide
+│   ├── IMPLEMENTATION_PLAN.md         → Comprehensive implementation guide
+│   ├── ARCHITECTURE.md                → System architecture and design
+│   ├── PROJECT_STRUCTURE.md           → Directory organization
+│   ├── SETUP_GUIDE.md                 → Installation and setup
+│   └── SUPERSET_DASHBOARDS.md         → Dashboard specifications
 └── challenge/
-    └── TheChallenge.md            → Original challenge requirements
+    └── TheChallenge.md                → Original challenge requirements
 ```
 
 ---
