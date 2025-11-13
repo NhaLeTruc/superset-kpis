@@ -1,0 +1,149 @@
+{
+  "dashboard_title": "Performance Monitoring - GoodNote Analytics",
+  "description": "Real-time performance metrics, anomaly detection, and device correlation analysis",
+  "slug": "performance-monitoring",
+  "published": true,
+  "metadata": {
+    "refresh_frequency": 1800
+  },
+  "charts": [
+    {
+      "slice_name": "P95 Load Time by Version",
+      "viz_type": "line",
+      "description": "95th percentile load time trend by app version",
+      "params": {
+        "datasource": "performance_by_version",
+        "viz_type": "line",
+        "x_axis": "metric_date",
+        "metrics": ["p95_duration_ms"],
+        "groupby": ["app_version"],
+        "time_grain_sqla": "P1D",
+        "time_range": "Last 30 days",
+        "y_axis_format": ",d",
+        "y_axis_label": "P95 Duration (ms)"
+      },
+      "query_context": {
+        "sql": "SELECT\n  metric_date,\n  app_version,\n  p50_duration_ms,\n  p95_duration_ms,\n  p99_duration_ms,\n  total_interactions\nFROM performance_by_version\nWHERE metric_date >= CURRENT_DATE - INTERVAL '30 days'\nORDER BY metric_date DESC, app_version"
+      },
+      "cache_timeout": 1800
+    },
+    {
+      "slice_name": "Device Performance Comparison",
+      "viz_type": "dist_bar",
+      "description": "Average load time by device type",
+      "params": {
+        "datasource": "device_performance",
+        "viz_type": "dist_bar",
+        "groupby": ["device_type"],
+        "metrics": ["AVG(avg_duration_ms)", "AVG(p95_duration_ms)"],
+        "time_range": "Last 7 days",
+        "order_desc": true
+      },
+      "query_context": {
+        "sql": "SELECT\n  device_type,\n  AVG(avg_duration_ms) as avg_load_time,\n  AVG(p95_duration_ms) as p95_load_time,\n  SUM(total_interactions) as total_interactions\nFROM device_performance\nWHERE metric_date >= CURRENT_DATE - INTERVAL '7 days'\nGROUP BY device_type\nORDER BY avg_load_time DESC"
+      },
+      "cache_timeout": 1800
+    },
+    {
+      "slice_name": "Performance Anomalies Alert Table",
+      "viz_type": "table",
+      "description": "Recent performance anomalies detected",
+      "params": {
+        "datasource": "performance_anomalies",
+        "viz_type": "table",
+        "groupby": ["detected_at", "severity", "app_version", "metric_name", "metric_value", "z_score", "description"],
+        "metrics": [],
+        "row_limit": 50,
+        "order_desc": true,
+        "orderby": [["detected_at", false]]
+      },
+      "query_context": {
+        "sql": "SELECT\n  TO_CHAR(detected_at, 'YYYY-MM-DD HH24:MI') as detected_time,\n  severity,\n  app_version,\n  device_type,\n  metric_name,\n  ROUND(metric_value, 2) as value,\n  ROUND(z_score, 2) as z_score,\n  description\nFROM performance_anomalies\nWHERE detected_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'\nORDER BY detected_at DESC, severity DESC\nLIMIT 50"
+      },
+      "cache_timeout": 1800
+    },
+    {
+      "slice_name": "P99 vs P50 Gap",
+      "viz_type": "line",
+      "description": "Gap between P99 and P50 (latency variance)",
+      "params": {
+        "datasource": "performance_by_version",
+        "viz_type": "line",
+        "x_axis": "metric_date",
+        "metrics": ["p99_duration_ms - p50_duration_ms"],
+        "groupby": ["app_version"],
+        "time_range": "Last 30 days",
+        "y_axis_label": "P99-P50 Gap (ms)"
+      },
+      "query_context": {
+        "sql": "SELECT\n  metric_date,\n  app_version,\n  (p99_duration_ms - p50_duration_ms) as latency_gap\nFROM performance_by_version\nWHERE metric_date >= CURRENT_DATE - INTERVAL '30 days'\nORDER BY metric_date DESC"
+      },
+      "cache_timeout": 1800
+    },
+    {
+      "slice_name": "Critical Anomalies Count",
+      "viz_type": "big_number_total",
+      "description": "Count of critical anomalies in last 24h",
+      "params": {
+        "datasource": "performance_anomalies",
+        "viz_type": "big_number_total",
+        "metric": "COUNT(*)",
+        "time_range": "Last 24 hours",
+        "where": "severity = 'critical'"
+      },
+      "query_context": {
+        "sql": "SELECT COUNT(*) as critical_anomalies\nFROM performance_anomalies\nWHERE detected_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'\n  AND severity = 'critical'"
+      },
+      "cache_timeout": 600
+    },
+    {
+      "slice_name": "Performance by App Version Heatmap",
+      "viz_type": "heatmap",
+      "description": "Performance heatmap across versions and dates",
+      "params": {
+        "datasource": "performance_by_version",
+        "viz_type": "heatmap",
+        "x_axis": "metric_date",
+        "y_axis": "app_version",
+        "metric": "p95_duration_ms",
+        "linear_color_scheme": "green_yellow_red",
+        "time_range": "Last 14 days"
+      },
+      "query_context": {
+        "sql": "SELECT\n  metric_date,\n  app_version,\n  p95_duration_ms\nFROM performance_by_version\nWHERE metric_date >= CURRENT_DATE - INTERVAL '14 days'\nORDER BY metric_date DESC, app_version"
+      },
+      "cache_timeout": 1800
+    }
+  ],
+  "filters": [
+    {
+      "filter_name": "App Version",
+      "filter_type": "filter_select",
+      "targets": [
+        ["performance_by_version", "app_version"],
+        ["performance_anomalies", "app_version"]
+      ],
+      "defaultValue": null
+    },
+    {
+      "filter_name": "Date Range",
+      "filter_type": "filter_time",
+      "targets": [
+        ["performance_by_version", "metric_date"],
+        ["device_performance", "metric_date"]
+      ],
+      "defaultValue": "Last 30 days"
+    },
+    {
+      "filter_name": "Severity",
+      "filter_type": "filter_select",
+      "targets": [["performance_anomalies", "severity"]],
+      "defaultValue": null,
+      "options": ["critical", "high", "medium", "low"]
+    }
+  ],
+  "refresh_schedule": {
+    "enabled": true,
+    "crontab": "*/30 * * * *"
+  }
+}

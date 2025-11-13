@@ -1,0 +1,204 @@
+{
+  "dashboard_title": "Session Analytics - GoodNote Analytics",
+  "description": "Session behavior analysis, bounce rates, and engagement patterns",
+  "slug": "session-analytics",
+  "published": true,
+  "metadata": {
+    "refresh_frequency": 21600
+  },
+  "charts": [
+    {
+      "slice_name": "Session Duration Treemap",
+      "viz_type": "treemap",
+      "description": "Session duration distribution by buckets",
+      "params": {
+        "datasource": "session_metrics",
+        "viz_type": "treemap",
+        "groupby": ["CASE\n  WHEN session_duration_ms < 60000 THEN '< 1 min'\n  WHEN session_duration_ms < 300000 THEN '1-5 min'\n  WHEN session_duration_ms < 900000 THEN '5-15 min'\n  WHEN session_duration_ms < 1800000 THEN '15-30 min'\n  ELSE '> 30 min'\nEND"],
+        "metric": "COUNT(*)",
+        "color_scheme": "supersetColors"
+      },
+      "query_context": {
+        "sql": "SELECT\n  CASE\n    WHEN session_duration_ms < 60000 THEN '< 1 min'\n    WHEN session_duration_ms < 300000 THEN '1-5 min'\n    WHEN session_duration_ms < 900000 THEN '5-15 min'\n    WHEN session_duration_ms < 1800000 THEN '15-30 min'\n    ELSE '> 30 min'\n  END as duration_bucket,\n  COUNT(*) as session_count,\n  ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage\nFROM session_metrics\nGROUP BY 1\nORDER BY MIN(session_duration_ms)"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Action Distribution Pie Chart",
+      "viz_type": "pie",
+      "description": "Distribution of sessions by action count",
+      "params": {
+        "datasource": "session_metrics",
+        "viz_type": "pie",
+        "groupby": ["CASE\n  WHEN actions_count = 1 THEN '1 action (Bounce)'\n  WHEN actions_count BETWEEN 2 AND 3 THEN '2-3 actions'\n  WHEN actions_count BETWEEN 4 AND 10 THEN '4-10 actions'\n  ELSE '> 10 actions'\nEND"],
+        "metric": "COUNT(*)",
+        "donut": true,
+        "show_labels": true,
+        "labels_outside": true
+      },
+      "query_context": {
+        "sql": "SELECT\n  CASE\n    WHEN actions_count = 1 THEN '1 action (Bounce)'\n    WHEN actions_count BETWEEN 2 AND 3 THEN '2-3 actions'\n    WHEN actions_count BETWEEN 4 AND 10 THEN '4-10 actions'\n    ELSE '> 10 actions'\n  END as action_bucket,\n  COUNT(*) as session_count\nFROM session_metrics\nGROUP BY 1\nORDER BY MIN(actions_count)"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Bounce Rate by Device",
+      "viz_type": "dist_bar",
+      "description": "Bounce rate comparison across devices",
+      "params": {
+        "datasource": "bounce_rates",
+        "viz_type": "dist_bar",
+        "groupby": ["dimension_value"],
+        "metrics": ["AVG(bounce_rate)"],
+        "where": "dimension_name = 'device_type'",
+        "order_desc": true,
+        "y_axis_format": ".2%"
+      },
+      "query_context": {
+        "sql": "SELECT\n  dimension_value as device_type,\n  AVG(bounce_rate) as avg_bounce_rate,\n  SUM(total_sessions) as total_sessions,\n  SUM(bounced_sessions) as bounced_sessions\nFROM bounce_rates\nWHERE dimension_name = 'device_type'\nGROUP BY dimension_value\nORDER BY avg_bounce_rate DESC"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Overall Bounce Rate Gauge",
+      "viz_type": "gauge_chart",
+      "description": "Overall bounce rate metric",
+      "params": {
+        "datasource": "bounce_rates",
+        "viz_type": "gauge_chart",
+        "metric": "AVG(bounce_rate)",
+        "where": "dimension_name IS NULL",
+        "y_axis_format": ".2%"
+      },
+      "query_context": {
+        "sql": "SELECT AVG(bounce_rate) as overall_bounce_rate\nFROM bounce_rates\nWHERE dimension_name IS NULL\n  AND metric_date >= CURRENT_DATE - INTERVAL '7 days'"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Bounce Rate Trend",
+      "viz_type": "line",
+      "description": "Daily bounce rate trend",
+      "params": {
+        "datasource": "bounce_rates",
+        "viz_type": "line",
+        "x_axis": "metric_date",
+        "metrics": ["bounce_rate"],
+        "groupby": [],
+        "where": "dimension_name IS NULL",
+        "time_grain_sqla": "P1D",
+        "time_range": "Last 30 days",
+        "y_axis_format": ".2%"
+      },
+      "query_context": {
+        "sql": "SELECT\n  metric_date,\n  bounce_rate,\n  total_sessions,\n  bounced_sessions\nFROM bounce_rates\nWHERE dimension_name IS NULL\n  AND metric_date >= CURRENT_DATE - INTERVAL '30 days'\nORDER BY metric_date"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Avg Session Duration by Device",
+      "viz_type": "dist_bar",
+      "description": "Average session duration by device type",
+      "params": {
+        "datasource": "session_metrics",
+        "viz_type": "dist_bar",
+        "groupby": ["device_type"],
+        "metrics": ["AVG(session_duration_ms)/1000"],
+        "order_desc": true,
+        "y_axis_label": "Avg Duration (seconds)"
+      },
+      "query_context": {
+        "sql": "SELECT\n  device_type,\n  AVG(session_duration_ms)/1000 as avg_duration_seconds,\n  AVG(actions_count) as avg_actions,\n  COUNT(*) as session_count\nFROM session_metrics\nGROUP BY device_type\nORDER BY avg_duration_seconds DESC"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Bounce Rate by Country",
+      "viz_type": "country_map",
+      "description": "Geographic bounce rate distribution",
+      "params": {
+        "datasource": "bounce_rates",
+        "viz_type": "country_map",
+        "entity": "dimension_value",
+        "metric": "AVG(bounce_rate)",
+        "where": "dimension_name = 'country'",
+        "linear_color_scheme": "red_yellow_green"
+      },
+      "query_context": {
+        "sql": "SELECT\n  dimension_value as country,\n  AVG(bounce_rate) as avg_bounce_rate\nFROM bounce_rates\nWHERE dimension_name = 'country'\nGROUP BY dimension_value"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Session Metrics Summary Table",
+      "viz_type": "table",
+      "description": "Summary table of session metrics",
+      "params": {
+        "datasource": "session_metrics",
+        "viz_type": "table",
+        "groupby": [],
+        "metrics": [
+          "COUNT(*)",
+          "AVG(session_duration_ms)/1000",
+          "AVG(actions_count)",
+          "SUM(CASE WHEN is_bounce = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)"
+        ],
+        "column_aliases": {
+          "COUNT(*)": "Total Sessions",
+          "AVG(session_duration_ms)/1000": "Avg Duration (sec)",
+          "AVG(actions_count)": "Avg Actions",
+          "SUM(CASE WHEN is_bounce = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)": "Bounce Rate (%)"
+        }
+      },
+      "query_context": {
+        "sql": "SELECT\n  COUNT(*) as total_sessions,\n  ROUND(AVG(session_duration_ms)/1000, 2) as avg_duration_sec,\n  ROUND(AVG(actions_count), 2) as avg_actions_per_session,\n  ROUND(SUM(CASE WHEN is_bounce = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as bounce_rate_pct\nFROM session_metrics"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Actions per Session Distribution",
+      "viz_type": "histogram",
+      "description": "Histogram of actions per session",
+      "params": {
+        "datasource": "session_metrics",
+        "viz_type": "histogram",
+        "all_columns_x": "actions_count",
+        "row_limit": 10000,
+        "bins": 20,
+        "x_axis_label": "Actions per Session",
+        "y_axis_label": "Session Count"
+      },
+      "query_context": {
+        "sql": "SELECT actions_count\nFROM session_metrics\nWHERE actions_count <= 50\nLIMIT 10000"
+      },
+      "cache_timeout": 86400
+    }
+  ],
+  "filters": [
+    {
+      "filter_name": "Date Range",
+      "filter_type": "filter_time",
+      "targets": [
+        ["session_metrics", "session_start_time"],
+        ["bounce_rates", "metric_date"]
+      ],
+      "defaultValue": "Last 30 days"
+    },
+    {
+      "filter_name": "Device Type",
+      "filter_type": "filter_select",
+      "targets": [["session_metrics", "device_type"]],
+      "defaultValue": null
+    },
+    {
+      "filter_name": "Country",
+      "filter_type": "filter_select",
+      "targets": [["session_metrics", "country"]],
+      "defaultValue": null
+    }
+  ],
+  "refresh_schedule": {
+    "enabled": true,
+    "crontab": "0 */6 * * *"
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "dashboard_title": "User Engagement Deep Dive - GoodNote Analytics",
+  "description": "Detailed user engagement metrics, cohort analysis, and power user identification",
+  "slug": "user-engagement-deep-dive",
+  "published": true,
+  "metadata": {
+    "refresh_frequency": 21600
+  },
+  "charts": [
+    {
+      "slice_name": "Cohort Retention Heatmap",
+      "viz_type": "heatmap",
+      "description": "Weekly cohort retention over 26 weeks",
+      "params": {
+        "datasource": "cohort_retention",
+        "viz_type": "heatmap",
+        "x_axis": "week_number",
+        "y_axis": "cohort_week",
+        "metric": "retention_rate",
+        "linear_color_scheme": "red_yellow_green",
+        "normalize_across": "heatmap"
+      },
+      "query_context": {
+        "sql": "SELECT\n  cohort_week,\n  week_number,\n  retention_rate,\n  cohort_size,\n  retained_users\nFROM cohort_retention\nWHERE week_number <= 26\nORDER BY cohort_week DESC, week_number"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Power Users Table",
+      "viz_type": "table",
+      "description": "Top power users with engagement metrics",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "table",
+        "groupby": ["user_id", "country", "device_type", "subscription_type"],
+        "metrics": ["total_interactions", "total_duration_hours"],
+        "row_limit": 100,
+        "order_desc": true,
+        "orderby": [["total_duration_hours", false]]
+      },
+      "query_context": {
+        "sql": "SELECT\n  user_id,\n  total_interactions,\n  total_duration_hours,\n  ROUND(avg_duration_ms/1000, 2) as avg_seconds,\n  country,\n  device_type,\n  subscription_type,\n  join_date\nFROM power_users\nORDER BY total_duration_hours DESC\nLIMIT 100"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Engagement Distribution Histogram",
+      "viz_type": "histogram",
+      "description": "Distribution of user engagement levels",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "histogram",
+        "all_columns_x": "total_duration_hours",
+        "row_limit": 10000,
+        "bins": 50
+      },
+      "query_context": {
+        "sql": "SELECT total_duration_hours FROM power_users"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Retention by Cohort Week",
+      "viz_type": "line",
+      "description": "Retention curves for different cohorts",
+      "params": {
+        "datasource": "cohort_retention",
+        "viz_type": "line",
+        "x_axis": "week_number",
+        "metrics": ["retention_rate"],
+        "groupby": ["cohort_week"],
+        "row_limit": 10,
+        "y_axis_format": ".2%"
+      },
+      "query_context": {
+        "sql": "SELECT\n  cohort_week,\n  week_number,\n  retention_rate\nFROM cohort_retention\nWHERE cohort_week IN (\n  SELECT cohort_week\n  FROM cohort_retention\n  GROUP BY cohort_week\n  ORDER BY cohort_week DESC\n  LIMIT 10\n)\nAND week_number <= 12\nORDER BY cohort_week DESC, week_number"
+      },
+      "cache_timeout": 21600
+    },
+    {
+      "slice_name": "Power Users by Country",
+      "viz_type": "pie",
+      "description": "Power user distribution by country",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "pie",
+        "groupby": ["country"],
+        "metric": "COUNT(*)",
+        "donut": true,
+        "show_labels": true,
+        "labels_outside": true
+      },
+      "query_context": {
+        "sql": "SELECT country, COUNT(*) as user_count\nFROM power_users\nGROUP BY country\nORDER BY user_count DESC"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Power Users by Device Type",
+      "viz_type": "pie",
+      "description": "Power user distribution by device",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "pie",
+        "groupby": ["device_type"],
+        "metric": "COUNT(*)",
+        "donut": true,
+        "show_labels": true
+      },
+      "query_context": {
+        "sql": "SELECT device_type, COUNT(*) as user_count\nFROM power_users\nGROUP BY device_type\nORDER BY user_count DESC"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Week 0 vs Week 12 Retention",
+      "viz_type": "compare",
+      "description": "Comparison of initial vs 12-week retention",
+      "params": {
+        "datasource": "cohort_retention",
+        "viz_type": "big_number_total",
+        "metric": "AVG(retention_rate)",
+        "compare_lag": 12,
+        "compare_suffix": "weeks"
+      },
+      "query_context": {
+        "sql": "SELECT\n  week_number,\n  AVG(retention_rate) as avg_retention\nFROM cohort_retention\nWHERE week_number IN (0, 12)\nGROUP BY week_number\nORDER BY week_number"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Avg Engagement Time by Subscription",
+      "viz_type": "dist_bar",
+      "description": "Average engagement hours by subscription type",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "dist_bar",
+        "groupby": ["subscription_type"],
+        "metrics": ["AVG(total_duration_hours)"],
+        "order_desc": true
+      },
+      "query_context": {
+        "sql": "SELECT\n  subscription_type,\n  AVG(total_duration_hours) as avg_hours,\n  COUNT(*) as user_count\nFROM power_users\nGROUP BY subscription_type\nORDER BY avg_hours DESC"
+      },
+      "cache_timeout": 86400
+    }
+  ],
+  "filters": [
+    {
+      "filter_name": "Country",
+      "filter_type": "filter_select",
+      "targets": [["power_users", "country"]],
+      "defaultValue": null
+    },
+    {
+      "filter_name": "Device Type",
+      "filter_type": "filter_select",
+      "targets": [["power_users", "device_type"]],
+      "defaultValue": null
+    },
+    {
+      "filter_name": "Subscription Type",
+      "filter_type": "filter_select",
+      "targets": [["power_users", "subscription_type"]],
+      "defaultValue": null
+    }
+  ],
+  "refresh_schedule": {
+    "enabled": true,
+    "crontab": "0 */6 * * *"
+  }
+}

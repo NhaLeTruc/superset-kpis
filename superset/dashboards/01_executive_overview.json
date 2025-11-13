@@ -1,0 +1,162 @@
+{
+  "dashboard_title": "Executive Overview - GoodNote Analytics",
+  "description": "High-level KPIs and trends for executive decision-making",
+  "slug": "executive-overview",
+  "published": true,
+  "css": "",
+  "position_json": {
+    "DASHBOARD_VERSION_KEY": "v2",
+    "GRID_ID": {
+      "type": "GRID",
+      "id": "GRID_ID",
+      "children": [],
+      "parents": ["ROOT_ID"]
+    }
+  },
+  "metadata": {
+    "filter_scopes": {},
+    "default_filters": "{}",
+    "refresh_frequency": 3600,
+    "timed_refresh_immune_slices": []
+  },
+  "charts": [
+    {
+      "slice_name": "DAU/MAU Time Series",
+      "viz_type": "line",
+      "description": "Daily and Monthly Active Users trend over time",
+      "params": {
+        "datasource": "daily_active_users",
+        "viz_type": "line",
+        "x_axis": "date",
+        "metrics": ["dau"],
+        "groupby": [],
+        "time_grain_sqla": "P1D",
+        "time_range": "Last 90 days",
+        "show_legend": true,
+        "line_interpolation": "linear",
+        "color_scheme": "supersetColors"
+      },
+      "query_context": {
+        "sql": "SELECT date, dau, total_interactions FROM daily_active_users WHERE date >= CURRENT_DATE - INTERVAL '90 days' ORDER BY date"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Stickiness Ratio Gauge",
+      "viz_type": "gauge_chart",
+      "description": "Current stickiness ratio (DAU/MAU)",
+      "params": {
+        "datasource": "user_stickiness",
+        "viz_type": "gauge_chart",
+        "metric": "stickiness",
+        "groupby": [],
+        "time_range": "Last 1 day"
+      },
+      "query_context": {
+        "sql": "SELECT AVG(stickiness) as avg_stickiness FROM user_stickiness WHERE date >= CURRENT_DATE - INTERVAL '7 days'"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Geographic Heatmap",
+      "viz_type": "country_map",
+      "description": "User distribution by country",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "country_map",
+        "entity": "country",
+        "metric": "COUNT(*)",
+        "linear_color_scheme": "blue_white_yellow"
+      },
+      "query_context": {
+        "sql": "SELECT country, COUNT(*) as user_count FROM power_users GROUP BY country ORDER BY user_count DESC"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Top 10 Countries by Users",
+      "viz_type": "dist_bar",
+      "description": "Bar chart of top countries",
+      "params": {
+        "datasource": "power_users",
+        "viz_type": "dist_bar",
+        "groupby": ["country"],
+        "metrics": ["COUNT(*)"],
+        "row_limit": 10,
+        "color_scheme": "supersetColors"
+      },
+      "query_context": {
+        "sql": "SELECT country, COUNT(*) as user_count FROM power_users GROUP BY country ORDER BY user_count DESC LIMIT 10"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Monthly Active Users Trend",
+      "viz_type": "line",
+      "description": "MAU trend over months",
+      "params": {
+        "datasource": "monthly_active_users",
+        "viz_type": "line",
+        "x_axis": "year_month",
+        "metrics": ["mau"],
+        "groupby": [],
+        "time_range": "Last 12 months",
+        "show_legend": true
+      },
+      "query_context": {
+        "sql": "SELECT year_month, mau, total_interactions, avg_duration_ms FROM monthly_active_users ORDER BY year_month DESC LIMIT 12"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "Engagement Summary Table",
+      "viz_type": "table",
+      "description": "Summary table of key metrics",
+      "params": {
+        "datasource": "daily_active_users",
+        "viz_type": "table",
+        "groupby": [],
+        "metrics": ["AVG(dau)", "AVG(total_interactions)", "AVG(avg_duration_ms)"],
+        "time_range": "Last 30 days"
+      },
+      "query_context": {
+        "sql": "SELECT\n  AVG(dau) as avg_daily_active_users,\n  AVG(total_interactions) as avg_daily_interactions,\n  AVG(total_duration_ms)/1000/60 as avg_minutes_per_day\nFROM daily_active_users\nWHERE date >= CURRENT_DATE - INTERVAL '30 days'"
+      },
+      "cache_timeout": 3600
+    },
+    {
+      "slice_name": "Stickiness Trend",
+      "viz_type": "line",
+      "description": "Stickiness ratio over time",
+      "params": {
+        "datasource": "user_stickiness",
+        "viz_type": "line",
+        "x_axis": "date",
+        "metrics": ["stickiness"],
+        "groupby": [],
+        "time_grain_sqla": "P1D",
+        "time_range": "Last 90 days",
+        "y_axis_format": ".2%"
+      },
+      "query_context": {
+        "sql": "SELECT date, stickiness, dau, mau FROM user_stickiness WHERE date >= CURRENT_DATE - INTERVAL '90 days' ORDER BY date"
+      },
+      "cache_timeout": 3600
+    }
+  ],
+  "filters": [
+    {
+      "filter_name": "Date Range",
+      "filter_type": "filter_time",
+      "targets": [
+        ["daily_active_users", "date"],
+        ["user_stickiness", "date"]
+      ],
+      "defaultValue": "Last 90 days"
+    }
+  ],
+  "refresh_schedule": {
+    "enabled": true,
+    "crontab": "0 * * * *"
+  }
+}
