@@ -40,8 +40,8 @@ def identify_hot_keys(
     # Using approxQuantile with relative error 0.01
     threshold_value = key_counts.approxQuantile("count", [threshold_percentile], 0.01)[0]
 
-    # Filter to only keys above the threshold
-    hot_keys = key_counts.filter(F.col("count") > threshold_value)
+    # Filter to only keys at or above the threshold (>= to include threshold value)
+    hot_keys = key_counts.filter(F.col("count") >= threshold_value)
 
     return hot_keys
 

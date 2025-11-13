@@ -679,8 +679,11 @@ class TestCalculateCohortRetention:
         )
 
         # Assert
-        cohort_a_results = result_df.filter(F.col("cohort_week") == date(2023, 1, 1)).collect()
-        cohort_b_results = result_df.filter(F.col("cohort_week") == date(2023, 1, 8)).collect()
+        # Note: date_trunc("week") returns Monday of the week
+        # 2023-01-01 (Sunday) → 2022-12-26 (Monday)
+        # 2023-01-08 (Sunday) → 2023-01-02 (Monday)
+        cohort_a_results = result_df.filter(F.col("cohort_week") == date(2022, 12, 26)).collect()
+        cohort_b_results = result_df.filter(F.col("cohort_week") == date(2023, 1, 2)).collect()
 
         assert len(cohort_a_results) > 0
         assert cohort_a_results[0]["cohort_size"] == 50
