@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Spark development environment for running tests
+  spark-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: goodnote-spark-dev
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./data:/app/data
+      - ./pytest.ini:/app/pytest.ini
+      - ./requirements.txt:/app/requirements.txt
+    environment:
+      - SPARK_MODE=local
+      - PYTHONPATH=/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command: tail -f /dev/null  # Keep container running
+
+  # PostgreSQL database for analytics
+  postgres:
+    image: postgres:15-alpine
+    container_name: goodnote-postgres
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analytics_user
+      POSTGRES_PASSWORD: analytics_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytics_user -d analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
