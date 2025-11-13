@@ -120,3 +120,99 @@ def detect_nulls(
     result_df = rows_with_nulls.withColumn("null_columns", null_columns_filtered)
 
     return result_df
+
+
+def detect_outliers(
+    df: DataFrame,
+    column: str,
+    method: str = "iqr",
+    iqr_multiplier: float = 1.5,
+    threshold_min: float = None,
+    threshold_max: float = None
+) -> DataFrame:
+    """
+    Detect outliers in a numeric column.
+
+    Methods:
+        - "iqr": Interquartile Range (Q1 - 1.5*IQR, Q3 + 1.5*IQR)
+        - "threshold": Fixed min/max thresholds
+
+    Args:
+        df: DataFrame to check
+        column: Numeric column to analyze
+        method: "iqr" or "threshold"
+        iqr_multiplier: Multiplier for IQR method (default: 1.5)
+        threshold_min: Minimum threshold (for threshold method)
+        threshold_max: Maximum threshold (for threshold method)
+
+    Returns:
+        DataFrame with only outlier rows, plus columns:
+            - outlier_reason (StringType): "below_min", "above_max", or "iqr_outlier"
+            - outlier_value (DoubleType): The outlier value
+    """
+    if method == "iqr":
+        # Calculate quartiles using approxQuantile
+        quantiles = df.approxQuantile(column, [0.25, 0.75], 0.01)
+        q1, q3 = quantiles[0], quantiles[1]
+        iqr = q3 - q1
+
+        # Calculate bounds
+        lower_bound = q1 - iqr_multiplier * iqr
+        upper_bound = q3 + iqr_multiplier * iqr
+
+        # Filter outliers
+        outliers = df.filter(
+            (F.col(column) < lower_bound) | (F.col(column) > upper_bound)
+        )
+
+        # Add outlier_reason and outlier_value
+        result_df = outliers.withColumn("outlier_value", F.col(column).cast("double"))
+        result_df = result_df.withColumn(
+            "outlier_reason",
+            F.when(F.col(column) < lower_bound, F.lit("iqr_outlier_below"))
+            .when(F.col(column) > upper_bound, F.lit("iqr_outlier_above"))
+            .otherwise(F.lit("iqr_outlier"))
+        )
+
+        return result_df
+
+    elif method == "threshold":
+        # Build filter condition based on thresholds
+        filter_condition = None
+
+        if threshold_min is not None:
+            filter_condition = F.col(column) < threshold_min
+
+        if threshold_max is not None:
+            max_condition = F.col(column) > threshold_max
+            if filter_condition is not None:
+                filter_condition = filter_condition | max_condition
+            else:
+                filter_condition = max_condition
+
+        # If no thresholds provided, return empty DataFrame
+        if filter_condition is None:
+            return df.limit(0).withColumn("outlier_reason", F.lit("")).withColumn("outlier_value", F.lit(0.0))
+
+        # Filter outliers
+        outliers = df.filter(filter_condition)
+
+        # Add outlier_value and outlier_reason
+        result_df = outliers.withColumn("outlier_value", F.col(column).cast("double"))
+
+        # Determine reason based on which threshold was violated
+        reason_expr = None
+        if threshold_min is not None and threshold_max is not None:
+            reason_expr = F.when(F.col(column) < threshold_min, F.lit("below_min")) \
+                          .when(F.col(column) > threshold_max, F.lit("above_max"))
+        elif threshold_min is not None:
+            reason_expr = F.lit("below_min")
+        elif threshold_max is not None:
+            reason_expr = F.lit("above_max")
+
+        result_df = result_df.withColumn("outlier_reason", reason_expr)
+
+        return result_df
+
+    else:
+        raise ValueError(f"Unknown method: {method}. Use 'iqr' or 'threshold'")

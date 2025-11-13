@@ -6,7 +6,7 @@ Reference: docs/TDD_SPEC.md - Task 5 (Data Quality Specifications)
 """
 import pytest
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, TimestampType
-from src.utils.data_quality import validate_schema, detect_nulls
+from src.utils.data_quality import validate_schema, detect_nulls, detect_outliers
 from datetime import datetime
 
 
@@ -175,3 +175,101 @@ class TestDetectNulls:
         # Row 2 should have NULL timestamp
         row2_nulls = results[1]["null_columns"]
         assert "timestamp" in row2_nulls, "Expected 'timestamp' in null_columns for row 2"
+
+
+class TestDetectOutliers:
+    """Tests for detect_outliers() function."""
+
+    def test_detect_outliers_iqr(self, spark):
+        """
+        GIVEN:
+            - 100 values: 1-100
+            - Q1=25, Q3=75, IQR=50
+            - Lower bound: 25 - 1.5*50 = -50
+            - Upper bound: 75 + 1.5*50 = 150
+            - Plus outliers: [-100, 200]
+        WHEN: detect_outliers(method="iqr") is called
+        THEN:
+            - Returns 2 rows (outliers: -100, 200)
+            - outlier_reason: ["iqr_outlier", "iqr_outlier"]
+            - outlier_value: [-100, 200]
+        """
+        # Arrange
+        schema = StructType([
+            StructField("id", IntegerType(), nullable=False),
+            StructField("value", IntegerType(), nullable=False)
+        ])
+
+        # Create 100 normal values (1-100) plus 2 outliers (-100, 200)
+        normal_data = [(i, i) for i in range(1, 101)]
+        outlier_data = [(101, -100), (102, 200)]
+        all_data = normal_data + outlier_data
+
+        df = spark.createDataFrame(all_data, schema=schema)
+
+        # Act
+        result_df = detect_outliers(df, column="value", method="iqr", iqr_multiplier=1.5)
+
+        # Assert
+        assert result_df.count() == 2, "Expected 2 outlier rows"
+
+        # Verify schema includes outlier columns
+        assert "outlier_reason" in result_df.columns, "Expected 'outlier_reason' column"
+        assert "outlier_value" in result_df.columns, "Expected 'outlier_value' column"
+
+        # Collect and verify results
+        results = sorted(result_df.collect(), key=lambda r: r["outlier_value"])
+
+        # First outlier: -100 (below lower bound)
+        assert results[0]["outlier_value"] == -100.0
+        assert "outlier" in results[0]["outlier_reason"].lower()
+
+        # Second outlier: 200 (above upper bound)
+        assert results[1]["outlier_value"] == 200.0
+        assert "outlier" in results[1]["outlier_reason"].lower()
+
+    def test_detect_outliers_threshold(self, spark):
+        """
+        GIVEN:
+            - Values: [100, 200, 1000, 29000000 (>8 hours)]
+            - threshold_max = 28800000 (8 hours in milliseconds)
+        WHEN: detect_outliers(method="threshold", threshold_max=28800000) is called
+        THEN:
+            - Returns 1 row with duration_ms = 29000000
+            - outlier_reason = "above_max"
+        """
+        # Arrange
+        schema = StructType([
+            StructField("id", IntegerType(), nullable=False),
+            StructField("duration_ms", LongType(), nullable=False)
+        ])
+
+        data = [
+            (1, 100),
+            (2, 200),
+            (3, 1000),
+            (4, 29000000)  # > 8 hours (outlier)
+        ]
+        df = spark.createDataFrame(data, schema=schema)
+
+        threshold_max = 28800000  # 8 hours in ms
+
+        # Act
+        result_df = detect_outliers(
+            df,
+            column="duration_ms",
+            method="threshold",
+            threshold_max=threshold_max
+        )
+
+        # Assert
+        assert result_df.count() == 1, "Expected 1 outlier row"
+
+        # Verify columns
+        assert "outlier_reason" in result_df.columns
+        assert "outlier_value" in result_df.columns
+
+        # Verify the outlier
+        result = result_df.collect()[0]
+        assert result["outlier_value"] == 29000000.0
+        assert result["outlier_reason"] == "above_max"
