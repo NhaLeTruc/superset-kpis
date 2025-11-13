@@ -124,9 +124,9 @@ def identify_power_users(
     Returns:
         DataFrame with power user metrics and metadata
     """
-    # Validate percentile
-    if percentile <= 0 or percentile >= 1:
-        raise ValueError("percentile must be between 0 and 1")
+    # Validate percentile (0.0 = all users, 1.0 = only top user)
+    if percentile < 0 or percentile > 1:
+        raise ValueError("percentile must be between 0 and 1 (inclusive)")
 
     # Filter outliers
     filtered_df = interactions_df.filter(F.col("duration_ms") <= max_duration_ms)
