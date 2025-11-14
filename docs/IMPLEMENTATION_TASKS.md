@@ -634,7 +634,8 @@ This phase implements Task 6 from IMPLEMENTATION_PLAN.md with full custom accumu
 - [x] Integrate accumulators into data processing logic
 - [x] Add tracking to `01_data_processing.py`
 - [x] Add tracking to `02_user_engagement.py`
-- [x] Integration pattern established for jobs 03 & 04
+- [x] Add tracking to `03_performance_metrics.py`
+- [x] Add tracking to `04_session_analysis.py`
 
 ### Task 13.3: Monitoring Output & Logging ✅
 - [x] Create `create_monitoring_context()` function
