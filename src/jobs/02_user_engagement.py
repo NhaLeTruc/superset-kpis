@@ -24,6 +24,7 @@ from pyspark.sql import DataFrame
 
 from src.config.spark_config import create_spark_session, configure_job_specific_settings
 from src.config.database_config import write_to_postgres
+from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 from src.transforms.engagement_transforms import (
     calculate_dau,
     calculate_mau,
@@ -200,9 +201,16 @@ def main():
     spark = create_spark_session(app_name="GoodNote - User Engagement")
     configure_job_specific_settings(spark, job_type="analytics")
 
+    # Create monitoring context
+    monitoring_ctx = create_monitoring_context(spark.sparkContext, "user_engagement")
+
     try:
         # Read enriched data
         enriched_df = read_enriched_data(spark, args.enriched_path)
+
+        # Track record count
+        record_count = enriched_df.count()
+        monitoring_ctx["record_counter"].add(record_count)
 
         # Compute all engagement metrics
         metrics = compute_engagement_metrics(enriched_df)
@@ -221,6 +229,10 @@ def main():
                 output_file = f"{args.output_path}/{metric_name}"
                 df.write.mode("overwrite").parquet(output_file)
                 print(f"   ✅ Wrote {metric_name}")
+
+        # Log monitoring summary
+        print("\n")
+        log_monitoring_summary(monitoring_ctx, "User Engagement Job")
 
         print("\n" + "=" * 60)
         print("✅ Job completed successfully!")

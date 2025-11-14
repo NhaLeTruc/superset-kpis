@@ -21,6 +21,7 @@ from pyspark.sql import functions as F
 from src.config.spark_config import create_spark_session, configure_job_specific_settings
 from src.transforms.join_transforms import optimized_join, identify_hot_keys
 from src.utils.data_quality import validate_schema, detect_nulls
+from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 
 
 def read_interactions(spark, path: str) -> DataFrame:
@@ -190,10 +191,17 @@ def main():
     spark = create_spark_session(app_name="GoodNote - Data Processing")
     configure_job_specific_settings(spark, job_type="etl")
 
+    # Create monitoring context
+    monitoring_ctx = create_monitoring_context(spark.sparkContext, "data_processing")
+
     try:
         # Read input data
         interactions_df = read_interactions(spark, args.interactions_path)
         metadata_df = read_metadata(spark, args.metadata_path)
+
+        # Track initial record count
+        interaction_count = interactions_df.count()
+        monitoring_ctx["record_counter"].add(interaction_count)
 
         # Validate data quality
         if not args.skip_validation:
@@ -207,6 +215,10 @@ def main():
 
         # Write output
         write_enriched_data(enriched_df, args.output_path)
+
+        # Log monitoring summary
+        print("\n")
+        log_monitoring_summary(monitoring_ctx, "Data Processing Job")
 
         print("\n" + "=" * 60)
         print("✅ Job completed successfully!")
