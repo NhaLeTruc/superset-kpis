@@ -72,3 +72,4 @@ docker/volumes/
 tmp/
 temp/
 *.tmp
+superset/*.db

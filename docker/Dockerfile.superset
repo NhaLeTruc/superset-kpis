@@ -1,0 +1,8 @@
+FROM apache/superset:latest
+
+# Install PostgreSQL driver
+# Note: Must install as root, but the venv is set up to include system packages
+USER root
+RUN /usr/local/bin/pip install --target=/app/.venv/lib/python3.10/site-packages psycopg2-binary
+
+USER superset
