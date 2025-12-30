@@ -5,7 +5,7 @@ services:
 
   # Spark Master Node
   spark-master:
-    image: apache/spark:3.5.0-python3
+    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
     container_name: ${CONTAINER_SPARK_MASTER:-goodnote-spark-master}
     environment:
       - SPARK_NO_DAEMONIZE=true
@@ -29,7 +29,7 @@ services:
 
   # Spark Worker Node 1
   spark-worker-1:
-    image: apache/spark:3.5.0-python3
+    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
     container_name: ${CONTAINER_SPARK_WORKER_1:-goodnote-spark-worker-1}
     environment:
       - SPARK_NO_DAEMONIZE=true
@@ -52,7 +52,7 @@ services:
 
   # Spark Worker Node 2
   spark-worker-2:
-    image: apache/spark:3.5.0-python3
+    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
     container_name: ${CONTAINER_SPARK_WORKER_2:-goodnote-spark-worker-2}
     environment:
       - SPARK_NO_DAEMONIZE=true
@@ -112,7 +112,7 @@ services:
   # =================================================================
 
   postgres:
-    image: postgres:15-alpine
+    image: ${POSTGRES_IMAGE:-postgres}:${POSTGRES_VERSION:-15-alpine}
     container_name: ${CONTAINER_POSTGRES:-goodnote-postgres}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-analytics}
@@ -136,7 +136,7 @@ services:
   # =================================================================
 
   redis:
-    image: redis:7-alpine
+    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-7-alpine}
     container_name: ${CONTAINER_REDIS:-goodnote-redis}
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -149,7 +149,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly ${REDIS_APPENDONLY:-yes}
 
   # =================================================================
   # Apache Superset (Business Intelligence & Dashboards)
@@ -159,17 +159,49 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.superset
+      args:
+        SUPERSET_IMAGE: ${SUPERSET_IMAGE:-apache/superset}
+        SUPERSET_VERSION: ${SUPERSET_VERSION:-latest}
     container_name: ${CONTAINER_SUPERSET:-goodnote-superset}
     environment:
+      # Admin Credentials
+      - SUPERSET_ADMIN_USERNAME=${SUPERSET_ADMIN_USERNAME:-admin}
+      - SUPERSET_ADMIN_PASSWORD=${SUPERSET_ADMIN_PASSWORD:-admin}
+      - SUPERSET_ADMIN_EMAIL=${SUPERSET_ADMIN_EMAIL:-admin@example.com}
+      - SUPERSET_ADMIN_FIRSTNAME=${SUPERSET_ADMIN_FIRSTNAME:-Admin}
+      - SUPERSET_ADMIN_LASTNAME=${SUPERSET_ADMIN_LASTNAME:-User}
+      # Security
       - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY:-CHANGE_THIS_SECRET_KEY}
       - SUPERSET_LOAD_EXAMPLES=${SUPERSET_LOAD_EXAMPLES:-no}
+      # Database Configuration (for data sources, not Superset metadata)
       - DATABASE_DB=${POSTGRES_DB:-analytics}
       - DATABASE_HOST=${POSTGRES_HOST:-postgres}
       - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
       - DATABASE_USER=${POSTGRES_USER:-analytics_user}
       - DATABASE_PORT=${POSTGRES_PORT:-5432}
+      # Superset Metadata Database
+      - SUPERSET_DB_TYPE=${SUPERSET_DB_TYPE:-sqlite}
+      - SUPERSET_DB_NAME=${SUPERSET_DB_NAME:-superset}
+      - SUPERSET_DB_HOST=${SUPERSET_DB_HOST:-${POSTGRES_HOST:-postgres}}
+      - SUPERSET_DB_PORT=${SUPERSET_DB_PORT:-${POSTGRES_PORT:-5432}}
+      - SUPERSET_DB_USER=${SUPERSET_DB_USER:-${POSTGRES_USER:-analytics_user}}
+      - SUPERSET_DB_PASSWORD=${SUPERSET_DB_PASSWORD:-${POSTGRES_PASSWORD:-analytics_pass}}
+      # Redis Configuration
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
+      # Superset Cache Configuration
+      - SUPERSET_CACHE_DEFAULT_TIMEOUT=${SUPERSET_CACHE_DEFAULT_TIMEOUT:-300}
+      - SUPERSET_DATA_CACHE_TIMEOUT=${SUPERSET_DATA_CACHE_TIMEOUT:-86400}
+      - SUPERSET_CACHE_REDIS_DB=${SUPERSET_CACHE_REDIS_DB:-1}
+      - SUPERSET_DATA_CACHE_REDIS_DB=${SUPERSET_DATA_CACHE_REDIS_DB:-2}
+      # Superset Application Settings
+      - SUPERSET_ROW_LIMIT=${SUPERSET_ROW_LIMIT:-5000}
+      - SUPERSET_WEBSERVER_PORT=${SUPERSET_WEBSERVER_PORT:-8088}
+      - SUPERSET_SQLLAB_TIMEOUT=${SUPERSET_SQLLAB_TIMEOUT:-300}
+      - SUPERSET_WEBSERVER_TIMEOUT=${SUPERSET_WEBSERVER_TIMEOUT:-300}
+      - SUPERSET_WTF_CSRF_ENABLED=${SUPERSET_WTF_CSRF_ENABLED:-True}
+      - SUPERSET_PUBLIC_ROLE_LIKE=${SUPERSET_PUBLIC_ROLE_LIKE:-Gamma}
+      # Config File Path
       - SUPERSET_CONFIG_PATH=/app/superset_home/superset_config.py
     ports:
       - "${SUPERSET_WEBSERVER_PORT:-8088}:8088"
@@ -188,7 +220,7 @@ services:
     # Initialize Superset on first run
     command: >
       sh -c "superset db upgrade &&
-      superset fab create-admin --username $${SUPERSET_ADMIN_USERNAME:-admin} --firstname $${SUPERSET_ADMIN_FIRSTNAME:-Admin} --lastname $${SUPERSET_ADMIN_LASTNAME:-User} --email $${SUPERSET_ADMIN_EMAIL:-admin@example.com} --password $${SUPERSET_ADMIN_PASSWORD:-admin} || true &&
+      superset fab create-admin --username \"$$SUPERSET_ADMIN_USERNAME\" --firstname \"$$SUPERSET_ADMIN_FIRSTNAME\" --lastname \"$$SUPERSET_ADMIN_LASTNAME\" --email \"$$SUPERSET_ADMIN_EMAIL\" --password \"$$SUPERSET_ADMIN_PASSWORD\" || true &&
       superset init &&
       superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
 

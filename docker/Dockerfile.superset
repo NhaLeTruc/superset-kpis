@@ -1,8 +1,13 @@
-FROM apache/superset:latest
+ARG SUPERSET_IMAGE=apache/superset
+ARG SUPERSET_VERSION=latest
+FROM ${SUPERSET_IMAGE}:${SUPERSET_VERSION}
 
 # Install PostgreSQL driver
 # Note: Must install as root, but the venv is set up to include system packages
 USER root
-RUN /usr/local/bin/pip install --target=/app/.venv/lib/python3.10/site-packages psycopg2-binary
+
+# Detect Python version dynamically and install psycopg2-binary
+RUN PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2) && \
+    /usr/local/bin/pip install --target=/app/.venv/lib/python${PYTHON_VERSION}/site-packages psycopg2-binary
 
 USER superset
