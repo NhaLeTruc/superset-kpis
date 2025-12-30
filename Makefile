@@ -144,21 +144,21 @@ test-specific:
 
 generate-data:
 	@echo "📊 Generating sample data (medium size)..."
-	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
+	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--medium \
 		--seed 42
 	@echo "✅ Sample data generated"
 
 generate-data-small:
 	@echo "📊 Generating small sample data (for quick testing)..."
-	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
+	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--small \
 		--seed 42
 	@echo "✅ Small sample data generated"
 
 generate-data-large:
 	@echo "📊 Generating large sample data (WARNING: may take several minutes)..."
-	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
+	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--large \
 		--seed 42
 	@echo "✅ Large sample data generated"
@@ -170,22 +170,22 @@ run-jobs:
 
 run-job-1:
 	@echo "⚡ Running Job 1: Data Processing..."
-	docker exec goodnote-spark-master python /opt/spark-apps/src/jobs/01_data_processing.py
+	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/01_data_processing.py
 	@echo "✅ Data Processing job completed"
 
 run-job-2:
 	@echo "⚡ Running Job 2: User Engagement..."
-	docker exec goodnote-spark-master python /opt/spark-apps/src/jobs/02_user_engagement.py
+	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/02_user_engagement.py
 	@echo "✅ User Engagement job completed"
 
 run-job-3:
 	@echo "⚡ Running Job 3: Performance Metrics..."
-	docker exec goodnote-spark-master python /opt/spark-apps/src/jobs/03_performance_metrics.py
+	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/03_performance_metrics.py
 	@echo "✅ Performance Metrics job completed"
 
 run-job-4:
 	@echo "⚡ Running Job 4: Session Analysis..."
-	docker exec goodnote-spark-master python /opt/spark-apps/src/jobs/04_session_analysis.py
+	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/04_session_analysis.py
 	@echo "✅ Session Analysis job completed"
 
 # ============================================================================
@@ -194,8 +194,8 @@ run-job-4:
 
 db-init:
 	@echo "🗄️  Initializing PostgreSQL database..."
-	docker exec goodnote-postgres psql -U postgres -d goodnote_analytics -f /docker-entrypoint-initdb.d/schema.sql
-	docker exec goodnote-postgres psql -U postgres -d goodnote_analytics -f /docker-entrypoint-initdb.d/indexes.sql
+	docker exec goodnote-postgres psql -U analytics_user -d analytics -f /docker-entrypoint-initdb.d/01_schema.sql
+	docker exec goodnote-postgres psql -U analytics_user -d analytics -f /docker-entrypoint-initdb.d/02_indexes.sql
 	@echo "✅ Database initialized"
 
 db-connect:

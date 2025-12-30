@@ -1,4 +1,5 @@
 # Spark Development Environment with Testing Tools
+# FROM bitnamilegacy/spark:3.5.0-debian-12-r17
 FROM apache/spark:3.5.0-python3
 
 # Switch to root to install packages

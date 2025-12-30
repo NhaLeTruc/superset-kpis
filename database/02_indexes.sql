@@ -149,11 +149,11 @@ CREATE INDEX IF NOT EXISTS idx_bounce_device_date ON bounce_rates(metric_date DE
 -- ============================================
 
 -- For efficient data cleanup/archival
-CREATE INDEX IF NOT EXISTS idx_dau_created_archival ON daily_active_users(created_at)
-    WHERE created_at < CURRENT_DATE - INTERVAL '90 days';
+-- Note: CURRENT_DATE is not immutable, so these indexes cannot use it in WHERE clause
+-- Instead, create regular indexes on created_at which can still be used for archival queries
+CREATE INDEX IF NOT EXISTS idx_dau_created_archival ON daily_active_users(created_at);
 
-CREATE INDEX IF NOT EXISTS idx_sessions_created_archival ON session_metrics(created_at)
-    WHERE created_at < CURRENT_DATE - INTERVAL '90 days';
+CREATE INDEX IF NOT EXISTS idx_sessions_created_archival ON session_metrics(created_at);
 
 
 -- ============================================
