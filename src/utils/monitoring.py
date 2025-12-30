@@ -135,24 +135,20 @@ def create_monitoring_context(spark_context, job_name: str) -> Dict[str, Any]:
     """
     context = {}
 
-    # Record counter
+    # Record counter - accumulator auto-registers in PySpark 3.x
     context["record_counter"] = spark_context.accumulator(0, RecordCounterAccumulator())
-    spark_context.register(context["record_counter"], f"{job_name}_record_counter")
 
     # Skipped records counter
     context["skipped_records"] = spark_context.accumulator(0, SkippedRecordsAccumulator())
-    spark_context.register(context["skipped_records"], f"{job_name}_skipped_records")
 
     # Data quality errors
     context["data_quality_errors"] = spark_context.accumulator({}, DataQualityErrorsAccumulator())
-    spark_context.register(context["data_quality_errors"], f"{job_name}_dq_errors")
 
     # Partition skew detector
     context["partition_skew"] = spark_context.accumulator(
         {"max_partition_size": 0, "min_partition_size": float('inf'), "partition_count": 0},
         PartitionSkewDetector()
     )
-    spark_context.register(context["partition_skew"], f"{job_name}_partition_skew")
 
     logger.info(f"📊 Monitoring context created for job: {job_name}")
     return context

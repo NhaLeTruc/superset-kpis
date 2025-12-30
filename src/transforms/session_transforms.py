@@ -6,7 +6,7 @@ Implements session timeout logic, bounce rate calculation, and session quality m
 """
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
-from pyspark.sql.types import StringType, IntegerType, LongType, DoubleType
+from pyspark.sql.types import StringType, IntegerType, LongType, DoubleType, BooleanType
 from typing import Optional, List
 
 
@@ -171,7 +171,7 @@ def calculate_session_metrics(sessionized_df: DataFrame) -> DataFrame:
     # Mark bounce sessions (single action)
     session_metrics_with_bounce = session_metrics_with_duration.withColumn(
         "is_bounce",
-        (F.col("actions_count") == 1).cast(IntegerType())
+        (F.col("actions_count") == 1).cast(BooleanType())
     )
 
     # Select final columns

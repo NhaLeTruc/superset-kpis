@@ -86,7 +86,7 @@ up:
 
 down:
 	@echo "🛑 Stopping Docker services..."
-	docker compose down
+	docker compose down -v --remove-orphans
 	@echo "✅ Docker services stopped"
 
 restart: down up
@@ -112,22 +112,22 @@ logs-superset:
 # Testing
 # ============================================================================
 
-test: test-unit
+test: test-unit test-integration 
 	@echo "✅ All tests completed"
 
 test-unit:
 	@echo "🧪 Running unit tests (59+ tests)..."
-	docker exec goodnote-spark-master pytest tests/unit -v --tb=short
+	docker exec goodnote-spark-dev pytest tests/unit -v --tb=short
 	@echo "✅ Unit tests completed"
 
 test-integration:
 	@echo "🧪 Running integration tests..."
-	docker exec goodnote-spark-master pytest tests/integration -v --tb=short
+	docker exec goodnote-spark-dev pytest tests/integration -v --tb=short
 	@echo "✅ Integration tests completed"
 
 test-coverage:
 	@echo "🧪 Running tests with coverage report..."
-	docker exec goodnote-spark-master pytest tests/unit \
+	docker exec goodnote-spark-dev pytest tests/unit \
 		--cov=src \
 		--cov-report=html \
 		--cov-report=term \
@@ -136,7 +136,7 @@ test-coverage:
 
 test-specific:
 	@echo "🧪 Usage: make test-specific TEST=tests/unit/test_join_transforms.py::test_identify_hot_keys_basic"
-	@echo "Example: docker exec goodnote-spark-master pytest $(TEST) -v"
+	@echo "Example: docker exec goodnote-spark-dev pytest $(TEST) -v"
 
 # ============================================================================
 # Data Generation & Jobs
@@ -145,21 +145,21 @@ test-specific:
 generate-data:
 	@echo "📊 Generating sample data (medium size)..."
 	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
-		--size medium \
+		--medium \
 		--seed 42
 	@echo "✅ Sample data generated"
 
 generate-data-small:
 	@echo "📊 Generating small sample data (for quick testing)..."
 	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
-		--size small \
+		--small \
 		--seed 42
 	@echo "✅ Small sample data generated"
 
 generate-data-large:
 	@echo "📊 Generating large sample data (WARNING: may take several minutes)..."
 	docker exec goodnote-spark-master python /opt/spark-apps/scripts/generate_sample_data.py \
-		--size large \
+		--large \
 		--seed 42
 	@echo "✅ Large sample data generated"
 

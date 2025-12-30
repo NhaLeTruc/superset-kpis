@@ -18,9 +18,8 @@ class TestMonitoringAccumulators:
         """Test that RecordCounterAccumulator tracks total records processed."""
         from src.utils.monitoring import RecordCounterAccumulator
 
-        # Create accumulator
-        acc = RecordCounterAccumulator()
-        spark.sparkContext.register(acc, "test_record_counter")
+        # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
+        acc = spark.sparkContext.accumulator(0, RecordCounterAccumulator())
 
         # Create test data
         data = [(i,) for i in range(100)]
@@ -43,9 +42,8 @@ class TestMonitoringAccumulators:
         """Test that SkippedRecordsAccumulator tracks filtered records."""
         from src.utils.monitoring import SkippedRecordsAccumulator
 
-        # Create accumulator
-        acc = SkippedRecordsAccumulator()
-        spark.sparkContext.register(acc, "test_skipped_records")
+        # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
+        acc = spark.sparkContext.accumulator(0, SkippedRecordsAccumulator())
 
         # Create test data with some invalid records
         data = [
@@ -75,16 +73,15 @@ class TestMonitoringAccumulators:
         """Test that DataQualityErrorsAccumulator tracks validation failures."""
         from src.utils.monitoring import DataQualityErrorsAccumulator
 
-        # Create accumulator
-        acc = DataQualityErrorsAccumulator()
-        spark.sparkContext.register(acc, "test_dq_errors")
+        # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
+        acc = spark.sparkContext.accumulator({}, DataQualityErrorsAccumulator())
 
         # Test adding different error types
-        acc.add("null_user_id")
-        acc.add("invalid_timestamp")
-        acc.add("null_user_id")
-        acc.add("negative_duration")
-        acc.add("null_user_id")
+        acc.add({"null_user_id": 1})
+        acc.add({"invalid_timestamp": 1})
+        acc.add({"null_user_id": 1})
+        acc.add({"negative_duration": 1})
+        acc.add({"null_user_id": 1})
 
         # Verify accumulator value (dictionary of error counts)
         errors = acc.value
@@ -97,9 +94,11 @@ class TestMonitoringAccumulators:
         """Test that PartitionSkewDetector tracks partition sizes."""
         from src.utils.monitoring import PartitionSkewDetector
 
-        # Create accumulator
-        acc = PartitionSkewDetector()
-        spark.sparkContext.register(acc, "test_partition_skew")
+        # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
+        acc = spark.sparkContext.accumulator(
+            {"max_partition_size": 0, "min_partition_size": float('inf'), "partition_count": 0},
+            PartitionSkewDetector()
+        )
 
         # Create test data - will be distributed across partitions
         data = [(i,) for i in range(1000)]
@@ -110,7 +109,7 @@ class TestMonitoringAccumulators:
             size = 0
             for row in partition:
                 size += 1
-            acc.add(size)
+            acc.add({"max_partition_size": size, "min_partition_size": size, "partition_count": 1})
             return iter([size])
 
         partition_sizes = df.rdd.mapPartitions(track_partition_size).collect()
@@ -158,9 +157,9 @@ class TestMonitoringHelpers:
         # Simulate some activity
         context["record_counter"].add(10000)
         context["skipped_records"].add(150)
-        context["data_quality_errors"].add("null_user_id")
-        context["data_quality_errors"].add("null_user_id")
-        context["data_quality_errors"].add("invalid_duration")
+        context["data_quality_errors"].add({"null_user_id": 1})
+        context["data_quality_errors"].add({"null_user_id": 1})
+        context["data_quality_errors"].add({"invalid_duration": 1})
 
         # Format summary
         summary = format_monitoring_summary(context, "Test Job")
@@ -228,13 +227,13 @@ class TestMonitoringIntegration:
             errors = []
             if row['user_id'] is None:
                 errors.append("null_user_id")
-                context["data_quality_errors"].add("null_user_id")
+                context["data_quality_errors"].add({"null_user_id": 1})
             if row['duration_ms'] is not None and row['duration_ms'] < 0:
                 errors.append("negative_duration")
-                context["data_quality_errors"].add("negative_duration")
+                context["data_quality_errors"].add({"negative_duration": 1})
             if row['timestamp'] is None:
                 errors.append("null_timestamp")
-                context["data_quality_errors"].add("null_timestamp")
+                context["data_quality_errors"].add({"null_timestamp": 1})
 
             if errors:
                 context["skipped_records"].add(1)
@@ -269,7 +268,7 @@ class TestMonitoringIntegration:
         # Track partition sizes after grouping (which will create skew)
         def track_partition(partition):
             size = sum(1 for _ in partition)
-            context["partition_skew"].add(size)
+            context["partition_skew"].add({"max_partition_size": size, "min_partition_size": size, "partition_count": 1})
             return iter([size])
 
         partition_sizes = df.rdd.mapPartitions(track_partition).collect()
