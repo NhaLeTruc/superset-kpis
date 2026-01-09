@@ -1,0 +1,112 @@
+"""
+Join Execution - Optimized Join Implementation
+
+Implements automatic join optimization with broadcast hints,
+skew detection, and salting strategies.
+"""
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+from .optimization import identify_hot_keys, apply_salting, explode_for_salting
+
+
+def optimized_join(
+    large_df: DataFrame,
+    small_df: DataFrame,
+    join_key: str,
+    hot_keys_df: DataFrame = None,
+    join_type: str = "inner",
+    enable_broadcast: bool = True,
+    enable_salting: bool = True,
+    broadcast_threshold_mb: int = None,
+    skew_threshold: float = 0.99,
+    salt_factor: int = 10
+) -> DataFrame:
+    """
+    Perform optimized join with automatic skew detection and mitigation.
+
+    Strategy:
+        1. If small_df fits broadcast threshold -> broadcast join
+        2. Else, detect hot keys in large_df (or use provided hot_keys_df)
+        3. If hot keys found -> apply salting
+        4. Perform join on salted keys
+        5. Clean up salt columns
+
+    Args:
+        large_df: Large DataFrame (e.g., interactions)
+        small_df: Small DataFrame (e.g., metadata)
+        join_key: Column to join on
+        hot_keys_df: Optional pre-computed hot keys DataFrame (output from identify_hot_keys)
+        join_type: "inner", "left", "right", "outer"
+        enable_broadcast: Try broadcast join if possible
+        enable_salting: Apply salting if skew detected
+        broadcast_threshold_mb: Broadcast threshold in MB (not used, kept for compatibility)
+        skew_threshold: Percentile threshold for hot key detection
+        salt_factor: Number of salt buckets
+
+    Returns:
+        Joined DataFrame with salt columns removed
+
+    Raises:
+        ValueError: If join_key not in both DataFrames
+    """
+    # Validate join_key exists in both DataFrames
+    if join_key not in large_df.columns:
+        raise ValueError(f"Column '{join_key}' not found in large DataFrame")
+    if join_key not in small_df.columns:
+        raise ValueError(f"Column '{join_key}' not found in small DataFrame")
+
+    # If hot_keys_df is explicitly provided, always use salting
+    if hot_keys_df is not None and enable_salting:
+        # If hot keys found, apply salting
+        if hot_keys_df.count() > 0:
+            # Apply salting to large_df
+            large_salted = apply_salting(large_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor)
+
+            # Explode small_df to match salted keys - rename join_key to avoid ambiguity
+            small_exploded = explode_for_salting(small_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor)
+            # Rename the join key in small table to avoid duplicate column after join
+            small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
+
+            # Join on salted keys
+            salted_key = f"{join_key}_salted"
+            result_df = large_salted.join(small_exploded, on=salted_key, how=join_type)
+
+            # Clean up salt columns and renamed join key
+            result_df = result_df.drop("salt", salted_key, f"{join_key}_small")
+
+            return result_df
+
+    # Strategy 1: Try broadcast join if enabled
+    if enable_broadcast:
+        # Simply use broadcast hint - Spark will use it if small_df is small enough
+        result_df = large_df.join(F.broadcast(small_df), on=join_key, how=join_type)
+        return result_df
+
+    # Strategy 2: Check for skew and apply salting if needed
+    if enable_salting:
+        # Detect hot keys in large_df
+        detected_hot_keys = identify_hot_keys(large_df, key_column=join_key, threshold_percentile=skew_threshold)
+
+        # If hot keys found, apply salting
+        if detected_hot_keys.count() > 0:
+            # Apply salting to large_df
+            large_salted = apply_salting(large_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor)
+
+            # Explode small_df to match salted keys - rename join_key to avoid ambiguity
+            small_exploded = explode_for_salting(small_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor)
+            # Rename the join key in small table to avoid duplicate column after join
+            small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
+
+            # Join on salted keys
+            salted_key = f"{join_key}_salted"
+            result_df = large_salted.join(small_exploded, on=salted_key, how=join_type)
+
+            # Clean up salt columns and renamed join key
+            result_df = result_df.drop("salt", salted_key, f"{join_key}_small")
+
+            return result_df
+
+    # Strategy 3: Standard join (no broadcast, no skew detected)
+    result_df = large_df.join(small_df, on=join_key, how=join_type)
+
+    return result_df
