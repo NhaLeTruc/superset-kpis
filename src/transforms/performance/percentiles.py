@@ -6,6 +6,7 @@ Functions for calculating percentile metrics and device-performance correlations
 from typing import List
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
 
 def calculate_percentiles(
@@ -118,7 +119,10 @@ def calculate_device_correlation(
         DataFrame with device performance metrics, sorted by avg_duration_ms DESC
     """
     # Join interactions with metadata
-    joined_df = interactions_df.join(metadata_df, on="user_id", how="inner")
+    # TODO: Ensure metadata_df has 'user_id' and 'device_type' columns
+    # TODO: Ensure interactions_df has 'user_id' and 'duration_ms' columns
+    # TODO: Handle missing device_type and multiple device types per user if necessary
+    joined_df = interactions_df.join(metadata_df, on="user_id", how="left")
 
     # Aggregate by device_type
     device_metrics = joined_df.groupBy("device_type").agg(
@@ -135,7 +139,7 @@ def calculate_device_correlation(
 
     # Calculate p95 duration per device
     # Group by device and calculate p95
-    device_groups = joined_df.select("device_type").distinct().collect()
+    device_groups = metadata_df.select("device_type").distinct()
 
     p95_results = []
     for device_row in device_groups:
@@ -144,7 +148,7 @@ def calculate_device_correlation(
         p95_value = device_df.approxQuantile("duration_ms", [0.95], 0.0001)[0]
         p95_results.append((device, float(p95_value)))
 
-    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+    
     p95_schema = StructType([
         StructField("device_type", StringType(), nullable=False),
         StructField("p95_duration_ms", DoubleType(), nullable=True)

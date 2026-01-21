@@ -71,7 +71,7 @@ brew install python@3.9
 ```bash
 # 1. Clone repository
 git clone <repo-url>
-cd claude-superset-demo
+cd superset-kpis
 
 # 2. Start all services (one command!)
 make quickstart

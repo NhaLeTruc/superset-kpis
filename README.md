@@ -12,7 +12,7 @@
 # Prerequisites: Docker 24.x+, 8GB+ RAM, 100GB+ disk
 
 # Clone and start (one command)
-git clone <repo-url> && cd claude-superset-demo
+git clone <repo-url> && cd superset-kpis
 cp .env.example .env
 make quickstart
 
@@ -48,7 +48,7 @@ make help              # Show all 50+ commands
 ## 📁 Project Structure
 
 ```txt
-claude-superset-demo/
+superset-kpis/
 ├── src/                    # Source code (23 functions, 1,200+ lines of jobs)
 ├── tests/                  # Test suite (59+ unit tests, 5 modules)
 ├── database/               # PostgreSQL schemas (13 tables, 40+ indexes)

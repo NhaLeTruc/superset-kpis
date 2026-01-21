@@ -7,7 +7,7 @@ This document provides a comprehensive overview of the project directory structu
 ## Complete Directory Tree
 
 ```
-insight-engineer-challenge/
+superset-kpis/
 ├── README.md                          # Project overview and quick start guide
 ├── IMPLEMENTATION_PLAN.md             # Detailed implementation plan
 ├── ARCHITECTURE.md                    # System architecture documentation
@@ -722,7 +722,7 @@ config/ ← schemas/ ← config/
 ```bash
 # Clone repository
 git clone <repo-url>
-cd insight-engineer-challenge
+cd superset-kpis
 
 # Create virtual environment
 python3 -m venv venv

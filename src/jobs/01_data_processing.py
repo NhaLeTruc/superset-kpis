@@ -19,7 +19,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.config.spark_config import create_spark_session, configure_job_specific_settings
-from src.transforms.join_transforms import optimized_join, identify_hot_keys
+from src.transforms.join.execution import optimized_join, identify_hot_keys
 from src.utils.data_quality import validate_schema, detect_nulls
 from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 

@@ -14,7 +14,7 @@ make quickstart
 
 # Or manually
 git clone <repo-url>
-cd claude-superset-demo
+cd superset-kpis
 docker compose up -d
 make generate-data
 make run-jobs
@@ -360,7 +360,7 @@ make: *** No rule to make target 'quickstart'. Stop.
 
 1. **Ensure you're in project root:**
    ```bash
-   pwd  # Should show .../claude-superset-demo
+   pwd  # Should show .../superset-kpis
    ls Makefile  # Should exist
    ```
 

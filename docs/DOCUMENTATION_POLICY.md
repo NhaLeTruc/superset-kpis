@@ -18,7 +18,7 @@
 ### Directory Structure
 
 ```
-claude-superset-demo/
+superset-kpis/
 ├── README.md                      ✅ Root (exception)
 ├── docs/                          ✅ All other .md files here
 │   ├── TDD_SPEC.md

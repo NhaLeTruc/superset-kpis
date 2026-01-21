@@ -16,84 +16,6 @@ You are provided with two large datasets:
    - Schema: `(user_id: String, join_date: Date, country: String, device_type: String, subscription_type: String)`
    - Example: `("u123", "2022-01-15", "US", "iPad", "premium")`
 
-Code to generate dataset:
-
-```py
-import csv
-import random
-from datetime import datetime, timedelta
-
-def generate_user_id():
-    return f"u{random.randint(1, 1000000):06d}"
-
-def generate_timestamp():
-    start_date = datetime(2023, 1, 1)
-    end_date = datetime(2023, 12, 31)
-    return start_date + timedelta(seconds=random.randint(0, int((end_date - start_date).total_seconds())))
-
-def generate_action_type():
-    return random.choice(['page_view', 'edit', 'create', 'delete', 'share'])
-
-def generate_page_id():
-    return f"p{random.randint(1, 1000000):06d}"
-
-def generate_duration_ms():
-    return random.randint(100, 300000)
-
-def generate_app_version():
-    major = random.randint(5, 7)
-    minor = random.randint(0, 9)
-    patch = random.randint(0, 9)
-    return f"{major}.{minor}.{patch}"
-
-def generate_join_date():
-    start_date = datetime(2020, 1, 1)
-    end_date = datetime(2023, 12, 31)
-    return start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
-
-def generate_country():
-    return random.choice(['US', 'UK', 'CA', 'AU', 'DE', 'FR', 'JP', 'IN', 'BR', 'MX'])
-
-def generate_device_type():
-    return random.choice(['iPhone', 'iPad', 'Android Phone', 'Android Tablet', 'Windows', 'Mac'])
-
-def generate_subscription_type():
-    return random.choice(['free', 'basic', 'premium', 'enterprise'])
-
-def generate_user_interactions(num_records, filename):
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['user_id', 'timestamp', 'action_type', 'page_id', 'duration_ms', 'app_version'])
-        for _ in range(num_records):
-            writer.writerow([
-                generate_user_id(),
-                generate_timestamp().strftime("%Y-%m-%d %H:%M:%S"),
-                generate_action_type(),
-                generate_page_id(),
-                generate_duration_ms(),
-                generate_app_version()
-            ])
-
-def generate_user_metadata(num_records, filename):
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['user_id', 'join_date', 'country', 'device_type', 'subscription_type'])
-        for _ in range(num_records):
-            writer.writerow([
-                generate_user_id(),
-                generate_join_date().strftime("%Y-%m-%d"),
-                generate_country(),
-                generate_device_type(),
-                generate_subscription_type()
-            ])
-
-# Generate sample datasets
-generate_user_interactions(1000000, 'user_interactions_sample.csv')
-generate_user_metadata(100000, 'user_metadata_sample.csv')
-
-print("Sample datasets generated successfully.")
-```
-
 ## Tasks
 
 1. Data Processing and Optimization
@@ -154,7 +76,6 @@ print("Sample datasets generated successfully.")
       - Explain how these accumulators can be used for real-time monitoring and alerting.
    b. Implement any optimizations you will perform and explain them in detail why these optimizations are required
 
-
 ## Requirements
 
 1. Use Spark 3.x with Scala or PySpark.
@@ -187,13 +108,3 @@ print("Sample datasets generated successfully.")
 4. Depth of analysis and insights derived from the data.
 5. Appropriate use of Spark features and optimization techniques.
 6. Quality of explanations
-
-## Time Estimate
-
-This challenge is designed to take approximately 3 to 6 hours for an experienced Spark developer. However, feel free to spend additional time if you wish to explore more advanced optimizations or analyses.
-
-## Submission
-
-Please submit your solution as a Git repository with all the required files and documentation. Ensure that your repo includes a clear history of commits showing your development process.
-
-Good luck!
