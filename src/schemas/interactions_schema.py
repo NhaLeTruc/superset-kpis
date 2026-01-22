@@ -10,6 +10,7 @@ INTERACTIONS_SCHEMA = StructType([
     StructField("interaction_id", StringType(), False),
     StructField("user_id", StringType(), False),
     StructField("action_type", StringType(), False),
+    StructField("page_id", StringType(), False),
     StructField("timestamp", TimestampType(), False),
     StructField("duration_ms", IntegerType(), False),
 ])

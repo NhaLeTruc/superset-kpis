@@ -234,6 +234,18 @@ class BaseAnalyticsJob(ABC):
             print("DAU Average:", metrics["dau"].agg({"dau": "avg"}).collect()[0][0])
         """
         pass
+    
+    @abstractmethod
+    def get_table_mapping(self) -> Optional[Dict[str, str]]:
+        """
+        Get mapping from metric names to database table names.
+
+        Override this if job writes to database.
+
+        Returns:
+            Dictionary mapping metric names to table names, or None
+        """
+        return None
 
     def run(self) -> int:
         """
@@ -306,14 +318,3 @@ class BaseAnalyticsJob(ABC):
         finally:
             if self.spark:
                 self.spark.stop()
-
-    def get_table_mapping(self) -> Optional[Dict[str, str]]:
-        """
-        Get mapping from metric names to database table names.
-
-        Override this if job writes to database.
-
-        Returns:
-            Dictionary mapping metric names to table names, or None
-        """
-        return None

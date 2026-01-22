@@ -8,10 +8,10 @@ Creates two CSV files:
 - user_metadata.csv: User demographic and device information
 
 Usage:
-    python scripts/generate_sample_data.py --num-users 1000 --num-interactions 10000
-    python scripts/generate_sample_data.py --small   # 1K users, 10K interactions
-    python scripts/generate_sample_data.py --medium  # 10K users, 100K interactions
-    python scripts/generate_sample_data.py --large   # 100K users, 1M interactions
+    python3 scripts/generate_sample_data.py --num-users 1000 --num-interactions 10000
+    python3 scripts/generate_sample_data.py --small   # 1K users, 10K interactions
+    python3 scripts/generate_sample_data.py --medium  # 10K users, 100K interactions
+    python3 scripts/generate_sample_data.py --large   # 100K users, 1M interactions
 """
 import argparse
 import csv
@@ -19,14 +19,22 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Constants
-ACTION_TYPES = ["VIEW", "EDIT", "SHARE", "EXPORT"]
-DEVICE_TYPES = ["iPhone", "iPad", "Android Phone", "Android Tablet"]
-COUNTRIES = ["US", "UK", "CA", "DE", "FR", "JP", "AU", "CN", "IN", "BR"]
-SUBSCRIPTION_TYPES = ["free", "premium", "enterprise"]
-APP_VERSIONS = ["3.0.0", "3.0.1", "3.1.0", "3.1.1", "3.2.0"]
+# Date Range for interactions
+ACT_START_DATE = datetime(2024, 1, 1)
+ACT_END_DATE = datetime(2025, 1, 1)
+
+# Date Range for user registrations
+REG_START_DATE = datetime(2023, 1, 1)
+REG_END_DATE = datetime(2023, 12, 31)
 
 # Realistic distributions
+ACTION_DISTRIBUTION = {
+    "VIEW": 0.50,
+    "EDIT": 0.30,
+    "SHARE": 0.15,
+    "EXPORT": 0.05
+}
+
 DEVICE_DISTRIBUTION = {
     "iPhone": 0.40,
     "iPad": 0.25,
@@ -62,15 +70,15 @@ VERSION_DISTRIBUTION = {
 }
 
 
-def weighted_random_choice(distribution):
+def weighted_random_choice(distribution: dict) -> str:
     """Choose item based on weighted distribution."""
     items = list(distribution.keys())
     weights = list(distribution.values())
     return random.choices(items, weights=weights, k=1)[0]
 
 
-def generate_user_metadata(num_users):
-    """Generate user metadata CSV."""
+def generate_user_metadata(num_users: int) -> list:
+    """Generate user metadata dataset."""
     print(f"📝 Generating metadata for {num_users:,} users...")
 
     users = []
@@ -81,7 +89,9 @@ def generate_user_metadata(num_users):
             "country": weighted_random_choice(COUNTRY_DISTRIBUTION),
             "subscription_type": weighted_random_choice(SUBSCRIPTION_DISTRIBUTION),
             "registration_date": (
-                datetime(2023, 1, 1) + timedelta(days=random.randint(0, 365))
+                REG_START_DATE + timedelta(
+                    days=random.randint(0, (REG_END_DATE - REG_START_DATE).days)
+                )
             ).strftime("%Y-%m-%d")
         }
         users.append(user)
@@ -90,9 +100,9 @@ def generate_user_metadata(num_users):
     return users
 
 
-def generate_user_interactions(num_interactions, users, include_skew=True):
+def generate_user_interactions(num_interactions: int, users: list, include_skew=False) -> list:
     """
-    Generate user interactions CSV.
+    Generate user interactions dataset.
 
     Args:
         num_interactions: Number of interactions to generate
@@ -126,13 +136,11 @@ def generate_user_interactions(num_interactions, users, include_skew=True):
         random.shuffle(user_pool)
 
     interactions = []
-    start_date = datetime(2024, 1, 1)
-    end_date = datetime(2024, 12, 31)
-    date_range = (end_date - start_date).days
+    date_range = (ACT_END_DATE - ACT_START_DATE).days
 
     for i in range(num_interactions):
         # Generate timestamp
-        timestamp = start_date + timedelta(
+        timestamp = ACT_START_DATE + timedelta(
             days=random.randint(0, date_range),
             hours=random.randint(0, 23),
             minutes=random.randint(0, 59),
@@ -154,16 +162,12 @@ def generate_user_interactions(num_interactions, users, include_skew=True):
         interaction = {
             "user_id": user_pool[i % len(user_pool)],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "action_type": weighted_random_choice(
-                {"VIEW": 0.50, "EDIT": 0.30, "SHARE": 0.15, "EXPORT": 0.05}
-            ),
+            "action_type": weighted_random_choice(ACTION_DISTRIBUTION),
+            "page_id": f"p{random.randint(1, 100):03d}",
             "duration_ms": duration_ms,
             "app_version": weighted_random_choice(VERSION_DISTRIBUTION)
         }
         interactions.append(interaction)
-
-        if (i + 1) % 100000 == 0:
-            print(f"   ⏳ Generated {i + 1:,} / {num_interactions:,} interactions...")
 
     # Sort by timestamp for realistic data
     interactions.sort(key=lambda x: x["timestamp"])
@@ -172,7 +176,7 @@ def generate_user_interactions(num_interactions, users, include_skew=True):
     return interactions
 
 
-def write_csv(data, filename, fieldnames):
+def write_csv(data: list, filename: str, fieldnames: list) -> None:
     """Write data to CSV file."""
     filepath = Path("data/raw") / filename
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -201,7 +205,7 @@ def main():
     parser.add_argument("--num-interactions", type=int, help="Number of interactions to generate")
 
     # Options
-    parser.add_argument("--no-skew", action="store_true", help="Disable data skew (uniform distribution)")
+    parser.add_argument("--is-skew", action="store_true", help="Enable data skew (power user distribution)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 
     args = parser.parse_args()
@@ -245,18 +249,16 @@ def main():
         ["user_id", "device_type", "country", "subscription_type", "registration_date"]
     )
 
-    print()
-
     # Generate interactions
     interactions = generate_user_interactions(
         num_interactions,
         users,
-        include_skew=not args.no_skew
+        include_skew=args.is_skew
     )
     write_csv(
         interactions,
         "user_interactions.csv",
-        ["user_id", "timestamp", "action_type", "duration_ms", "app_version"]
+        ["user_id", "timestamp", "action_type", "page_id", "duration_ms", "app_version"]
     )
 
     print(f"\n{'='*60}")
