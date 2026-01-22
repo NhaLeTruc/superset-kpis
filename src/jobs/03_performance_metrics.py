@@ -9,9 +9,16 @@ Calculates performance metrics:
 
 Writes results to PostgreSQL for monitoring dashboards.
 
-Usage:
-    python src/jobs/03_performance_metrics.py \
-        --enriched-path data/processed/enriched_interactions.parquet \
+Usage (via helper script):
+    ./scripts/run_spark_job.sh src/jobs/03_performance_metrics.py \
+        --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --write-to-db
+
+Usage (direct spark-submit):
+    docker exec goodnote-spark-master /opt/spark/bin/spark-submit \
+        --master local[*] \
+        /opt/spark-apps/src/jobs/03_performance_metrics.py \
+        --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db
 """
 import argparse

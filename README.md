@@ -22,7 +22,7 @@ make status            # Check services
 make db-tables         # View database tables
 
 # Common Commands
-make quickstart        # Complete setup
+make down              # Complete setup
 make test-coverage     # Generate coverage report
 make generate-data     # Create sample data
 make run-jobs          # Execute all ETL jobs
