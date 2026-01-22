@@ -13,7 +13,7 @@ You are provided with two large datasets:
    - Example: `("u123", "2023-07-01 14:30:15", "page_view", "p456", 12000, "5.7.3")`
 
 2. User Metadata (~ 100 GB, partitioned by country)
-   - Schema: `(user_id: String, join_date: Date, country: String, device_type: String, subscription_type: String)`
+   - Schema: `(user_id: String, registration_date: Date, country: String, device_type: String, subscription_type: String)`
    - Example: `("u123", "2022-01-15", "US", "iPad", "premium")`
 
 ## Tasks
