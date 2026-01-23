@@ -17,7 +17,7 @@ This document describes the complete system architecture for the GoodNote Analyt
 │  │  Partitioned by Date   │      │   Partitioned by       │     │
 │  │  Schema: user_id,      │      │   Country              │     │
 │  │  timestamp, action,    │      │   Schema: user_id,     │     │
-│  │  page_id, duration,    │      │   join_date, country,  │     │
+│  │  page_id, duration,    │      │   registration_date, country,  │     │
 │  │  app_version           │      │   device, subscription │     │
 │  └────────────┬───────────┘      └────────────┬───────────┘     │
 └───────────────┼──────────────────────────────┼──────────────────┘
@@ -189,7 +189,7 @@ This document describes the complete system architecture for the GoodNote Analyt
 - **Schema:**
   ```
   user_id: STRING (unique identifier)
-  join_date: DATE
+  registration_date: DATE
   country: STRING (ISO 2-letter code)
   device_type: STRING (iPhone, iPad, Android, etc.)
   subscription_type: STRING (free, basic, premium, enterprise)

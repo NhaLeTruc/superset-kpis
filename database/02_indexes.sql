@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_interactions_user_time ON user_interactions(user_
 CREATE INDEX IF NOT EXISTS idx_metadata_country ON user_metadata(country);
 CREATE INDEX IF NOT EXISTS idx_metadata_device ON user_metadata(device_type);
 CREATE INDEX IF NOT EXISTS idx_metadata_subscription ON user_metadata(subscription_type);
-CREATE INDEX IF NOT EXISTS idx_metadata_join_date ON user_metadata(join_date);
+CREATE INDEX IF NOT EXISTS idx_metadata_registration_date ON user_metadata(registration_date);
 
 
 -- ============================================

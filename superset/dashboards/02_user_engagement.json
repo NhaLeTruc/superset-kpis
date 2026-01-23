@@ -39,7 +39,7 @@
         "orderby": [["total_duration_hours", false]]
       },
       "query_context": {
-        "sql": "SELECT\n  user_id,\n  total_interactions,\n  total_duration_hours,\n  ROUND(avg_duration_ms/1000, 2) as avg_seconds,\n  country,\n  device_type,\n  subscription_type,\n  join_date\nFROM power_users\nORDER BY total_duration_hours DESC\nLIMIT 100"
+        "sql": "SELECT\n  user_id,\n  total_interactions,\n  total_duration_hours,\n  ROUND(avg_duration_ms/1000, 2) as avg_seconds,\n  country,\n  device_type,\n  subscription_type,\n  registration_date\nFROM power_users\nORDER BY total_duration_hours DESC\nLIMIT 100"
       },
       "cache_timeout": 21600
     },

@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS power_users (
     country VARCHAR(10),
     device_type VARCHAR(50),
     subscription_type VARCHAR(50),
-    join_date DATE,
+    registration_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id)
 );
@@ -239,7 +239,7 @@ COMMENT ON TABLE user_interactions IS 'Raw or enriched user interactions (option
 -- Store user metadata for reference
 CREATE TABLE IF NOT EXISTS user_metadata (
     user_id VARCHAR(50) PRIMARY KEY,
-    join_date DATE NOT NULL,
+    registration_date DATE NOT NULL,
     country VARCHAR(10) NOT NULL,
     device_type VARCHAR(50) NOT NULL,
     subscription_type VARCHAR(50) NOT NULL,
