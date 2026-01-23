@@ -8,12 +8,15 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
+from src.schemas.columns import COL_USER_ID, COL_DURATION_MS, COL_DEVICE_TYPE
+from src.config.constants import DEFAULT_PERCENTILES
+
 
 def calculate_percentiles(
     df: DataFrame,
     value_column: str,
     group_by_columns: List[str],
-    percentiles: List[float] = [0.50, 0.95, 0.99]
+    percentiles: List[float] = DEFAULT_PERCENTILES
 ) -> DataFrame:
     """
     Calculate percentile metrics grouped by dimensions.
@@ -122,13 +125,13 @@ def calculate_device_correlation(
     # TODO: Ensure metadata_df has 'user_id' and 'device_type' columns
     # TODO: Ensure interactions_df has 'user_id' and 'duration_ms' columns
     # TODO: Handle missing device_type and multiple device types per user if necessary
-    joined_df = interactions_df.join(metadata_df, on="user_id", how="left")
+    joined_df = interactions_df.join(metadata_df, on=COL_USER_ID, how="left")
 
     # Aggregate by device_type
-    device_metrics = joined_df.groupBy("device_type").agg(
-        F.avg("duration_ms").alias("avg_duration_ms"),
+    device_metrics = joined_df.groupBy(COL_DEVICE_TYPE).agg(
+        F.avg(COL_DURATION_MS).alias("avg_duration_ms"),
         F.count("*").alias("total_interactions"),
-        F.countDistinct("user_id").alias("unique_users")
+        F.countDistinct(COL_USER_ID).alias("unique_users")
     )
 
     # Calculate interactions_per_user
@@ -139,30 +142,30 @@ def calculate_device_correlation(
 
     # Calculate p95 duration per device
     # Group by device and calculate p95
-    device_groups = metadata_df.select("device_type").distinct()
+    device_groups = metadata_df.select(COL_DEVICE_TYPE).distinct()
 
     p95_results = []
-    for device_row in device_groups:
-        device = device_row["device_type"]
-        device_df = joined_df.filter(F.col("device_type") == device)
-        p95_value = device_df.approxQuantile("duration_ms", [0.95], 0.0001)[0]
+    for device_row in device_groups.collect():
+        device = device_row[COL_DEVICE_TYPE]
+        device_df = joined_df.filter(F.col(COL_DEVICE_TYPE) == device)
+        p95_value = device_df.approxQuantile(COL_DURATION_MS, [0.95], 0.0001)[0]
         p95_results.append((device, float(p95_value)))
 
-    
+
     p95_schema = StructType([
-        StructField("device_type", StringType(), nullable=False),
+        StructField(COL_DEVICE_TYPE, StringType(), nullable=False),
         StructField("p95_duration_ms", DoubleType(), nullable=True)
     ])
     p95_df = interactions_df.sql_ctx.createDataFrame(p95_results, schema=p95_schema)
 
     # Join p95 with device_metrics
-    result_df = device_metrics.join(p95_df, on="device_type", how="left")
+    result_df = device_metrics.join(p95_df, on=COL_DEVICE_TYPE, how="left")
 
     # Sort by avg_duration_ms descending
     result_df = result_df.orderBy(F.col("avg_duration_ms").desc())
 
     return result_df.select(
-        "device_type",
+        COL_DEVICE_TYPE,
         "avg_duration_ms",
         "p95_duration_ms",
         "total_interactions",

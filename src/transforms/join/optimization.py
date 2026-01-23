@@ -7,11 +7,13 @@ to mitigate hot key problems in distributed joins.
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
+
 
 def identify_hot_keys(
     df: DataFrame,
     key_column: str,
-    threshold_percentile: float = 0.99
+    threshold_percentile: float = HOT_KEY_THRESHOLD_PERCENTILE
 ) -> DataFrame:
     """
     Identify hot keys (skewed values) in a DataFrame.

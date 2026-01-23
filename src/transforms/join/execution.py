@@ -6,6 +6,8 @@ skew detection, and salting strategies.
 """
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+
+from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from .optimization import identify_hot_keys, apply_salting, explode_for_salting
 
 
@@ -18,7 +20,7 @@ def optimized_join(
     enable_broadcast: bool = True,
     enable_salting: bool = True,
     broadcast_threshold_mb: int = None,
-    skew_threshold: float = 0.99,
+    skew_threshold: float = HOT_KEY_THRESHOLD_PERCENTILE,
     salt_factor: int = 10
 ) -> DataFrame:
     """

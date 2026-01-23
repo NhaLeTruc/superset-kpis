@@ -6,6 +6,8 @@ Calculates user retention rates by cohort over time.
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_REGISTRATION_DATE
+
 
 def calculate_cohort_retention(
     interactions_df: DataFrame,
@@ -18,7 +20,7 @@ def calculate_cohort_retention(
 
     Args:
         interactions_df: User interactions [user_id, timestamp, ...]
-        metadata_df: User metadata with join_date [user_id, join_date, ...]
+        metadata_df: User metadata with registration_date [user_id, registration_date, ...]
         cohort_period: "week" or "month" (default: "week")
         retention_weeks: Number of weeks to analyze (renamed from analysis_weeks)
 
@@ -38,24 +40,22 @@ def calculate_cohort_retention(
         ])
         return interactions_df.sql_ctx.createDataFrame([], schema=empty_schema)
 
-    # Calculate cohort week (first day of week user joined)
-    # Try join_date first, fall back to registration_date
-    join_date_col = "join_date" if "join_date" in metadata_df.columns else "registration_date"
+    # Calculate cohort week (first day of week user registered)
     metadata_with_cohort = metadata_df.withColumn(
         "cohort_week",
-        F.date_trunc("week", F.col(join_date_col))
+        F.date_trunc("week", F.col(COL_REGISTRATION_DATE))
     )
 
     # Add week from interactions
     interactions_with_week = interactions_df.withColumn(
         "interaction_week",
-        F.date_trunc("week", F.col("timestamp"))
+        F.date_trunc("week", F.col(COL_TIMESTAMP))
     )
 
     # Join interactions with cohort data
     joined_df = interactions_with_week.join(
-        metadata_with_cohort.select("user_id", "cohort_week"),
-        on="user_id",
+        metadata_with_cohort.select(COL_USER_ID, "cohort_week"),
+        on=COL_USER_ID,
         how="inner"
     )
 
@@ -73,12 +73,12 @@ def calculate_cohort_retention(
 
     # Get cohort sizes
     cohort_sizes = metadata_with_cohort.groupBy("cohort_week").agg(
-        F.count("user_id").alias("cohort_size")
+        F.count(COL_USER_ID).alias("cohort_size")
     )
 
     # Count active users per cohort per week
     active_users_per_week = joined_df.groupBy("cohort_week", "weeks_since_join").agg(
-        F.countDistinct("user_id").alias("active_users")
+        F.countDistinct(COL_USER_ID).alias("active_users")
     )
 
     # Join with cohort sizes

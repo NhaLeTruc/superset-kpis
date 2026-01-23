@@ -6,6 +6,9 @@ Calculates stickiness ratio and identifies power users.
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS, COL_PAGE_ID
+from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
+
 
 def calculate_stickiness(dau_df: DataFrame, mau_df: DataFrame) -> DataFrame:
     """
@@ -41,7 +44,7 @@ def calculate_stickiness(dau_df: DataFrame, mau_df: DataFrame) -> DataFrame:
 def identify_power_users(
     interactions_df: DataFrame,
     metadata_df: DataFrame,
-    percentile: float = 0.99,
+    percentile: float = HOT_KEY_THRESHOLD_PERCENTILE,
     max_duration_ms: int = 28800000
 ) -> DataFrame:
     """
@@ -61,24 +64,24 @@ def identify_power_users(
         raise ValueError("percentile must be between 0 and 1 (inclusive)")
 
     # Filter outliers
-    filtered_df = interactions_df.filter(F.col("duration_ms") <= max_duration_ms)
+    filtered_df = interactions_df.filter(F.col(COL_DURATION_MS) <= max_duration_ms)
 
     # Add date column for days_active calculation
-    filtered_df = filtered_df.withColumn("date", F.to_date(F.col("timestamp")))
+    filtered_df = filtered_df.withColumn("date", F.to_date(F.col(COL_TIMESTAMP)))
 
     # Build aggregation expressions
     agg_exprs = [
-        F.sum("duration_ms").alias("total_duration_ms"),
+        F.sum(COL_DURATION_MS).alias("total_duration_ms"),
         F.count("*").alias("total_interactions"),
         F.countDistinct("date").alias("days_active")
     ]
 
     # Add unique_pages only if page_id column exists
-    if "page_id" in filtered_df.columns:
-        agg_exprs.append(F.countDistinct("page_id").alias("unique_pages"))
+    if COL_PAGE_ID in filtered_df.columns:
+        agg_exprs.append(F.countDistinct(COL_PAGE_ID).alias("unique_pages"))
 
     # Calculate user-level metrics
-    user_metrics = filtered_df.groupBy("user_id").agg(*agg_exprs)
+    user_metrics = filtered_df.groupBy(COL_USER_ID).agg(*agg_exprs)
 
     # Add unique_pages as null if it wasn't calculated
     if "unique_pages" not in user_metrics.columns:
@@ -109,6 +112,6 @@ def identify_power_users(
     power_users = power_users.withColumn("percentile_rank", F.lit(percentile * 100))
 
     # Join with metadata
-    result_df = power_users.join(metadata_df, on="user_id", how="left")
+    result_df = power_users.join(metadata_df, on=COL_USER_ID, how="left")
 
     return result_df

@@ -8,11 +8,13 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import Window
 
+from src.config.constants import Z_SCORE_ANOMALY_THRESHOLD
+
 
 def detect_anomalies_statistical(
     df: DataFrame,
     value_column: str,
-    z_threshold: float = 3.0,
+    z_threshold: float = Z_SCORE_ANOMALY_THRESHOLD,
     group_by_columns: List[str] = None
 ) -> DataFrame:
     """

@@ -8,10 +8,13 @@ from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
 
+from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_SESSION_ID
+from src.config.constants import SESSION_TIMEOUT_SECONDS
+
 
 def sessionize_interactions(
     interactions_df: DataFrame,
-    session_timeout_seconds: int = 1800
+    session_timeout_seconds: int = SESSION_TIMEOUT_SECONDS
 ) -> DataFrame:
     """
     Assign session IDs to user interactions based on time gaps.
@@ -45,18 +48,18 @@ def sessionize_interactions(
         +-------+-------------------+-------------+
     """
     # Validate required columns
-    required_cols = ["user_id", "timestamp"]
+    required_cols = [COL_USER_ID, COL_TIMESTAMP]
     missing_cols = [col for col in required_cols if col not in interactions_df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
     # Define window: partition by user, order by timestamp
-    user_window = Window.partitionBy("user_id").orderBy("timestamp")
+    user_window = Window.partitionBy(COL_USER_ID).orderBy(COL_TIMESTAMP)
 
     # Calculate time difference from previous interaction (in seconds)
     df_with_lag = interactions_df.withColumn(
         "prev_timestamp",
-        F.lag("timestamp", 1).over(user_window)
+        F.lag(COL_TIMESTAMP, 1).over(user_window)
     )
 
     df_with_gap = df_with_lag.withColumn(
@@ -65,7 +68,7 @@ def sessionize_interactions(
             F.col("prev_timestamp").isNull(),
             0
         ).otherwise(
-            (F.unix_timestamp("timestamp") - F.unix_timestamp("prev_timestamp"))
+            (F.unix_timestamp(COL_TIMESTAMP) - F.unix_timestamp("prev_timestamp"))
         )
     )
 
@@ -86,9 +89,9 @@ def sessionize_interactions(
 
     # Create unique session_id: user_id + "_" + session_number
     df_with_session_id = df_with_session_num.withColumn(
-        "session_id",
+        COL_SESSION_ID,
         F.concat(
-            F.col("user_id"),
+            F.col(COL_USER_ID),
             F.lit("_"),
             (F.col("session_number") - 1).cast(StringType())
         )
