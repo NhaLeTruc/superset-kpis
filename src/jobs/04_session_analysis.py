@@ -15,11 +15,11 @@ Usage (via helper script):
         --write-to-db
 
 Usage (direct spark-submit):
-    docker exec goodnote-spark-master /opt/spark/bin/spark-submit \
-        --master local[*] \
+    docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
         /opt/spark-apps/src/jobs/04_session_analysis.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
-        --write-to-db
+        --write-to-db'
 """
 import argparse
 import sys
@@ -29,6 +29,11 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.jobs.base_job import BaseAnalyticsJob
+from src.schemas.columns import (
+    COL_SESSION_ID, COL_DEVICE_TYPE, COL_COUNTRY, COL_METRIC_DATE,
+    COL_IS_BOUNCE, COL_SESSION_DURATION_MS, COL_ACTION_COUNT,
+)
+from src.config.constants import SESSION_TIMEOUT_SECONDS, TABLE_SESSION_METRICS, TABLE_BOUNCE_RATES
 from src.transforms.session import (
     sessionize_interactions,
     calculate_session_metrics,
@@ -74,10 +79,10 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         sessionized_df = sessionize_interactions(
             enriched_df,
-            session_timeout_seconds=1800  # 30 minutes
+            session_timeout_seconds=SESSION_TIMEOUT_SECONDS
         )
 
-        session_count = sessionized_df.select("session_id").distinct().count()
+        session_count = sessionized_df.select(COL_SESSION_ID).distinct().count()
         print(f"   ✅ Created {session_count:,} sessions")
 
         # 2. Calculate Session Metrics
@@ -86,24 +91,24 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         session_metrics_df = calculate_session_metrics(sessionized_df)
 
         # Add device_type and country from enriched data
-        session_with_metadata = sessionized_df.groupBy("session_id").agg(
-            F.first("device_type").alias("device_type"),
-            F.first("country").alias("country")
+        session_with_metadata = sessionized_df.groupBy(COL_SESSION_ID).agg(
+            F.first(COL_DEVICE_TYPE).alias(COL_DEVICE_TYPE),
+            F.first(COL_COUNTRY).alias(COL_COUNTRY)
         )
 
         session_metrics_df = session_metrics_df.join(
             session_with_metadata,
-            "session_id",
+            COL_SESSION_ID,
             "left"
         )
 
         # Add metric date for time-series analysis
         session_metrics_df = session_metrics_df.withColumn(
-            "metric_date",
+            COL_METRIC_DATE,
             F.to_date("session_start_time")
         )
 
-        bounce_count = session_metrics_df.filter("is_bounce = 1").count()
+        bounce_count = session_metrics_df.filter(F.col(COL_IS_BOUNCE) == 1).count()
         bounce_percentage = (bounce_count / session_count) * 100 if session_count > 0 else 0
 
         print(f"   ✅ Computed metrics for {session_count:,} sessions")
@@ -126,11 +131,11 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         # By Device Type
         device_bounce_df = calculate_bounce_rate(
             session_metrics_df,
-            group_by_columns=["device_type", "metric_date"]
+            group_by_columns=[COL_DEVICE_TYPE, COL_METRIC_DATE]
         )
         device_bounce_df = device_bounce_df \
-            .withColumn("dimension_name", F.lit("device_type")) \
-            .withColumnRenamed("device_type", "dimension_value")
+            .withColumn("dimension_name", F.lit(COL_DEVICE_TYPE)) \
+            .withColumnRenamed(COL_DEVICE_TYPE, "dimension_value")
 
         print(f"   ✅ Bounce rates by device type:")
         for row in device_bounce_df.select("dimension_value", "bounce_rate").distinct().collect():
@@ -139,11 +144,11 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         # By Country
         country_bounce_df = calculate_bounce_rate(
             session_metrics_df,
-            group_by_columns=["country", "metric_date"]
+            group_by_columns=[COL_COUNTRY, COL_METRIC_DATE]
         )
         country_bounce_df = country_bounce_df \
-            .withColumn("dimension_name", F.lit("country")) \
-            .withColumnRenamed("country", "dimension_value")
+            .withColumn("dimension_name", F.lit(COL_COUNTRY)) \
+            .withColumnRenamed(COL_COUNTRY, "dimension_value")
 
         # Combine all bounce rates
         bounce_rates_df = overall_bounce_df \
@@ -168,10 +173,10 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         total_sessions = session_df.count()
 
         session_stats = session_df.agg(
-            F.avg("session_duration_ms").alias("avg_duration"),
-            F.max("session_duration_ms").alias("max_duration"),
-            F.avg("action_count").alias("avg_actions"),
-            F.sum(F.when(F.col("is_bounce") == 1, 1).otherwise(0)).alias("bounce_count")
+            F.avg(COL_SESSION_DURATION_MS).alias("avg_duration"),
+            F.max(COL_SESSION_DURATION_MS).alias("max_duration"),
+            F.avg(COL_ACTION_COUNT).alias("avg_actions"),
+            F.sum(F.when(F.col(COL_IS_BOUNCE) == 1, 1).otherwise(0)).alias("bounce_count")
         ).collect()[0]
 
         print(f"\nSession Metrics:")
@@ -185,10 +190,10 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         # Duration distribution
         print(f"\n  Session Duration Distribution:")
         duration_buckets = session_df.select(
-            F.when(F.col("session_duration_ms") < 60000, "< 1 min")
-             .when(F.col("session_duration_ms") < 300000, "1-5 min")
-             .when(F.col("session_duration_ms") < 900000, "5-15 min")
-             .when(F.col("session_duration_ms") < 1800000, "15-30 min")
+            F.when(F.col(COL_SESSION_DURATION_MS) < 60000, "< 1 min")
+             .when(F.col(COL_SESSION_DURATION_MS) < 300000, "1-5 min")
+             .when(F.col(COL_SESSION_DURATION_MS) < 900000, "5-15 min")
+             .when(F.col(COL_SESSION_DURATION_MS) < 1800000, "15-30 min")
              .otherwise("> 30 min").alias("duration_bucket")
         ).groupBy("duration_bucket").count().orderBy("count", ascending=False)
 
@@ -228,8 +233,8 @@ class SessionAnalysisJob(BaseAnalyticsJob):
     def get_table_mapping(self) -> Dict[str, str]:
         """Get database table mapping."""
         return {
-            "session_metrics": "session_metrics",
-            "bounce_rates": "bounce_rates"
+            "session_metrics": TABLE_SESSION_METRICS,
+            "bounce_rates": TABLE_BOUNCE_RATES,
         }
 
 

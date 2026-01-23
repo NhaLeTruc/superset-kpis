@@ -15,11 +15,11 @@ Usage (via helper script):
         --write-to-db
 
 Usage (direct spark-submit):
-    docker exec goodnote-spark-master /opt/spark/bin/spark-submit \
-        --master local[*] \
+    docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
         /opt/spark-apps/src/jobs/03_performance_metrics.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
-        --write-to-db
+        --write-to-db'
 """
 import argparse
 import sys
@@ -30,6 +30,14 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.jobs.base_job import BaseAnalyticsJob
+from src.schemas.columns import (
+    COL_TIMESTAMP, COL_DURATION_MS, COL_APP_VERSION,
+    COL_DEVICE_TYPE, COL_USER_ID, COL_METRIC_DATE,
+)
+from src.config.constants import (
+    DEFAULT_PERCENTILES, Z_SCORE_ANOMALY_THRESHOLD,
+    TABLE_PERFORMANCE_BY_VERSION, TABLE_DEVICE_PERFORMANCE, TABLE_PERFORMANCE_ANOMALIES,
+)
 from src.transforms.performance import (
     calculate_percentiles,
     calculate_device_correlation,
@@ -68,7 +76,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         enriched_df = self.read_enriched_data(self.args.enriched_path)
 
         # Add date column for time-series analysis
-        enriched_df = enriched_df.withColumn("metric_date", F.to_date("timestamp"))
+        enriched_df = enriched_df.withColumn(COL_METRIC_DATE, F.to_date(COL_TIMESTAMP))
 
         metrics = {}
 
@@ -76,9 +84,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print("\n📊 Calculating Performance Percentiles by App Version...")
         version_perf_df = calculate_percentiles(
             df=enriched_df,
-            value_column="duration_ms",
-            group_by_columns=["app_version", "metric_date"],
-            percentiles=[0.5, 0.95, 0.99]
+            value_column=COL_DURATION_MS,
+            group_by_columns=[COL_APP_VERSION, COL_METRIC_DATE],
+            percentiles=DEFAULT_PERCENTILES
         )
 
         # Rename percentile columns to match database schema
@@ -95,9 +103,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print("\n📊 Calculating Device Performance...")
         device_percentiles = calculate_percentiles(
             df=enriched_df,
-            value_column="duration_ms",
-            group_by_columns=["device_type", "metric_date"],
-            percentiles=[0.5, 0.95, 0.99]
+            value_column=COL_DURATION_MS,
+            group_by_columns=[COL_DEVICE_TYPE, COL_METRIC_DATE],
+            percentiles=DEFAULT_PERCENTILES
         )
 
         device_percentiles = device_percentiles \
@@ -106,13 +114,13 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             .withColumnRenamed("p99", "p99_duration_ms")
 
         # Add user count
-        device_perf_with_users = enriched_df.groupBy("device_type", "metric_date").agg(
-            F.countDistinct("user_id").alias("user_count")
+        device_perf_with_users = enriched_df.groupBy(COL_DEVICE_TYPE, COL_METRIC_DATE).agg(
+            F.countDistinct(COL_USER_ID).alias("user_count")
         )
 
         device_perf_final = device_percentiles.join(
             device_perf_with_users,
-            ["device_type", "metric_date"],
+            [COL_DEVICE_TYPE, COL_METRIC_DATE],
             "left"
         )
 
@@ -124,9 +132,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print("\n📊 Detecting Performance Anomalies...")
         anomalies_df = detect_anomalies_statistical(
             df=enriched_df,
-            value_column="duration_ms",
-            z_threshold=3.0,
-            group_by_columns=["app_version", "metric_date"]
+            value_column=COL_DURATION_MS,
+            z_threshold=Z_SCORE_ANOMALY_THRESHOLD,
+            group_by_columns=[COL_APP_VERSION, COL_METRIC_DATE]
         )
 
         if anomalies_df.count() > 0:
@@ -229,9 +237,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
     def get_table_mapping(self) -> Dict[str, str]:
         """Get database table mapping with special mode for anomalies."""
         return {
-            "performance_by_version": "performance_by_version",
-            "device_performance": "device_performance",
-            "performance_anomalies": "performance_anomalies"
+            "performance_by_version": TABLE_PERFORMANCE_BY_VERSION,
+            "device_performance": TABLE_DEVICE_PERFORMANCE,
+            "performance_anomalies": TABLE_PERFORMANCE_ANOMALIES,
         }
 
 

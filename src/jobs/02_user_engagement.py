@@ -17,11 +17,11 @@ Usage (via helper script):
         --write-to-db
 
 Usage (direct spark-submit):
-    docker exec goodnote-spark-master /opt/spark/bin/spark-submit \
-        --master local[*] \
+    docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
         /opt/spark-apps/src/jobs/02_user_engagement.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
-        --write-to-db
+        --write-to-db'
 """
 import argparse
 import sys
@@ -30,6 +30,14 @@ from typing import Dict
 from pyspark.sql import DataFrame
 
 from src.jobs.base_job import BaseAnalyticsJob
+from src.schemas.columns import (
+    COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE,
+)
+from src.config.constants import (
+    HOT_KEY_THRESHOLD_PERCENTILE,
+    TABLE_DAILY_ACTIVE_USERS, TABLE_MONTHLY_ACTIVE_USERS,
+    TABLE_USER_STICKINESS, TABLE_POWER_USERS, TABLE_COHORT_RETENTION,
+)
 from src.transforms.engagement import (
     calculate_dau,
     calculate_mau,
@@ -97,12 +105,12 @@ class UserEngagementJob(BaseAnalyticsJob):
         # 4. Power Users (Top 1%)
         print("\n📊 Identifying Power Users...")
         metadata_df = enriched_df.select(
-            "user_id", "join_date", "country", "device_type", "subscription_type"
+            COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE
         ).distinct()
         power_users_df = identify_power_users(
             enriched_df,
             metadata_df,
-            percentile=0.99
+            percentile=HOT_KEY_THRESHOLD_PERCENTILE
         )
         power_user_count = power_users_df.count()
         print(f"   ✅ Identified {power_user_count} power users (top 1%)")
@@ -176,11 +184,11 @@ class UserEngagementJob(BaseAnalyticsJob):
     def get_table_mapping(self) -> Dict[str, str]:
         """Get database table mapping."""
         return {
-            "dau": "daily_active_users",
-            "mau": "monthly_active_users",
-            "stickiness": "user_stickiness",
-            "power_users": "power_users",
-            "cohort_retention": "cohort_retention"
+            "dau": TABLE_DAILY_ACTIVE_USERS,
+            "mau": TABLE_MONTHLY_ACTIVE_USERS,
+            "stickiness": TABLE_USER_STICKINESS,
+            "power_users": TABLE_POWER_USERS,
+            "cohort_retention": TABLE_COHORT_RETENTION,
         }
 
 

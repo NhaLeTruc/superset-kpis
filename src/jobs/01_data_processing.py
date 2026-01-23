@@ -12,12 +12,12 @@ Usage (via helper script):
         --output-path /app/data/processed/enriched_interactions.parquet
 
 Usage (direct spark-submit):
-    docker exec goodnote-spark-master /opt/spark/bin/spark-submit \
-        --master local[*] \
+    docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
         /opt/spark-apps/src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/interactions.parquet \
         --metadata-path /app/data/raw/metadata.parquet \
-        --output-path /app/data/processed/enriched_interactions.parquet
+        --output-path /app/data/processed/enriched_interactions.parquet'
 """
 import argparse
 import sys
@@ -28,6 +28,14 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.jobs.base_job import BaseAnalyticsJob
+from src.schemas import (
+    INTERACTIONS_REQUIRED_COLUMNS,
+    INTERACTIONS_NOT_NULL_COLUMNS,
+    METADATA_REQUIRED_COLUMNS,
+    METADATA_NOT_NULL_COLUMNS,
+)
+from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_ACTION_TYPE, COL_DEVICE_TYPE
+from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.transforms.join.execution import optimized_join, identify_hot_keys
 from src.utils.data_quality import detect_nulls
 from src.utils.monitoring import log_monitoring_summary
@@ -60,23 +68,21 @@ class DataProcessingJob(BaseAnalyticsJob):
         print("\n🔍 Validating input data quality...")
 
         # Check for required columns in interactions
-        required_interactions_cols = ["user_id", "timestamp", "action_type", "page_id", "duration_ms", "app_version"]
-        missing_cols = [col for col in required_interactions_cols if col not in interactions_df.columns]
+        missing_cols = [col for col in INTERACTIONS_REQUIRED_COLUMNS if col not in interactions_df.columns]
         if missing_cols:
             raise ValueError(f"Missing columns in interactions: {missing_cols}")
 
         # Check for required columns in metadata
-        required_metadata_cols = ["user_id", "join_date", "country", "device_type", "subscription_type"]
-        missing_cols = [col for col in required_metadata_cols if col not in metadata_df.columns]
+        missing_cols = [col for col in METADATA_REQUIRED_COLUMNS if col not in metadata_df.columns]
         if missing_cols:
             raise ValueError(f"Missing columns in metadata: {missing_cols}")
 
         # Detect nulls in critical columns
-        null_cols_interactions = detect_nulls(interactions_df, ["user_id", "timestamp"])
+        null_cols_interactions = detect_nulls(interactions_df, INTERACTIONS_NOT_NULL_COLUMNS)
         if null_cols_interactions:
             print(f"   ⚠️  Warning: NULL values found in interactions: {null_cols_interactions}")
 
-        null_cols_metadata = detect_nulls(metadata_df, ["user_id"])
+        null_cols_metadata = detect_nulls(metadata_df, METADATA_NOT_NULL_COLUMNS)
         if null_cols_metadata:
             print(f"   ⚠️  Warning: NULL values found in metadata: {null_cols_metadata}")
 
@@ -97,8 +103,8 @@ class DataProcessingJob(BaseAnalyticsJob):
         print("   🔍 Analyzing data skew...")
         hot_keys_df = identify_hot_keys(
             interactions_df,
-            key_column="user_id",
-            threshold_percentile=0.99
+            key_column=COL_USER_ID,
+            threshold_percentile=HOT_KEY_THRESHOLD_PERCENTILE
         )
 
         hot_key_count = hot_keys_df.count()
@@ -112,7 +118,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         enriched_df = optimized_join(
             large_df=interactions_df,
             small_df=metadata_df,
-            join_key="user_id",
+            join_key=COL_USER_ID,
             join_type="left",
             broadcast_threshold_mb=100
         )
@@ -167,30 +173,30 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         # Date range
         date_stats = enriched_df.agg(
-            F.min("timestamp").alias("min_date"),
-            F.max("timestamp").alias("max_date")
+            F.min(COL_TIMESTAMP).alias("min_date"),
+            F.max(COL_TIMESTAMP).alias("max_date")
         ).collect()[0]
 
         print(f"Date Range: {date_stats['min_date']} to {date_stats['max_date']}")
 
         # Record counts
         total_records = enriched_df.count()
-        total_users = enriched_df.select("user_id").distinct().count()
+        total_users = enriched_df.select(COL_USER_ID).distinct().count()
 
         print(f"Total Interactions: {total_records:,}")
         print(f"Unique Users: {total_users:,}")
 
         # Action type distribution
         print("\nAction Type Distribution:")
-        action_counts = enriched_df.groupBy("action_type").count().orderBy(F.desc("count"))
+        action_counts = enriched_df.groupBy(COL_ACTION_TYPE).count().orderBy(F.desc("count"))
         for row in action_counts.collect()[:10]:
-            print(f"  {row['action_type']}: {row['count']:,}")
+            print(f"  {row[COL_ACTION_TYPE]}: {row['count']:,}")
 
         # Device type distribution
         print("\nDevice Type Distribution:")
-        device_counts = enriched_df.groupBy("device_type").count().orderBy(F.desc("count"))
+        device_counts = enriched_df.groupBy(COL_DEVICE_TYPE).count().orderBy(F.desc("count"))
         for row in device_counts.collect():
-            print(f"  {row['device_type']}: {row['count']:,}")
+            print(f"  {row[COL_DEVICE_TYPE]}: {row['count']:,}")
 
         print("=" * 60)
 
@@ -205,7 +211,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         # Add date partition column
         enriched_df = enriched_df.withColumn(
             "date",
-            F.to_date("timestamp")
+            F.to_date(COL_TIMESTAMP)
         )
 
         # Write with date partitioning
