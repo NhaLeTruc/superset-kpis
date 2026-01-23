@@ -5,7 +5,9 @@ services:
 
   # Spark Master Node
   spark-master:
-    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.spark
     container_name: ${CONTAINER_SPARK_MASTER:-goodnote-spark-master}
     environment:
       - SPARK_NO_DAEMONIZE=true
@@ -17,7 +19,6 @@ services:
       - ./src:/opt/spark-apps/src/
       - ./data:/app/data
       - ./database:/app/database
-      - ./requirements.txt:/app/requirements.txt
       - ./scripts:/opt/spark-apps/scripts/
     networks:
       - goodnote-network
@@ -29,7 +30,9 @@ services:
 
   # Spark Worker Node 1
   spark-worker-1:
-    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.spark
     container_name: ${CONTAINER_SPARK_WORKER_1:-goodnote-spark-worker-1}
     environment:
       - SPARK_NO_DAEMONIZE=true
@@ -52,7 +55,9 @@ services:
 
   # Spark Worker Node 2
   spark-worker-2:
-    image: ${SPARK_IMAGE:-apache/spark}:${SPARK_VERSION:-3.5.0-python3}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.spark
     container_name: ${CONTAINER_SPARK_WORKER_2:-goodnote-spark-worker-2}
     environment:
       - SPARK_NO_DAEMONIZE=true

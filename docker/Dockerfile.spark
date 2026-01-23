@@ -1,0 +1,17 @@
+# Spark Master/Worker with project dependencies
+FROM apache/spark:3.5.0-python3
+
+USER root
+
+# Install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+
+# Create required runtime directories
+RUN mkdir -p /tmp/spark-events /app/data/raw /app/data/processed
+
+# Set PYTHONPATH so 'from src.xxx import' resolves against the mounted volume
+ENV PYTHONPATH=/opt/spark-apps
+
+# Use a neutral working directory to avoid spark-submit treating CWD as a JAR
+WORKDIR /opt/spark

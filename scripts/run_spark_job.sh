@@ -78,19 +78,19 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${SPARK_MASTER_CONTAINER}$"; th
 fi
 
 # Run the job using spark-submit
-# Set PYTHONPATH so 'from src.xxx import' works
+# Uses bash -c to prevent shell glob expansion of local[*] and ensure proper
+# argument parsing inside the container.
+# PYTHONPATH is set in docker-compose.yml for the spark-master service.
 docker exec "${SPARK_MASTER_CONTAINER}" \
-    /opt/spark/bin/spark-submit \
-    --master "${SPARK_MASTER_URL}" \
-    --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
-    --conf "spark.pyspark.python=python3" \
-    --conf "spark.pyspark.driver.python=python3" \
-    --conf "spark.driver.extraPythonPath=/opt/spark-apps" \
-    --conf "spark.executor.extraPythonPath=/opt/spark-apps" \
-    --conf "spark.sql.adaptive.enabled=true" \
-    --conf "spark.sql.adaptive.coalescePartitions.enabled=true" \
-    "${CONTAINER_SCRIPT}" \
-    ${JOB_ARGS}
+    bash -c "/opt/spark/bin/spark-submit \
+    --master \"${SPARK_MASTER_URL}\" \
+    --conf \"spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp\" \
+    --conf \"spark.pyspark.python=python3\" \
+    --conf \"spark.pyspark.driver.python=python3\" \
+    --conf \"spark.sql.adaptive.enabled=true\" \
+    --conf \"spark.sql.adaptive.coalescePartitions.enabled=true\" \
+    ${CONTAINER_SCRIPT} \
+    ${JOB_ARGS}"
 
 EXIT_CODE=$?
 

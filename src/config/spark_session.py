@@ -100,6 +100,8 @@ def create_spark_session(
     # Warehouse & Checkpointing
     warehouse_dir = os.getenv("SPARK_WAREHOUSE_DIR", "/tmp/spark-warehouse")
     checkpoint_dir = os.getenv("SPARK_CHECKPOINT_DIR", "/tmp/spark-checkpoint")
+    event_log_dir = os.getenv("SPARK_EVENT_LOG_DIR", "/tmp/spark-events")
+    os.makedirs(event_log_dir, exist_ok=True)
 
     builder = builder \
         .config("spark.sql.warehouse.dir", warehouse_dir) \
@@ -110,7 +112,7 @@ def create_spark_session(
         .config("spark.ui.enabled", "true") \
         .config("spark.ui.port", "4040") \
         .config("spark.eventLog.enabled", "true") \
-        .config("spark.eventLog.dir", "/tmp/spark-events")
+        .config("spark.eventLog.dir", event_log_dir)
 
     # Hive Support (Optional)
     if enable_hive:
