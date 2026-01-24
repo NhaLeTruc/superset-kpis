@@ -90,18 +90,6 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         session_metrics_df = calculate_session_metrics(sessionized_df)
 
-        # Add device_type and country from enriched data
-        session_with_metadata = sessionized_df.groupBy(COL_SESSION_ID).agg(
-            F.first(COL_DEVICE_TYPE).alias(COL_DEVICE_TYPE),
-            F.first(COL_COUNTRY).alias(COL_COUNTRY)
-        )
-
-        session_metrics_df = session_metrics_df.join(
-            session_with_metadata,
-            COL_SESSION_ID,
-            "left"
-        )
-
         # Add metric date for time-series analysis
         session_metrics_df = session_metrics_df.withColumn(
             COL_METRIC_DATE,
@@ -152,8 +140,8 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         # Combine all bounce rates
         bounce_rates_df = overall_bounce_df \
-            .union(device_bounce_df) \
-            .union(country_bounce_df)
+            .unionByName(device_bounce_df) \
+            .unionByName(country_bounce_df)
 
         bounce_rate_count = bounce_rates_df.count()
         print(f"   ✅ Calculated {bounce_rate_count} bounce rate metrics")
