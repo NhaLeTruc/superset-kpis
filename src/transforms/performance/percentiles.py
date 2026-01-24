@@ -6,7 +6,6 @@ Functions for calculating percentile metrics and device-performance correlations
 from typing import List
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
 from src.schemas.columns import COL_USER_ID, COL_DURATION_MS, COL_DEVICE_TYPE
 from src.config.constants import DEFAULT_PERCENTILES
@@ -65,57 +64,83 @@ def calculate_device_correlation(
     metadata_df: DataFrame
 ) -> DataFrame:
     """
-    Calculate device-performance correlation metrics.
+    Identify correlation between device type and app performance using one-way ANOVA.
+
+    Since device_type is categorical and duration_ms is continuous, Pearson correlation
+    is not appropriate. One-way ANOVA tests whether there is a statistically significant
+    difference in performance across device types. Eta-squared (eta^2) quantifies the
+    effect size as the proportion of variance in duration explained by device type.
 
     Args:
         interactions_df: User interactions with duration_ms
         metadata_df: User metadata with device_type
 
     Returns:
-        DataFrame with device performance metrics, sorted by avg_duration_ms DESC
+        DataFrame with per-device performance metrics and ANOVA correlation stats,
+        sorted by avg_duration_ms DESC.
+
+        Columns:
+            device_type, avg_duration_ms, p95_duration_ms, total_interactions,
+            unique_users, interactions_per_user, f_statistic, eta_squared
     """
-    # Join interactions with metadata
-    # TODO: Ensure metadata_df has 'user_id' and 'device_type' columns
-    # TODO: Ensure interactions_df has 'user_id' and 'duration_ms' columns
-    # TODO: Handle missing device_type and multiple device types per user if necessary
     joined_df = interactions_df.join(metadata_df, on=COL_USER_ID, how="left")
 
-    # Aggregate by device_type
+    # Per-device descriptive statistics in a single aggregation pass
     device_metrics = joined_df.groupBy(COL_DEVICE_TYPE).agg(
         F.avg(COL_DURATION_MS).alias("avg_duration_ms"),
         F.count("*").alias("total_interactions"),
-        F.countDistinct(COL_USER_ID).alias("unique_users")
+        F.countDistinct(COL_USER_ID).alias("unique_users"),
+        F.percentile_approx(COL_DURATION_MS, 0.95).alias("p95_duration_ms"),
+        F.variance(COL_DURATION_MS).alias("_group_variance")
     )
 
-    # Calculate interactions_per_user
     device_metrics = device_metrics.withColumn(
         "interactions_per_user",
         (F.col("total_interactions") / F.col("unique_users")).cast("double")
     )
 
-    # Calculate p95 duration per device
-    # Group by device and calculate p95
-    device_groups = metadata_df.select(COL_DEVICE_TYPE).distinct()
+    # --- One-way ANOVA: device_type (categorical) vs duration_ms (continuous) ---
+    overall_stats = joined_df.agg(
+        F.avg(COL_DURATION_MS).alias("grand_mean"),
+        F.count("*").alias("N")
+    ).collect()[0]
+    grand_mean = float(overall_stats["grand_mean"])
+    N = int(overall_stats["N"])
 
-    p95_results = []
-    for device_row in device_groups.collect():
-        device = device_row[COL_DEVICE_TYPE]
-        device_df = joined_df.filter(F.col(COL_DEVICE_TYPE) == device)
-        p95_value = device_df.approxQuantile(COL_DURATION_MS, [0.95], 0.0001)[0]
-        p95_results.append((device, float(p95_value)))
+    k = int(device_metrics.count())
 
+    # Compute SSB and SSW from per-group stats already calculated
+    anova_components = device_metrics.agg(
+        F.sum(
+            F.col("total_interactions") * F.pow(F.col("avg_duration_ms") - F.lit(grand_mean), 2)
+        ).alias("SSB"),
+        F.sum(
+            F.when(F.col("_group_variance").isNotNull(),
+                   (F.col("total_interactions") - 1) * F.col("_group_variance"))
+            .otherwise(0.0)
+        ).alias("SSW")
+    ).collect()[0]
 
-    p95_schema = StructType([
-        StructField(COL_DEVICE_TYPE, StringType(), nullable=False),
-        StructField("p95_duration_ms", DoubleType(), nullable=True)
-    ])
-    p95_df = interactions_df.sql_ctx.createDataFrame(p95_results, schema=p95_schema)
+    SSB = float(anova_components["SSB"])
+    SSW = float(anova_components["SSW"])
+    SST = SSB + SSW
 
-    # Join p95 with device_metrics
-    result_df = device_metrics.join(p95_df, on=COL_DEVICE_TYPE, how="left")
+    # F-statistic requires k > 1 and SSW > 0 (non-zero within-group variance)
+    if k > 1 and N > k and SSW > 0:
+        f_statistic = (SSB / (k - 1)) / (SSW / (N - k))
+    else:
+        f_statistic = None
 
-    # Sort by avg_duration_ms descending
-    result_df = result_df.orderBy(F.col("avg_duration_ms").desc())
+    eta_squared = SSB / SST if SST > 0 else None
+
+    # Attach ANOVA results as columns for downstream consumption
+    result_df = device_metrics \
+        .withColumn("f_statistic",
+                    F.lit(f_statistic).cast("double")) \
+        .withColumn("eta_squared",
+                    F.lit(eta_squared).cast("double")) \
+        .drop("_group_variance") \
+        .orderBy(F.col("avg_duration_ms").desc())
 
     return result_df.select(
         COL_DEVICE_TYPE,
@@ -123,5 +148,7 @@ def calculate_device_correlation(
         "p95_duration_ms",
         "total_interactions",
         "unique_users",
-        "interactions_per_user"
+        "interactions_per_user",
+        "f_statistic",
+        "eta_squared"
     )
