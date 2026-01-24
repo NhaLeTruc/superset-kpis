@@ -97,7 +97,7 @@ class UserEngagementJob(BaseAnalyticsJob):
         print("\n📊 Calculating Stickiness Ratio...")
         stickiness_df = calculate_stickiness(dau_df, mau_df)
         stickiness_count = stickiness_df.count()
-        avg_stickiness = stickiness_df.agg({"stickiness": "avg"}).collect()[0][0]
+        avg_stickiness = stickiness_df.agg({"stickiness_ratio": "avg"}).collect()[0][0]
         print(f"   ✅ Computed stickiness for {stickiness_count} days")
         print(f"   📈 Average stickiness: {avg_stickiness:.2%}")
         metrics["stickiness"] = stickiness_df
@@ -138,7 +138,12 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         # DAU Summary
         dau_df = metrics["dau"]
-        dau_stats = dau_df.agg({"dau": "avg", "dau": "max", "dau": "min"}).collect()[0]
+        from pyspark.sql import functions as F
+        dau_stats = dau_df.select(
+            F.avg("daily_active_users"),
+            F.max("daily_active_users"),
+            F.min("daily_active_users")
+        ).collect()[0]
         print(f"\nDaily Active Users:")
         print(f"  Average DAU: {dau_stats[0]:,.0f}")
         print(f"  Max DAU: {dau_stats[1]:,}")
@@ -146,17 +151,17 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         # MAU Summary
         mau_df = metrics["mau"]
-        mau_stats = mau_df.agg({"mau": "avg"}).collect()[0]
+        mau_stats = mau_df.agg({"monthly_active_users": "avg"}).collect()[0]
         print(f"\nMonthly Active Users:")
         print(f"  Average MAU: {mau_stats[0]:,.0f}")
 
         # Stickiness Summary
         stickiness_df = metrics["stickiness"]
-        stickiness_stats = stickiness_df.agg({
-            "stickiness": "avg",
-            "stickiness": "max",
-            "stickiness": "min"
-        }).collect()[0]
+        stickiness_stats = stickiness_df.select(
+            F.avg("stickiness_ratio"),
+            F.max("stickiness_ratio"),
+            F.min("stickiness_ratio")
+        ).collect()[0]
         print(f"\nStickiness Ratio:")
         print(f"  Average: {stickiness_stats[0]:.2%}")
         print(f"  Max: {stickiness_stats[1]:.2%}")
@@ -165,7 +170,7 @@ class UserEngagementJob(BaseAnalyticsJob):
         # Power Users Summary
         power_users_df = metrics["power_users"]
         power_user_count = power_users_df.count()
-        total_hours = power_users_df.agg({"total_duration_hours": "sum"}).collect()[0][0]
+        total_hours = power_users_df.agg({"hours_spent": "sum"}).collect()[0][0]
         print(f"\nPower Users:")
         print(f"  Count: {power_user_count:,} (top 1%)")
         print(f"  Total Engagement: {total_hours:,.0f} hours")
