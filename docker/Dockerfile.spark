@@ -7,6 +7,10 @@ USER root
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
+# Download PostgreSQL JDBC driver
+RUN curl -fSL https://jdbc.postgresql.org/download/postgresql-42.7.1.jar \
+    -o /opt/spark/jars/postgresql-42.7.1.jar
+
 # Create required runtime directories
 RUN mkdir -p /tmp/spark-events /app/data/raw /app/data/processed
 
