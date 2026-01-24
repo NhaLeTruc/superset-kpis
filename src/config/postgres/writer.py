@@ -62,18 +62,17 @@ def write_to_postgres(
 
     # Write to PostgreSQL
     try:
-        df.write \
-            .jdbc(
-                url=jdbc_url,
-                table=table_name,
-                mode=mode,
-                properties=properties
-            ) \
-            .option("batchsize", batch_size) \
-            .option("isolationLevel", "READ_COMMITTED") \
-            .save()
+        properties["batchsize"] = str(batch_size)
+        properties["isolationLevel"] = "READ_COMMITTED"
 
-        print(f"✅ Successfully wrote {df.count()} rows to {table_name}")
+        df.write.jdbc(
+            url=jdbc_url,
+            table=table_name,
+            mode=mode,
+            properties=properties
+        )
+
+        print(f"✅ Successfully wrote to {table_name}")
 
     except Exception as e:
         print(f"❌ Failed to write to {table_name}: {str(e)}")
