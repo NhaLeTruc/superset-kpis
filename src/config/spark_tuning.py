@@ -39,9 +39,9 @@ def configure_job_specific_settings(
 
     elif job_type == "analytics":
         # Analytics: fewer partitions, more broadcasting
-        spark.conf.set("spark.sql.shuffle.partitions", "100")
+        spark.conf.set("spark.sql.shuffle.partitions", "20")
         spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "200MB")
-        print("📈 Configured for Analytics workload (100 partitions, 200MB broadcast)")
+        print("📈 Configured for Analytics workload (20 partitions, 200MB broadcast)")
 
     elif job_type == "ml":
         # ML: more memory for caching, fewer partitions

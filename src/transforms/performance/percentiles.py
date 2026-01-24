@@ -42,67 +42,20 @@ def calculate_percentiles(
         if p <= 0 or p >= 1:
             raise ValueError(f"Percentile {p} must be between 0 and 1")
 
-    # Group by specified columns and calculate statistics
+    # Build aggregation expressions: stats + percentiles in a single pass
     agg_exprs = [
         F.count("*").alias("count"),
         F.avg(value_column).alias(f"avg_{value_column}"),
         F.stddev(value_column).alias(f"stddev_{value_column}")
     ]
 
-    # Calculate percentiles using approxQuantile
-    # We need to do this per group, so we'll use a different approach
+    for p in percentiles:
+        percentile_name = f"p{int(p * 100)}"
+        agg_exprs.append(
+            F.percentile_approx(value_column, p).alias(percentile_name)
+        )
+
     result_df = df.groupBy(*group_by_columns).agg(*agg_exprs)
-
-    # For each group, calculate percentiles
-    # We'll collect group keys and calculate percentiles for each group
-    groups = result_df.select(*group_by_columns).collect()
-
-    # Create percentile columns
-    percentile_results = []
-    for group_row in groups:
-        # Build filter condition for this group
-        filter_condition = None
-        for col in group_by_columns:
-            col_condition = F.col(col) == group_row[col]
-            if filter_condition is None:
-                filter_condition = col_condition
-            else:
-                filter_condition = filter_condition & col_condition
-
-        # Filter to this group
-        group_df = df.filter(filter_condition)
-
-        # Calculate percentiles for this group with higher accuracy
-        percentile_values = group_df.approxQuantile(value_column, percentiles, 0.0001)
-
-        # Create a row with group keys + percentile values
-        row_dict = {col: group_row[col] for col in group_by_columns}
-        for i, p in enumerate(percentiles):
-            percentile_name = f"p{int(p * 100)}"
-            row_dict[percentile_name] = float(percentile_values[i])
-
-        percentile_results.append(row_dict)
-
-    # Create DataFrame from percentile results
-    if percentile_results:
-        from pyspark.sql.types import StructType, StructField, DoubleType
-
-        # Build schema dynamically
-        schema_fields = []
-        for col in group_by_columns:
-            # Get original column type from df
-            orig_field = [f for f in df.schema.fields if f.name == col][0]
-            schema_fields.append(StructField(col, orig_field.dataType, nullable=False))
-
-        for p in percentiles:
-            percentile_name = f"p{int(p * 100)}"
-            schema_fields.append(StructField(percentile_name, DoubleType(), nullable=True))
-
-        percentile_schema = StructType(schema_fields)
-        percentile_df = df.sql_ctx.createDataFrame(percentile_results, schema=percentile_schema)
-
-        # Join with aggregated statistics
-        result_df = result_df.join(percentile_df, on=group_by_columns, how="inner")
 
     return result_df
 
