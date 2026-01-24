@@ -59,10 +59,11 @@ class BaseAnalyticsJob(ABC):
             path: Path to Parquet file/directory
 
         Returns:
-            DataFrame with enriched interactions
+            DataFrame with enriched interactions (cached)
         """
         print(f"📖 Reading enriched data from: {path}")
-        df = self.spark.read.parquet(path)
+        from pyspark import StorageLevel
+        df = self.spark.read.parquet(path).persist(StorageLevel.MEMORY_AND_DISK)
         record_count = df.count()
         print(f"   ✅ Loaded {record_count:,} enriched interactions")
 
@@ -93,7 +94,7 @@ class BaseAnalyticsJob(ABC):
                          table_mapping: Dict[str, str],
                          mode: str = "overwrite",
                          batch_size: int = 10000,
-                         num_partitions: int = 4) -> None:
+                         num_partitions: Optional[int] = None) -> None:
         """
         Write multiple DataFrames to PostgreSQL.
 
@@ -122,7 +123,6 @@ class BaseAnalyticsJob(ABC):
                     batch_size=batch_size,
                     num_partitions=num_partitions
                 )
-                print(f"   ✅ Successfully wrote {df.count():,} rows")
 
             except Exception as e:
                 print(f"   ❌ Failed to write {metric_name}: {str(e)}")
