@@ -5,6 +5,7 @@ Following TDD approach - tests written before implementation.
 Reference: docs/TDD_SPEC.md - Task 5 (Data Quality Specifications)
 """
 import pytest
+from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, TimestampType
 from src.utils.data_quality import validate_schema, detect_nulls, detect_outliers
 from datetime import datetime
@@ -165,16 +166,14 @@ class TestDetectNulls:
         # Verify schema includes null_columns
         assert "null_columns" in result_df.columns, "Expected 'null_columns' column in result"
 
-        # Collect results and verify null_columns content
-        results = result_df.collect()
+        # Use filter-based assertions (order-independent)
+        user_null_rows = result_df.filter(F.col("user_id").isNull()).collect()
+        assert len(user_null_rows) == 1, "Expected 1 row with NULL user_id"
+        assert "user_id" in user_null_rows[0]["null_columns"], "Expected 'user_id' in null_columns"
 
-        # Row 1 should have NULL user_id
-        row1_nulls = results[0]["null_columns"]
-        assert "user_id" in row1_nulls, "Expected 'user_id' in null_columns for row 1"
-
-        # Row 2 should have NULL timestamp
-        row2_nulls = results[1]["null_columns"]
-        assert "timestamp" in row2_nulls, "Expected 'timestamp' in null_columns for row 2"
+        timestamp_null_rows = result_df.filter(F.col("timestamp").isNull()).collect()
+        assert len(timestamp_null_rows) == 1, "Expected 1 row with NULL timestamp"
+        assert "timestamp" in timestamp_null_rows[0]["null_columns"], "Expected 'timestamp' in null_columns"
 
 
 class TestDetectOutliers:
