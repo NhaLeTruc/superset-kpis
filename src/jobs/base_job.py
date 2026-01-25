@@ -17,12 +17,13 @@ import argparse
 import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame, SparkSession
 
 from src.config.spark_config import create_spark_session, configure_job_specific_settings
 from src.config.database_config import write_to_postgres
+from src.utils.data_quality import detect_nulls
 from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 
 
@@ -48,31 +49,6 @@ class BaseAnalyticsJob(ABC):
         self.monitoring_ctx: Optional[Dict] = None
         self.args = None
 
-    def read_enriched_data(self, path: str) -> DataFrame:
-        """
-        Read enriched interactions from Parquet.
-
-        Common implementation used by most analytics jobs.
-        Override if job needs different input.
-
-        Args:
-            path: Path to Parquet file/directory
-
-        Returns:
-            DataFrame with enriched interactions (cached)
-        """
-        print(f"📖 Reading enriched data from: {path}")
-        from pyspark import StorageLevel
-        df = self.spark.read.parquet(path).persist(StorageLevel.MEMORY_AND_DISK)
-        record_count = df.count()
-        print(f"   ✅ Loaded {record_count:,} enriched interactions")
-
-        # Track in monitoring
-        if self.monitoring_ctx:
-            self.monitoring_ctx["record_counter"].add(record_count)
-
-        return df
-
     def read_parquet(self, path: str, name: str = "data") -> DataFrame:
         """
         Generic method to read any Parquet file.
@@ -85,10 +61,75 @@ class BaseAnalyticsJob(ABC):
             DataFrame
         """
         print(f"📖 Reading {name} from: {path}")
-        df = self.spark.read.parquet(path)
+        df = self.spark.read.parquet(path).persist()
         record_count = df.count()
+
+        # Track in monitoring
+        if self.monitoring_ctx:
+            self.monitoring_ctx["record_counter"].add(record_count)
+
+        print(f"   ✅ Loaded {record_count:,} records. Please unpersist when done.")
+        return df
+
+    def read_csv(self, path: str, name: str = "data") -> DataFrame:
+        """
+        Generic method to read any CSV file.
+
+        Args:
+            path: Path to CSV file
+            name: Display name for logging
+
+        Returns:
+            DataFrame
+        """
+        print(f"📖 Reading {name} from: {path}")
+        df = self.spark.read.csv(path, header=True, inferSchema=True)
+        record_count = df.count()
+
+        # Track in monitoring
+        if self.monitoring_ctx:
+            self.monitoring_ctx["record_counter"].add(record_count)
+
         print(f"   ✅ Loaded {record_count:,} records")
         return df
+
+    def validate_dataframe(
+        self,
+        df: DataFrame,
+        required_columns: List[str],
+        not_null_columns: List[str],
+        name: str
+    ) -> List[str]:
+        """
+        Validate a DataFrame's structure and data quality.
+
+        Args:
+            df: DataFrame to validate
+            required_columns: Columns that must exist (raises ValueError if missing)
+            not_null_columns: Columns to check for NULLs (returns warnings)
+            name: Display name for error messages
+
+        Returns:
+            List of warning messages (empty if no issues)
+
+        Raises:
+            ValueError: If required columns are missing
+        """
+        warnings = []
+
+        # Check for required columns
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing columns in {name}: {missing_cols}")
+
+        # Detect nulls in non-nullable columns
+        if not_null_columns:
+            null_rows_df = detect_nulls(df, not_null_columns)
+            null_count = null_rows_df.count()
+            if null_count > 0:
+                warnings.append(f"NULL values found in {name}: {null_count} rows affected")
+
+        return warnings
 
     def write_to_database(self, metrics: Dict[str, DataFrame],
                          table_mapping: Dict[str, str],
@@ -128,20 +169,28 @@ class BaseAnalyticsJob(ABC):
                 print(f"   ❌ Failed to write {metric_name}: {str(e)}")
                 raise
 
-    def write_to_parquet(self, metrics: Dict[str, DataFrame],
-                        output_path: str) -> None:
+    def write_to_parquet(
+        self,
+        metrics: Dict[str, DataFrame],
+        output_path: str,
+        partition_by: Optional[List[str]] = None
+    ) -> None:
         """
         Write multiple DataFrames to Parquet files.
 
         Args:
             metrics: Dictionary mapping metric names to DataFrames
             output_path: Base directory path for outputs
+            partition_by: Optional list of column names to partition by
         """
         print(f"\n💾 Writing metrics to Parquet: {output_path}")
 
         for metric_name, df in metrics.items():
             output_file = f"{output_path}/{metric_name}"
-            df.write.mode("overwrite").parquet(output_file)
+            writer = df.write.mode("overwrite")
+            if partition_by:
+                writer = writer.partitionBy(*partition_by)
+            writer.parquet(output_file)
             print(f"   ✅ Wrote {metric_name}")
 
     def setup_spark(self) -> None:
