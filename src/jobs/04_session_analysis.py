@@ -2,11 +2,11 @@
 """
 Job 4: Session Analysis
 
-Sessionizes user interactions and calculates session metrics:
-- Sessionization (30-minute timeout)
-- Session metrics (duration, actions count, bounce flag)
+Calculates session metrics using Spark's native session_window():
+- Session metrics (duration, actions count, bounce flag) with 30-minute timeout
 - Bounce rates (overall and by dimensions)
 
+Uses session_window() for single-pass sessionization and aggregation.
 Writes results to PostgreSQL for dashboard consumption.
 
 Usage (via helper script):
@@ -30,12 +30,11 @@ from pyspark.sql import functions as F
 
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
-    COL_SESSION_ID, COL_DEVICE_TYPE, COL_COUNTRY, COL_METRIC_DATE,
+    COL_DEVICE_TYPE, COL_COUNTRY, COL_METRIC_DATE,
     COL_IS_BOUNCE, COL_SESSION_DURATION_MS, COL_ACTION_COUNT,
 )
 from src.config.constants import SESSION_TIMEOUT_SECONDS, TABLE_SESSION_METRICS, TABLE_BOUNCE_RATES
 from src.transforms.session import (
-    sessionize_interactions,
     calculate_session_metrics,
     calculate_bounce_rate
 )
@@ -73,22 +72,15 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         results = {}
 
-        # 1. Sessionize Interactions
-        print("\n📊 Sessionizing user interactions...")
+        # 1. Calculate Session Metrics (uses session_window() internally)
+        print("\n📊 Calculating session metrics...")
         print("   ⏱️  Session timeout: 30 minutes")
 
-        sessionized_df = sessionize_interactions(
-            enriched_df,
-            session_timeout_seconds=SESSION_TIMEOUT_SECONDS
-        )
+        session_timeout = f"{SESSION_TIMEOUT_SECONDS} seconds"
+        session_metrics_df = calculate_session_metrics(enriched_df, session_timeout=session_timeout)
 
-        session_count = sessionized_df.select(COL_SESSION_ID).distinct().count()
+        session_count = session_metrics_df.count()
         print(f"   ✅ Created {session_count:,} sessions")
-
-        # 2. Calculate Session Metrics
-        print("\n📊 Calculating session metrics...")
-
-        session_metrics_df = calculate_session_metrics(sessionized_df)
 
         # Add metric date for time-series analysis
         session_metrics_df = session_metrics_df.withColumn(
@@ -96,10 +88,9 @@ class SessionAnalysisJob(BaseAnalyticsJob):
             F.to_date("session_start_time")
         )
 
-        bounce_count = session_metrics_df.filter(F.col(COL_IS_BOUNCE) == 1).count()
+        bounce_count = session_metrics_df.filter(F.col(COL_IS_BOUNCE) == True).count()
         bounce_percentage = (bounce_count / session_count) * 100 if session_count > 0 else 0
 
-        print(f"   ✅ Computed metrics for {session_count:,} sessions")
         print(f"   📊 Bounce sessions: {bounce_count:,} ({bounce_percentage:.1f}%)")
 
         results["session_metrics"] = session_metrics_df
