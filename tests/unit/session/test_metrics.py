@@ -4,10 +4,11 @@ Unit tests for session metrics transforms.
 Tests calculate_session_metrics() and calculate_bounce_rate() functions from session transforms.
 """
 import pytest
+from chispa.dataframe_comparer import assert_df_equality
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, LongType,
-    TimestampType, DoubleType
+    TimestampType, DoubleType, BooleanType
 )
 from datetime import datetime, timedelta
 from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
@@ -127,6 +128,55 @@ class TestCalculateSessionMetrics:
         # s003 - multi-action
         assert results[2]["is_bounce"] is False
         assert results[2]["action_count"] == 2
+
+    def test_calculate_session_metrics_empty_dataframe(self, spark):
+        """
+        GIVEN: Empty DataFrame with correct schema
+        WHEN: calculate_session_metrics() is called
+        THEN: Returns empty DataFrame with output schema
+        """
+        # Arrange
+        schema = StructType([
+            StructField("user_id", StringType(), nullable=False),
+            StructField("session_id", StringType(), nullable=False),
+            StructField("timestamp", TimestampType(), nullable=False),
+            StructField("duration_ms", LongType(), nullable=False)
+        ])
+
+        empty_df = spark.createDataFrame([], schema=schema)
+
+        # Act
+        result_df = calculate_session_metrics(empty_df)
+
+        # Assert
+        assert result_df.count() == 0
+        assert "session_id" in result_df.columns
+        assert "session_duration_ms" in result_df.columns
+
+    def test_calculate_session_metrics_zero_duration(self, spark):
+        """
+        GIVEN: Session with zero duration action
+        WHEN: calculate_session_metrics() is called
+        THEN: Handles zero duration correctly
+        """
+        # Arrange
+        schema = StructType([
+            StructField("user_id", StringType(), nullable=False),
+            StructField("session_id", StringType(), nullable=False),
+            StructField("timestamp", TimestampType(), nullable=False),
+            StructField("duration_ms", LongType(), nullable=False)
+        ])
+
+        data = [("u001", "s001", datetime(2023, 1, 1, 10, 0, 0), 0)]
+        df = spark.createDataFrame(data, schema=schema)
+
+        # Act
+        result_df = calculate_session_metrics(df)
+
+        # Assert
+        result = result_df.collect()[0]
+        assert result["session_duration_ms"] == 0
+        assert result["is_bounce"] is True
 
 
 class TestCalculateBounceRate:

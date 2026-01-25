@@ -16,6 +16,7 @@ from src.transforms.performance import (
     calculate_device_correlation,
     detect_anomalies_statistical
 )
+from tests.unit.helpers.assertions import assert_percentile_accuracy
 
 
 class TestCalculatePercentiles:
@@ -147,17 +148,75 @@ class TestCalculatePercentiles:
             percentiles=[0.50, 0.95, 0.99]
         )
 
-        # Assert
+        # Assert using custom helper
         result = result_df.collect()[0]
 
         # p50 ≈ 5000 (±1%)
-        assert abs(result["p50"] - 5000) / 5000 < 0.01
+        assert_percentile_accuracy(result["p50"], 5000, tolerance_pct=1.0)
 
         # p95 ≈ 9500 (±1%)
-        assert abs(result["p95"] - 9500) / 9500 < 0.01
+        assert_percentile_accuracy(result["p95"], 9500, tolerance_pct=1.0)
 
         # p99 ≈ 9900 (±1%)
-        assert abs(result["p99"] - 9900) / 9900 < 0.01
+        assert_percentile_accuracy(result["p99"], 9900, tolerance_pct=1.0)
+
+    def test_calculate_percentiles_single_value(self, spark):
+        """
+        GIVEN: A single value in the group
+        WHEN: calculate_percentiles() is called
+        THEN: All percentiles equal the single value
+        """
+        # Arrange
+        schema = StructType([
+            StructField("group", StringType(), nullable=False),
+            StructField("value", IntegerType(), nullable=False)
+        ])
+
+        data = [("A", 5000)]
+        df = spark.createDataFrame(data, schema=schema)
+
+        # Act
+        result_df = calculate_percentiles(
+            df,
+            value_column="value",
+            group_by_columns=["group"],
+            percentiles=[0.50, 0.95, 0.99]
+        )
+
+        # Assert
+        row = result_df.collect()[0]
+        assert row["p50"] == 5000
+        assert row["p95"] == 5000
+        assert row["count"] == 1
+
+    def test_calculate_percentiles_all_same_values(self, spark):
+        """
+        GIVEN: All values in the group are identical
+        WHEN: calculate_percentiles() is called
+        THEN: All percentiles equal the value, stddev is 0
+        """
+        # Arrange
+        schema = StructType([
+            StructField("group", StringType(), nullable=False),
+            StructField("value", IntegerType(), nullable=False)
+        ])
+
+        data = [("A", 1000)] * 100
+        df = spark.createDataFrame(data, schema=schema)
+
+        # Act
+        result_df = calculate_percentiles(
+            df,
+            value_column="value",
+            group_by_columns=["group"],
+            percentiles=[0.50, 0.95]
+        )
+
+        # Assert
+        row = result_df.collect()[0]
+        assert row["p50"] == 1000
+        assert row["p95"] == 1000
+        assert row["stddev_value"] == 0.0
 
 
 class TestCalculateDeviceCorrelation:
