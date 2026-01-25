@@ -84,10 +84,10 @@ def calculate_cohort_retention(
     # Join with cohort sizes
     retention_df = active_users_per_week.join(cohort_sizes, on="cohort_week", how="left")
 
-    # Calculate retention rate
+    # Calculate retention rate as decimal (0.0 to 1.0)
     retention_df = retention_df.withColumn(
         "retention_rate",
-        ((F.col("active_users") / F.col("cohort_size")) * 100.0).cast("double")
+        (F.col("active_users") / F.col("cohort_size")).cast("double")
     )
 
     # Create complete weeks range for each cohort (including weeks with 0 active users)

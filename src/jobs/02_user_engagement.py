@@ -98,7 +98,7 @@ class UserEngagementJob(BaseAnalyticsJob):
         stickiness_df = calculate_stickiness(dau_df, mau_df)
         stickiness_count = stickiness_df.count()
         avg_stickiness = stickiness_df.agg({"stickiness_ratio": "avg"}).collect()[0][0]
-        print(f"   ✅ Computed stickiness for {stickiness_count} days")
+        print(f"   ✅ Computed stickiness for {stickiness_count} months")
         print(f"   📈 Average stickiness: {avg_stickiness:.2%}")
         metrics["stickiness"] = stickiness_df
 

@@ -32,10 +32,10 @@ def calculate_stickiness(dau_df: DataFrame, mau_df: DataFrame) -> DataFrame:
     # Join with MAU
     stickiness_df = avg_dau_per_month.join(mau_df, on="month", how="inner")
 
-    # Calculate stickiness ratio as percentage
+    # Calculate stickiness ratio as decimal (0.0 to 1.0)
     stickiness_df = stickiness_df.withColumn(
         "stickiness_ratio",
-        ((F.col("avg_dau") / F.col("monthly_active_users")) * 100.0).cast("double")
+        (F.col("avg_dau") / F.col("monthly_active_users")).cast("double")
     )
 
     return stickiness_df.select("month", "avg_dau", "monthly_active_users", "stickiness_ratio")

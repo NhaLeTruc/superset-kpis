@@ -55,7 +55,7 @@ class TestCalculateCohortRetention:
         # Assert
         results = result_df.orderBy("week_number").collect()
         for week in range(4):
-            assert results[week]["retention_rate"] == 100.0
+            assert results[week]["retention_rate"] == 1.0
 
     def test_calculate_cohort_retention_declining(self, spark):
         """
@@ -102,10 +102,10 @@ class TestCalculateCohortRetention:
 
         # Assert
         results = result_df.orderBy("week_number").collect()
-        assert results[0]["retention_rate"] == 100.0
-        assert results[1]["retention_rate"] == 80.0
-        assert results[2]["retention_rate"] == 60.0
-        assert results[3]["retention_rate"] == 50.0
+        assert results[0]["retention_rate"] == 1.0
+        assert results[1]["retention_rate"] == 0.8
+        assert results[2]["retention_rate"] == 0.6
+        assert results[3]["retention_rate"] == 0.5
 
     def test_calculate_cohort_retention_multiple_cohorts(self, spark):
         """

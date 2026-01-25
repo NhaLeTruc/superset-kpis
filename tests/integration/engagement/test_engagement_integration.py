@@ -118,10 +118,10 @@ class TestDAUMAU:
         results = stickiness_df.orderBy("month").collect()
         assert len(results) == 1  # Only one month
 
-        # Check stickiness ratio (avg DAU/MAU * 100)
+        # Check stickiness ratio (avg DAU/MAU)
         # Avg DAU = (20 + 25 + 30) / 3 = 25
-        # Stickiness = 25 / 100 * 100 = 25%
-        assert results[0]["stickiness_ratio"] == pytest.approx(25.0, rel=0.01)
+        # Stickiness = 25 / 100 = 0.25
+        assert results[0]["stickiness_ratio"] == pytest.approx(0.25, rel=0.01)
 
     def test_engagement_metrics_complete(self, spark, sample_interactions_data, sample_metadata_data):
         """Test DAU/MAU/stickiness pipeline."""
@@ -149,11 +149,11 @@ class TestDAUMAU:
         stickiness_df = calculate_stickiness(dau_df, mau_df)
         assert stickiness_df.count() > 0, "Should calculate stickiness"
 
-        # Verify stickiness is a percentage (0-100)
+        # Verify stickiness is a decimal ratio (0.0-1.0)
         stickiness_values = stickiness_df.select("stickiness_ratio").collect()
         for row in stickiness_values:
             ratio = row["stickiness_ratio"]
-            assert 0 <= ratio <= 100, f"Stickiness should be 0-100%, got {ratio}"
+            assert 0 <= ratio <= 1, f"Stickiness should be 0.0-1.0, got {ratio}"
 
     def test_engagement_metrics_with_monitoring(self, spark, sample_interactions_data,
                                                sample_metadata_data):

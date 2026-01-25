@@ -140,17 +140,17 @@ class TestCohortsAndPowerUsers:
         week_1_retention = [r for r in results if r["week_number"] == 1]
         week_2_retention = [r for r in results if r["week_number"] == 2]
 
-        # Week 0 should be 100% (all users active)
+        # Week 0 should be 1.0 (all users active)
         assert len(week_0_retention) > 0
-        assert week_0_retention[0]["retention_rate"] == pytest.approx(100.0, rel=0.01)
+        assert week_0_retention[0]["retention_rate"] == pytest.approx(1.0, rel=0.01)
 
-        # Week 1 should be ~80% (8/10 users)
+        # Week 1 should be ~0.8 (8/10 users)
         if len(week_1_retention) > 0:
-            assert week_1_retention[0]["retention_rate"] == pytest.approx(80.0, rel=0.01)
+            assert week_1_retention[0]["retention_rate"] == pytest.approx(0.8, rel=0.01)
 
-        # Week 2 should be ~60% (6/10 users)
+        # Week 2 should be ~0.6 (6/10 users)
         if len(week_2_retention) > 0:
-            assert week_2_retention[0]["retention_rate"] == pytest.approx(60.0, rel=0.01)
+            assert week_2_retention[0]["retention_rate"] == pytest.approx(0.6, rel=0.01)
 
     def test_engagement_pipeline_complete(self, spark, sample_interactions_data, sample_metadata_data):
         """Test complete user engagement pipeline."""

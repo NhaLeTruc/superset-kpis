@@ -54,7 +54,7 @@ class TestCalculateStickiness:
         assert result["month"] == date(2023, 1, 1)
         assert result["avg_dau"] == 10.0
         assert result["monthly_active_users"] == 10
-        assert result["stickiness_ratio"] == 100.0
+        assert result["stickiness_ratio"] == 1.0
 
     def test_calculate_stickiness_low(self, spark):
         """
@@ -93,7 +93,7 @@ class TestCalculateStickiness:
 
         # Assert
         result = result_df.collect()[0]
-        assert abs(result["stickiness_ratio"] - 10.0) < 0.1
+        assert abs(result["stickiness_ratio"] - 0.1) < 0.01
 
     def test_calculate_stickiness_single_day(self, spark):
         """
@@ -128,4 +128,4 @@ class TestCalculateStickiness:
 
         # Assert
         result = result_df.collect()[0]
-        assert result["stickiness_ratio"] == 100.0
+        assert result["stickiness_ratio"] == 1.0
