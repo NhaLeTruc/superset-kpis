@@ -31,10 +31,10 @@ from typing import Optional
 # =============================================================================
 # DATE RANGES
 # =============================================================================
-ACT_START_DATE = datetime(2024, 1, 1)
-ACT_END_DATE = datetime(2025, 1, 1)
-REG_START_DATE = datetime(2023, 1, 1)
-REG_END_DATE = datetime(2023, 12, 31)
+ACT_START_DATE = datetime(2024, 3, 31)
+ACT_END_DATE = datetime(2024, 12, 31)
+REG_START_DATE = datetime(2024, 1, 1)
+REG_END_DATE = datetime(2024, 3, 31)
 
 # Session timeout must match Spark job constant
 SESSION_TIMEOUT_SECONDS = 1800
