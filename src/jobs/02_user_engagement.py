@@ -75,7 +75,7 @@ class UserEngagementJob(BaseAnalyticsJob):
             Dictionary with DataFrames for each metric
         """
         # Read enriched data
-        enriched_df = self.read_enriched_data(self.args.enriched_path)
+        enriched_df = self.read_parquet(self.args.enriched_path, "enriched interactions")
 
         metrics = {}
 

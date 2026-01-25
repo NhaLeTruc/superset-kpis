@@ -73,7 +73,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             Dictionary with DataFrames for each metric
         """
         # Read enriched data
-        enriched_df = self.read_enriched_data(self.args.enriched_path)
+        enriched_df = self.read_parquet(self.args.enriched_path, "enriched interactions")
 
         # Add date column for time-series analysis
         enriched_df = enriched_df.withColumn(COL_METRIC_DATE, F.to_date(COL_TIMESTAMP))
