@@ -12,6 +12,7 @@ import pytest
 import os
 from pyspark.sql import functions as F
 from datetime import datetime
+from tests.unit.helpers.assertions import assert_dataframe_schema
 
 
 class TestDataProcessingJob:
@@ -62,23 +63,18 @@ class TestDataProcessingJob:
             small_df=metadata_df,
             join_key="user_id",
             hot_keys_df=hot_keys,
-            broadcast_threshold_mb=10,
             salt_factor=5
         )
 
         # Verify results
-        assert enriched_df.count() == 1000, "Should have all 1000 interactions enriched"
-
-        # Verify join added metadata columns
-        expected_columns = ["interaction_id", "user_id", "action_type", "timestamp",
-                          "duration_ms", "country", "device_type", "subscription_type"]
-        for col in expected_columns:
-            assert col in enriched_df.columns, f"Missing column: {col}"
-
-        # Verify no data loss
-        original_count = interactions_df.count()
         enriched_count = enriched_df.count()
-        assert enriched_count == original_count, f"Data loss: {original_count} -> {enriched_count}"
+        assert enriched_count == 1000, "Should have all 1000 interactions enriched"
+
+        # Verify join added metadata columns using helper
+        expected_columns = ["interaction_id", "user_id", "action_type", "timestamp",
+                          "duration_ms", "country", "device_type", "subscription_type",
+                          "app_version", "registration_date"]
+        assert_dataframe_schema(enriched_df, expected_columns)
 
         # Step 6: Write to output
         output_path = os.path.join(test_data_paths["processed"], "enriched_interactions")
@@ -139,7 +135,6 @@ class TestDataProcessingJob:
             small_df=metadata_df,
             join_key="user_id",
             hot_keys_df=hot_keys,
-            broadcast_threshold_mb=1,  # Force salting by lowering threshold
             salt_factor=10
         )
 
@@ -240,18 +235,20 @@ class TestDataProcessingJob:
         assert filtered_df.count() > 0, "Should be able to filter by partition"
 
     def test_empty_input_handling(self, spark, test_data_paths):
-        """Test pipeline handles empty input gracefully."""
-        from src.utils.data_quality import validate_schema
+        """Test pipeline handles empty input without errors."""
+        from src.utils.data_quality import validate_schema, detect_nulls
         from src.schemas.interactions_schema import INTERACTIONS_SCHEMA
 
         # Create empty DataFrame with correct schema
         empty_df = spark.createDataFrame([], INTERACTIONS_SCHEMA)
 
         # Should validate successfully even if empty
-        validate_schema(empty_df, INTERACTIONS_SCHEMA, strict=False)
+        is_valid, errors = validate_schema(empty_df, INTERACTIONS_SCHEMA, strict=False)
+        assert is_valid, f"Empty DataFrame should validate: {errors}"
 
-        # Count should be zero
-        assert empty_df.count() == 0, "Empty DataFrame should have count of 0"
+        # Verify detect_nulls handles empty input gracefully
+        null_report = detect_nulls(empty_df, ["user_id", "timestamp"])
+        assert null_report.count() == 0, "Null report from empty DataFrame should be empty"
 
     def test_monitoring_integration(self, spark, sample_interactions_data, sample_metadata_data):
         """Test monitoring accumulators track processing metrics."""
