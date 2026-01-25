@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.types import StructType
 
 from src.config.spark_config import create_spark_session, configure_job_specific_settings
 from src.config.database_config import write_to_postgres
@@ -96,31 +97,54 @@ class BaseAnalyticsJob(ABC):
     def validate_dataframe(
         self,
         df: DataFrame,
-        required_columns: List[str],
-        not_null_columns: List[str],
-        name: str
+        required_columns: Optional[List[str]] = None,
+        not_null_columns: Optional[List[str]] = None,
+        name: str = "DataFrame",
+        schema: Optional[StructType] = None
     ) -> List[str]:
         """
         Validate a DataFrame's structure and data quality.
 
         Args:
             df: DataFrame to validate
-            required_columns: Columns that must exist (raises ValueError if missing)
-            not_null_columns: Columns to check for NULLs (returns warnings)
+            required_columns: Columns that must exist (ignored if schema provided)
+            not_null_columns: Columns to check for NULLs (ignored if schema provided)
             name: Display name for error messages
+            schema: Optional StructType schema - if provided, derives required_columns,
+                    not_null_columns, and validates datatypes automatically.
+                    Type validation uses schema metadata only (O(1), no data scan).
 
         Returns:
             List of warning messages (empty if no issues)
 
         Raises:
-            ValueError: If required columns are missing
+            ValueError: If required columns are missing or no validation criteria provided
         """
         warnings = []
+
+        # If schema provided, derive columns from it
+        if schema:
+            required_columns = [f.name for f in schema.fields]
+            not_null_columns = [f.name for f in schema.fields if not f.nullable]
+        elif required_columns is None:
+            raise ValueError("Must provide either 'schema' or 'required_columns'")
 
         # Check for required columns
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
             raise ValueError(f"Missing columns in {name}: {missing_cols}")
+
+        # Validate datatypes (metadata only - O(1), no data scan)
+        if schema:
+            for field in schema.fields:
+                if field.name in df.columns:
+                    actual_type = df.schema[field.name].dataType
+                    if actual_type != field.dataType:
+                        warnings.append(
+                            f"Type mismatch in {name}.{field.name}: "
+                            f"expected {field.dataType.simpleString()}, "
+                            f"got {actual_type.simpleString()}"
+                        )
 
         # Detect nulls in non-nullable columns
         if not_null_columns:

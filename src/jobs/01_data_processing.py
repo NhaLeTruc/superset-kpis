@@ -28,12 +28,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.jobs.base_job import BaseAnalyticsJob
-from src.schemas import (
-    INTERACTIONS_REQUIRED_COLUMNS,
-    INTERACTIONS_NOT_NULL_COLUMNS,
-    METADATA_REQUIRED_COLUMNS,
-    METADATA_NOT_NULL_COLUMNS,
-)
+from src.schemas import INTERACTIONS_SCHEMA, METADATA_SCHEMA
 from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_ACTION_TYPE, COL_DEVICE_TYPE
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.transforms.join.execution import optimized_join, identify_hot_keys
@@ -135,16 +130,10 @@ class DataProcessingJob(BaseAnalyticsJob):
 
             warnings = []
             warnings.extend(self.validate_dataframe(
-                interactions_df,
-                INTERACTIONS_REQUIRED_COLUMNS,
-                INTERACTIONS_NOT_NULL_COLUMNS,
-                "interactions"
+                interactions_df, name="interactions", schema=INTERACTIONS_SCHEMA
             ))
             warnings.extend(self.validate_dataframe(
-                metadata_df,
-                METADATA_REQUIRED_COLUMNS,
-                METADATA_NOT_NULL_COLUMNS,
-                "metadata"
+                metadata_df, name="metadata", schema=METADATA_SCHEMA
             ))
 
             for warning in warnings:
