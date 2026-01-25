@@ -3,6 +3,7 @@ Unit tests for optimized join execution.
 
 Tests optimized_join() function from join transforms.
 """
+from chispa.dataframe_comparer import assert_df_equality
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from src.transforms.join import optimized_join
@@ -163,9 +164,16 @@ class TestOptimizedJoin:
             large_df, small_df, join_key="user_id", join_type="left"
         )
 
-        # Assert
-        assert result_df.count() == 3, "All 3 users should be present"
+        # Assert using chispa
+        expected_schema = StructType([
+            StructField("user_id", StringType(), nullable=False),
+            StructField("interaction_id", IntegerType(), nullable=False),
+            StructField("country", StringType(), nullable=True)
+        ])
+        expected_df = spark.createDataFrame([
+            ("u001", 1, "US"),
+            ("u002", 2, "UK"),
+            ("u003", 3, None)
+        ], schema=expected_schema)
 
-        # Check u003 has NULL country
-        u003_row = result_df.filter(F.col("user_id") == "u003").collect()[0]
-        assert u003_row["country"] is None, "u003 should have NULL country"
+        assert_df_equality(result_df, expected_df, ignore_row_order=True, ignore_nullable=True)

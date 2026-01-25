@@ -4,8 +4,9 @@ Unit tests for DAU and MAU calculation.
 Tests calculate_dau() and calculate_mau() functions from engagement transforms.
 """
 import pytest
+from chispa.dataframe_comparer import assert_df_equality
 from pyspark.sql.types import (
-    StructType, StructField, StringType, LongType, TimestampType
+    StructType, StructField, StringType, LongType, TimestampType, DateType, IntegerType
 )
 from datetime import datetime, timedelta, date
 from src.transforms.engagement import calculate_dau, calculate_mau
@@ -47,20 +48,18 @@ class TestCalculateDAU:
         # Act
         result_df = calculate_dau(df)
 
-        # Assert
-        results = result_df.orderBy("date").collect()
+        # Assert using chispa
+        expected_df = spark.createDataFrame([
+            (date(2023, 1, 1), 2, 5, 20000),
+            (date(2023, 1, 2), 2, 2, 10000),
+        ], ["date", "daily_active_users", "total_interactions", "total_duration_ms"])
 
-        # 2023-01-01
-        assert results[0]["date"] == date(2023, 1, 1)
-        assert results[0]["daily_active_users"] == 2
-        assert results[0]["total_interactions"] == 5
-        assert results[0]["total_duration_ms"] == 20000
-
-        # 2023-01-02
-        assert results[1]["date"] == date(2023, 1, 2)
-        assert results[1]["daily_active_users"] == 2
-        assert results[1]["total_interactions"] == 2
-        assert results[1]["total_duration_ms"] == 10000
+        assert_df_equality(
+            result_df.select("date", "daily_active_users", "total_interactions", "total_duration_ms"),
+            expected_df,
+            ignore_row_order=True,
+            ignore_nullable=True
+        )
 
     def test_calculate_dau_single_user(self, spark):
         """
@@ -198,16 +197,18 @@ class TestCalculateMAU:
         # Act
         result_df = calculate_mau(df)
 
-        # Assert
-        results = result_df.orderBy("month").collect()
+        # Assert using chispa
+        expected_df = spark.createDataFrame([
+            (date(2023, 1, 1), 2),
+            (date(2023, 2, 1), 2),
+        ], ["month", "monthly_active_users"])
 
-        # Jan 2023
-        assert results[0]["month"] == date(2023, 1, 1)
-        assert results[0]["monthly_active_users"] == 2
-
-        # Feb 2023
-        assert results[1]["month"] == date(2023, 2, 1)
-        assert results[1]["monthly_active_users"] == 2
+        assert_df_equality(
+            result_df.select("month", "monthly_active_users"),
+            expected_df,
+            ignore_row_order=True,
+            ignore_nullable=True
+        )
 
     def test_calculate_mau_daily_active_user(self, spark):
         """
