@@ -7,16 +7,16 @@ and writes enriched data to Parquet for downstream analytics.
 
 Usage (via helper script):
     ./scripts/run_spark_job.sh src/jobs/01_data_processing.py \
-        --interactions-path /app/data/raw/interactions.parquet \
-        --metadata-path /app/data/raw/metadata.parquet \
+        --interactions-path /app/data/raw/user_interactions.csv \
+        --metadata-path /app/data/raw/user_metadata.csv \
         --output-path /app/data/processed/enriched_interactions.parquet
 
 Usage (direct spark-submit):
     docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
         --master "local[*]" \
         /opt/spark-apps/src/jobs/01_data_processing.py \
-        --interactions-path /app/data/raw/interactions.parquet \
-        --metadata-path /app/data/raw/metadata.parquet \
+        --interactions-path /app/data/raw/user_interactions.csv \
+        --metadata-path /app/data/raw/user_metadata.csv \
         --output-path /app/data/processed/enriched_interactions.parquet'
 """
 import argparse
@@ -37,7 +37,6 @@ from src.schemas import (
 from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_ACTION_TYPE, COL_DEVICE_TYPE
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.transforms.join.execution import optimized_join, identify_hot_keys
-from src.utils.data_quality import detect_nulls
 from src.utils.monitoring import log_monitoring_summary
 
 
@@ -62,31 +61,6 @@ class DataProcessingJob(BaseAnalyticsJob):
         parser.add_argument("--skip-validation", action="store_true",
                           help="Skip data validation")
         return parser
-
-    def validate_input_data(self, interactions_df: DataFrame, metadata_df: DataFrame) -> None:
-        """Validate input data quality."""
-        print("\n🔍 Validating input data quality...")
-
-        # Check for required columns in interactions
-        missing_cols = [col for col in INTERACTIONS_REQUIRED_COLUMNS if col not in interactions_df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing columns in interactions: {missing_cols}")
-
-        # Check for required columns in metadata
-        missing_cols = [col for col in METADATA_REQUIRED_COLUMNS if col not in metadata_df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing columns in metadata: {missing_cols}")
-
-        # Detect nulls in critical columns
-        null_cols_interactions = detect_nulls(interactions_df, INTERACTIONS_NOT_NULL_COLUMNS)
-        if null_cols_interactions:
-            print(f"   ⚠️  Warning: NULL values found in interactions: {null_cols_interactions}")
-
-        null_cols_metadata = detect_nulls(metadata_df, METADATA_NOT_NULL_COLUMNS)
-        if null_cols_metadata:
-            print(f"   ⚠️  Warning: NULL values found in metadata: {null_cols_metadata}")
-
-        print("   ✅ Data validation complete")
 
     def enrich_interactions(self, interactions_df: DataFrame, metadata_df: DataFrame) -> DataFrame:
         """
@@ -114,13 +88,13 @@ class DataProcessingJob(BaseAnalyticsJob):
         else:
             print("   ✅ No significant data skew detected")
 
-        # Perform optimized join
+        # Perform optimized join with hot keys for salting
         enriched_df = optimized_join(
             large_df=interactions_df,
             small_df=metadata_df,
             join_key=COL_USER_ID,
             join_type="left",
-            broadcast_threshold_mb=100
+            hot_keys_df=hot_keys_df
         )
 
         # Add processing metadata
@@ -141,11 +115,11 @@ class DataProcessingJob(BaseAnalyticsJob):
             Dictionary with enriched DataFrame
         """
         # Read input data
-        interactions_df = self.read_parquet(
+        interactions_df = self.read_csv(
             self.args.interactions_path,
             name="interactions"
         )
-        metadata_df = self.read_parquet(
+        metadata_df = self.read_csv(
             self.args.metadata_path,
             name="user metadata"
         )
@@ -157,10 +131,37 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         # Validate data quality
         if not self.args.skip_validation:
-            self.validate_input_data(interactions_df, metadata_df)
+            print("\n🔍 Validating input data quality...")
+
+            warnings = []
+            warnings.extend(self.validate_dataframe(
+                interactions_df,
+                INTERACTIONS_REQUIRED_COLUMNS,
+                INTERACTIONS_NOT_NULL_COLUMNS,
+                "interactions"
+            ))
+            warnings.extend(self.validate_dataframe(
+                metadata_df,
+                METADATA_REQUIRED_COLUMNS,
+                METADATA_NOT_NULL_COLUMNS,
+                "metadata"
+            ))
+
+            for warning in warnings:
+                print(f"   ⚠️  {warning}")
+
+            print("   ✅ Data validation complete")
 
         # Enrich interactions with metadata
         enriched_df = self.enrich_interactions(interactions_df, metadata_df)
+
+        # Unpersist input dataframes to free memory
+        interactions_df.unpersist()
+        metadata_df.unpersist()
+        print("   🧹 Released input DataFrames from memory")
+
+        # Add date partition column for downstream partitioned writes
+        enriched_df = enriched_df.withColumn("date", F.to_date(COL_TIMESTAMP))
 
         return {"enriched_interactions": enriched_df}
 
@@ -204,24 +205,6 @@ class DataProcessingJob(BaseAnalyticsJob):
         """This job writes to Parquet, not database."""
         return None
 
-    def write_enriched_output(self, enriched_df: DataFrame, output_path: str) -> None:
-        """Write enriched data to Parquet with partitioning."""
-        print(f"\n💾 Writing enriched data to: {output_path}")
-
-        # Add date partition column
-        enriched_df = enriched_df.withColumn(
-            "date",
-            F.to_date(COL_TIMESTAMP)
-        )
-
-        # Write with date partitioning
-        enriched_df.write \
-            .mode("overwrite") \
-            .partitionBy("date") \
-            .parquet(output_path)
-
-        print("   ✅ Data written successfully")
-
     def run(self) -> int:
         """
         Execute data processing pipeline.
@@ -249,10 +232,11 @@ class DataProcessingJob(BaseAnalyticsJob):
             # Print summary
             self.print_summary(metrics)
 
-            # Write enriched output (custom for this ETL job)
-            self.write_enriched_output(
-                metrics["enriched_interactions"],
-                self.args.output_path
+            # Write enriched output with date partitioning
+            self.write_to_parquet(
+                metrics,
+                self.args.output_path,
+                partition_by=["date"]
             )
 
             # Log monitoring summary

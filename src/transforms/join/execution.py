@@ -19,7 +19,6 @@ def optimized_join(
     hot_keys_df: DataFrame = None,
     enable_broadcast: bool = True,
     enable_salting: bool = True,
-    broadcast_threshold_mb: int = None,
     skew_threshold: float = HOT_KEY_THRESHOLD_PERCENTILE,
     salt_factor: int = 10
 ) -> DataFrame:
@@ -41,7 +40,6 @@ def optimized_join(
         hot_keys_df: Optional pre-computed hot keys DataFrame (output from identify_hot_keys)
         enable_broadcast: Try broadcast join if possible
         enable_salting: Apply salting if skew detected
-        broadcast_threshold_mb: Broadcast threshold in MB (not used, kept for compatibility)
         skew_threshold: Percentile threshold for hot key detection
         salt_factor: Number of salt buckets
 
