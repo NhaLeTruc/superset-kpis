@@ -128,6 +128,9 @@ class UserEngagementJob(BaseAnalyticsJob):
         print(f"   ✅ Computed retention for {cohort_count} cohort-week combinations")
         metrics["cohort_retention"] = cohort_df
 
+        # Unpersist enriched data
+        enriched_df.unpersist()
+
         return metrics
 
     def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
