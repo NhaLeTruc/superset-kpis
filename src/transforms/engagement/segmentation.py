@@ -102,14 +102,53 @@ def identify_power_users(
         F.col("avg_duration_per_interaction")
     )
 
-    # Calculate threshold for top percentile
-    threshold_value = user_metrics.approxQuantile("total_duration_ms", [percentile], 0.01)[0]
+    # Calculate how many users to include based on percentile threshold
+    # Original semantics: include users where percent_rank >= percentile
+    # percent_rank = (rank - 1) / (n - 1), so we derive count from that formula
+    import math
+    total_users = user_metrics.count()
 
-    # Filter to power users
-    power_users = user_metrics.filter(F.col("total_duration_ms") >= threshold_value)
+    if total_users == 0:
+        power_users = user_metrics
+    elif total_users == 1:
+        # Single user is always a power user
+        power_users = user_metrics
+    else:
+        # Calculate exact count to include (matches percent_rank >= percentile semantics)
+        users_to_include = total_users - math.ceil(percentile * (total_users - 1))
+        users_to_include = max(1, users_to_include)  # Always include at least 1
 
-    # Add percentile rank
-    power_users = power_users.withColumn("percentile_rank", F.lit(percentile * 100))
+        # Sort by total_duration_ms descending and take top N
+        # This avoids a global window function which would move all data to one partition
+        power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(users_to_include)
+
+    # Calculate percentile rank without window function (avoids single-partition warning)
+    # Power users is a small dataset (top 1%), so collect is safe
+    power_users_count = power_users.count()
+
+    if power_users_count <= 1:
+        # Single user or empty: assign max percentile
+        power_users = power_users.withColumn("percentile_rank", F.lit(100.0))
+    else:
+        # Collect, sort, compute rank mathematically, then recreate DataFrame
+        spark = power_users.sparkSession
+        schema = power_users.schema
+
+        # Collect and sort by total_duration_ms ascending
+        rows = power_users.collect()
+        sorted_rows = sorted(rows, key=lambda r: r["total_duration_ms"])
+
+        # Compute percentile_rank for each row
+        # Row 0 (lowest) -> percentile * 100, Row N-1 (highest) -> 100
+        ranked_data = []
+        for i, row in enumerate(sorted_rows):
+            pct_rank = percentile * 100 + (i / (power_users_count - 1)) * (1 - percentile) * 100
+            ranked_data.append((*row, float(pct_rank)))
+
+        # Recreate DataFrame with percentile_rank column
+        from pyspark.sql.types import DoubleType, StructField
+        new_schema = schema.add(StructField("percentile_rank", DoubleType(), True))
+        power_users = spark.createDataFrame(ranked_data, schema=new_schema)
 
     # Join with metadata
     result_df = power_users.join(metadata_df, on=COL_USER_ID, how="left")
