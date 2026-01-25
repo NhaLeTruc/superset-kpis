@@ -13,9 +13,7 @@ class TestBounceRates:
 
     def test_bounce_rate_calculation(self, spark):
         """Test bounce rate calculation."""
-        from src.transforms.session import (
-            sessionize_interactions, calculate_session_metrics, calculate_bounce_rate
-        )
+        from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
         from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
 
         schema = StructType([
@@ -44,8 +42,7 @@ class TestBounceRates:
         df = spark.createDataFrame(data, schema)
 
         # Calculate bounce rate
-        sessionized = sessionize_interactions(df, session_timeout_seconds=1800)
-        metrics = calculate_session_metrics(sessionized)
+        metrics = calculate_session_metrics(df, session_timeout="1800 seconds")
         bounce_rate = calculate_bounce_rate(metrics)
 
         # Should have 1 overall bounce rate
@@ -58,9 +55,7 @@ class TestBounceRates:
 
     def test_grouped_bounce_rate(self, spark, sample_metadata_data):
         """Test bounce rate calculation grouped by dimensions."""
-        from src.transforms.session import (
-            sessionize_interactions, calculate_session_metrics, calculate_bounce_rate
-        )
+        from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
         from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
 
         interaction_schema = StructType([
@@ -91,11 +86,8 @@ class TestBounceRates:
         # Add device type from metadata
         enriched_df = df.join(sample_metadata_data, "user_id", "left")
 
-        # Sessionize and calculate metrics
-        sessionized = sessionize_interactions(enriched_df, session_timeout_seconds=1800)
-        metrics = calculate_session_metrics(sessionized)
-
-        # Calculate bounce rate by device type
+        # Calculate session metrics and bounce rate by device type
+        metrics = calculate_session_metrics(enriched_df, session_timeout="1800 seconds")
         bounce_by_device = calculate_bounce_rate(metrics, group_by_columns=["device_type"])
 
         # Should have bounce rates for different device types

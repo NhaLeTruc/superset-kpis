@@ -35,7 +35,7 @@ class TestBasicPipeline:
             detect_anomalies_statistical
         )
         from src.transforms.session import (
-            sessionize_interactions, calculate_session_metrics,
+            calculate_session_metrics,
             calculate_bounce_rate
         )
         from src.utils.monitoring import create_monitoring_context, format_monitoring_summary
@@ -162,16 +162,11 @@ class TestBasicPipeline:
         print("📊 JOB 4: Session Analysis")
         print("="*60)
 
-        # Sessionize interactions
-        sessionized_df = sessionize_interactions(
+        # Calculate session metrics (uses session_window() internally)
+        session_metrics_df = calculate_session_metrics(
             interactions_df,
-            session_timeout_seconds=1800
+            session_timeout="1800 seconds"
         )
-        session_interaction_count = sessionized_df.count()
-        assert session_interaction_count == 1000, "All interactions should be sessionized"
-
-        # Calculate session metrics
-        session_metrics_df = calculate_session_metrics(sessionized_df)
         session_count = session_metrics_df.count()
         assert session_count > 0, "Should calculate session metrics"
 

@@ -16,7 +16,7 @@ class TestPipelineEdgeCases:
         """Test data flows correctly through entire pipeline without loss."""
         from src.transforms.join import identify_hot_keys, optimized_join
         from src.transforms.engagement import calculate_dau
-        from src.transforms.session import sessionize_interactions, calculate_session_metrics
+        from src.transforms.session import calculate_session_metrics
 
         # Track record counts through pipeline
         original_count = sample_interactions_data.count()
@@ -31,12 +31,15 @@ class TestPipelineEdgeCases:
         assert enriched_count == original_count, \
             f"Enrichment should not lose data: {original_count} -> {enriched_count}"
 
-        # After sessionization
-        sessionized_df = sessionize_interactions(sample_interactions_data)
-        sessionized_count = sessionized_df.count()
+        # Session metrics should be created from interactions
+        session_metrics_df = calculate_session_metrics(
+            sample_interactions_data,
+            session_timeout="1800 seconds"
+        )
+        session_count = session_metrics_df.count()
 
-        assert sessionized_count == original_count, \
-            f"Sessionization should not lose data: {original_count} -> {sessionized_count}"
+        assert session_count > 0, \
+            f"Should create sessions from {original_count} interactions"
 
         # DAU should have users from original data
         dau_df = calculate_dau(sample_interactions_data)
