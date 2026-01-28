@@ -18,8 +18,6 @@ from pyspark.sql.types import BooleanType, DoubleType, LongType
 from src.schemas.columns import (
     COL_ACTION_COUNT,
     COL_BOUNCE_RATE,
-    COL_COUNTRY,
-    COL_DEVICE_TYPE,
     COL_DURATION_MS,
     COL_IS_BOUNCE,
     COL_METRIC_DATE,

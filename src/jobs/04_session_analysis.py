@@ -87,7 +87,13 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         enriched_df = self.read_parquet(self.args.enriched_path, "enriched interactions")
 
         # Validate required columns
-        required_columns = [COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS, COL_DEVICE_TYPE, COL_COUNTRY]
+        required_columns = [
+            COL_USER_ID,
+            COL_TIMESTAMP,
+            COL_DURATION_MS,
+            COL_DEVICE_TYPE,
+            COL_COUNTRY,
+        ]
         self.validate_dataframe(enriched_df, required_columns=required_columns, name="enriched_df")
 
         results = {}
@@ -131,9 +137,9 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         freq_stats = session_freq_df.agg(
             F.avg("total_sessions").alias("avg_sessions_per_user"),
             F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
-            (F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100).alias(
-                "return_user_rate"
-            ),
+            (
+                F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
+            ).alias("return_user_rate"),
         ).collect()[0]
 
         if freq_stats["avg_sessions_per_user"] is not None:
@@ -295,9 +301,7 @@ class SessionAnalysisJob(BaseAnalyticsJob):
                 F.max("total_sessions").alias("max_sessions"),
                 F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
                 (
-                    F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0))
-                    / F.count("*")
-                    * 100
+                    F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
                 ).alias("return_rate"),
             ).collect()[0]
 
