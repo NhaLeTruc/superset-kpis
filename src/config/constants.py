@@ -3,6 +3,11 @@ DEFAULT_PERCENTILES = [0.50, 0.95, 0.99]
 HOT_KEY_THRESHOLD_PERCENTILE = 0.99
 Z_SCORE_ANOMALY_THRESHOLD = 3.0
 
+# Anomaly severity thresholds (z-score values)
+ANOMALY_SEVERITY_CRITICAL = 4.0
+ANOMALY_SEVERITY_HIGH = 3.5
+ANOMALY_SEVERITY_MEDIUM = 3.0
+
 # Database table names
 TABLE_DAILY_ACTIVE_USERS = "daily_active_users"
 TABLE_MONTHLY_ACTIVE_USERS = "monthly_active_users"

@@ -59,7 +59,9 @@ def calculate_percentiles(
     return result_df
 
 
-def calculate_device_correlation(interactions_df: DataFrame, metadata_df: DataFrame) -> DataFrame:
+def calculate_device_correlation(
+    interactions_df: DataFrame, metadata_df: DataFrame | None = None
+) -> DataFrame:
     """
     Identify correlation between device type and app performance using one-way ANOVA.
 
@@ -69,8 +71,9 @@ def calculate_device_correlation(interactions_df: DataFrame, metadata_df: DataFr
     effect size as the proportion of variance in duration explained by device type.
 
     Args:
-        interactions_df: User interactions with duration_ms
-        metadata_df: User metadata with device_type
+        interactions_df: User interactions with duration_ms (and optionally device_type)
+        metadata_df: User metadata with device_type. Optional if interactions_df
+            already contains device_type column (e.g., for enriched data).
 
     Returns:
         DataFrame with per-device performance metrics and ANOVA correlation stats,
@@ -80,7 +83,15 @@ def calculate_device_correlation(interactions_df: DataFrame, metadata_df: DataFr
             device_type, avg_duration_ms, p95_duration_ms, total_interactions,
             unique_users, interactions_per_user, f_statistic, eta_squared
     """
-    joined_df = interactions_df.join(metadata_df, on=COL_USER_ID, how="left")
+    # Skip join if interactions_df already has device_type (e.g., enriched data)
+    if COL_DEVICE_TYPE in interactions_df.columns:
+        joined_df = interactions_df
+    elif metadata_df is not None:
+        joined_df = interactions_df.join(metadata_df, on=COL_USER_ID, how="left")
+    else:
+        raise ValueError(
+            f"Column '{COL_DEVICE_TYPE}' not found in interactions_df and metadata_df is None"
+        )
 
     # Per-device descriptive statistics in a single aggregation pass
     device_metrics = joined_df.groupBy(COL_DEVICE_TYPE).agg(

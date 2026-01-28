@@ -5,6 +5,8 @@ Provides reusable schema definitions for test DataFrames.
 Eliminates duplication of StructType definitions across tests.
 """
 
+from __future__ import annotations
+
 from pyspark.sql.types import (
     BooleanType,
     DateType,

@@ -4,6 +4,8 @@ Custom Test Assertions
 Provides reusable assertion helpers for common test patterns.
 """
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame
 
 

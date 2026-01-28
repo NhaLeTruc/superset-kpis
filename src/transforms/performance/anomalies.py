@@ -64,12 +64,15 @@ def detect_anomalies_statistical(
         )
 
     # Step 2: Calculate initial z-scores and identify non-anomalous data
-    # Add small epsilon to stddev to prevent division by zero
+    # When stddev is 0 or null (all values identical), z-score is 0 (no anomalies possible)
     df_with_initial_zscore = df_with_initial_stats.withColumn(
         "initial_z_score",
-        (
-            (F.col(value_column) - F.col("initial_mean")) / (F.col("initial_stddev") + F.lit(1e-10))
-        ).cast("double"),
+        F.when(
+            (F.col("initial_stddev").isNull()) | (F.col("initial_stddev") == 0),
+            F.lit(0.0),
+        )
+        .otherwise((F.col(value_column) - F.col("initial_mean")) / F.col("initial_stddev"))
+        .cast("double"),
     )
 
     # Filter to non-anomalous data (|z| <= threshold)
@@ -100,13 +103,15 @@ def detect_anomalies_statistical(
         )
 
     # Step 4: Calculate final z-scores using refined baseline
-    # Add small epsilon to stddev to prevent division by zero
+    # When stddev is 0 or null (all values identical), z-score is 0 (no anomalies possible)
     df_with_zscore = df_with_refined_stats.withColumn(
         "z_score",
-        (
-            (F.col(value_column) - F.col("baseline_mean"))
-            / (F.col("baseline_stddev") + F.lit(1e-10))
-        ).cast("double"),
+        F.when(
+            (F.col("baseline_stddev").isNull()) | (F.col("baseline_stddev") == 0),
+            F.lit(0.0),
+        )
+        .otherwise((F.col(value_column) - F.col("baseline_mean")) / F.col("baseline_stddev"))
+        .cast("double"),
     )
 
     # Filter to anomalies (|z_score| > threshold)

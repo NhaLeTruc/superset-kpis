@@ -26,12 +26,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.config.constants import (
+    ANOMALY_SEVERITY_CRITICAL,
+    ANOMALY_SEVERITY_HIGH,
+    ANOMALY_SEVERITY_MEDIUM,
     DEFAULT_PERCENTILES,
     TABLE_DEVICE_CORRELATION,
     TABLE_DEVICE_PERFORMANCE,
@@ -45,6 +47,7 @@ from src.schemas.columns import (
     COL_DEVICE_TYPE,
     COL_DURATION_MS,
     COL_METRIC_DATE,
+    COL_SEVERITY,
     COL_TIMESTAMP,
     COL_USER_ID,
 )
@@ -60,6 +63,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
     def __init__(self):
         super().__init__(job_name="Performance Metrics", job_type="analytics")
+        self._counts: dict[str, int] = {}
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
@@ -82,6 +86,20 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         """
         # Read enriched data
         enriched_df = self.read_parquet(self.args.enriched_path, "enriched interactions")
+
+        # Validate required columns exist
+        required_columns = [
+            COL_APP_VERSION,
+            COL_DEVICE_TYPE,
+            COL_DURATION_MS,
+            COL_TIMESTAMP,
+            COL_USER_ID,
+        ]
+        warnings = self.validate_dataframe(
+            enriched_df, required_columns=required_columns, name="enriched_df"
+        )
+        for warning in warnings:
+            print(f"   ⚠️  {warning}")
 
         # Add date column for time-series analysis
         enriched_df = enriched_df.withColumn(COL_METRIC_DATE, F.to_date(COL_TIMESTAMP))
@@ -139,9 +157,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # 2b. Device-Performance Correlation (ANOVA)
         print("\n📊 Calculating Device-Performance Correlation (ANOVA)...")
+        # enriched_df already has device_type, so no need to pass metadata_df
         device_correlation_df = calculate_device_correlation(
             interactions_df=enriched_df,
-            metadata_df=enriched_df.select(COL_USER_ID, COL_DEVICE_TYPE).distinct(),
         ).persist()
         correlation_count = device_correlation_df.count()
         print(f"   ✅ Computed correlation for {correlation_count} device types")
@@ -167,16 +185,16 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Enrich anomalies with severity classification
         anomalies_df = anomalies_df.withColumn(
-            "severity",
-            F.when(F.abs(F.col("z_score")) >= 4.0, "critical")
-            .when(F.abs(F.col("z_score")) >= 3.5, "high")
-            .when(F.abs(F.col("z_score")) >= 3.0, "medium")
+            COL_SEVERITY,
+            F.when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_CRITICAL, "critical")
+            .when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_HIGH, "high")
+            .when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_MEDIUM, "medium")
             .otherwise("low"),
         )
 
         # Add detection timestamp and description
         anomalies_df = (
-            anomalies_df.withColumn("detected_at", F.lit(datetime.now()))
+            anomalies_df.withColumn("detected_at", F.current_timestamp())
             .withColumn("metric_name", F.lit("duration_ms"))
             .withColumn(
                 "description",
@@ -204,13 +222,24 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             print(f"   ⚠️  Detected {anomaly_count} performance anomalies")
 
             # Show critical anomalies
-            critical_count = anomalies_df.filter("severity = 'critical'").count()
+            critical_count = anomalies_df.filter(F.col(COL_SEVERITY) == "critical").count()
             if critical_count > 0:
                 print(f"   🚨 {critical_count} CRITICAL anomalies require immediate attention!")
         else:
             print("   ✅ No anomalies detected")
 
         metrics["performance_anomalies"] = anomalies_df
+
+        # Store counts for print_summary() to avoid redundant count() calls
+        self._counts = {
+            "version": version_count,
+            "device": device_count,
+            "correlation": correlation_count,
+            "anomaly": anomaly_count,
+        }
+
+        # Unpersist intermediate DataFrames (metrics DataFrames will be unpersisted after write)
+        enriched_df.unpersist()
 
         return metrics
 
@@ -223,7 +252,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         # Version Performance Summary
         version_df = metrics["performance_by_version"]
         print("\nPerformance by Version:")
-        print(f"  Total Combinations: {version_df.count():,}")
+        print(f"  Total Combinations: {self._counts.get('version', version_df.count()):,}")
 
         version_summary = version_df.agg(
             F.avg("p50_duration_ms").alias("avg_p50"),
@@ -231,24 +260,28 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             F.avg("p99_duration_ms").alias("avg_p99"),
         ).collect()[0]
 
-        print(f"  Average P50: {version_summary['avg_p50']:,.0f}ms")
-        print(f"  Average P95: {version_summary['avg_p95']:,.0f}ms")
-        print(f"  Average P99: {version_summary['avg_p99']:,.0f}ms")
+        avg_p50 = version_summary["avg_p50"] if version_summary["avg_p50"] is not None else 0.0
+        avg_p95 = version_summary["avg_p95"] if version_summary["avg_p95"] is not None else 0.0
+        avg_p99 = version_summary["avg_p99"] if version_summary["avg_p99"] is not None else 0.0
+        print(f"  Average P50: {avg_p50:,.0f}ms")
+        print(f"  Average P95: {avg_p95:,.0f}ms")
+        print(f"  Average P99: {avg_p99:,.0f}ms")
 
         # Device Performance Summary
         device_df = metrics["device_performance"]
         print("\nDevice Performance:")
-        print(f"  Total Combinations: {device_df.count():,}")
+        print(f"  Total Combinations: {self._counts.get('device', device_df.count()):,}")
 
         device_summary = (
-            device_df.groupBy("device_type")
+            device_df.groupBy(COL_DEVICE_TYPE)
             .agg(F.avg("avg_duration_ms").alias("avg_duration"))
             .orderBy(F.desc("avg_duration"))
         )
 
         print("  Average Duration by Device:")
         for row in device_summary.collect():
-            print(f"    {row['device_type']}: {row['avg_duration']:,.0f}ms")
+            avg_duration = row["avg_duration"] if row["avg_duration"] is not None else 0.0
+            print(f"    {row[COL_DEVICE_TYPE]}: {avg_duration:,.0f}ms")
 
         # Device Correlation Summary (ANOVA)
         correlation_df = metrics["device_correlation"]
@@ -272,15 +305,15 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Anomalies Summary
         anomalies_df = metrics["performance_anomalies"]
-        anomaly_count = anomalies_df.count()
+        anomaly_count = self._counts.get("anomaly") or anomalies_df.count()
         print("\nPerformance Anomalies:")
         print(f"  Total Detected: {anomaly_count}")
 
-        if anomaly_count > 0:
-            severity_dist = anomalies_df.groupBy("severity").count().orderBy(F.desc("count"))
+        if anomaly_count and anomaly_count > 0:
+            severity_dist = anomalies_df.groupBy(COL_SEVERITY).count().orderBy(F.desc("count"))
             print("  By Severity:")
             for row in severity_dist.collect():
-                print(f"    {row['severity']}: {row['count']}")
+                print(f"    {row[COL_SEVERITY]}: {row['count']}")
 
         print("=" * 60)
 

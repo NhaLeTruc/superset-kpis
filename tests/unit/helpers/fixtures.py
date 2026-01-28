@@ -5,6 +5,8 @@ Provides reusable functions for generating test data.
 Eliminates duplication of data generation logic across tests.
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta
 
 from pyspark.sql import DataFrame, SparkSession
