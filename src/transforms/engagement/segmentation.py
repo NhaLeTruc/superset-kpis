@@ -4,9 +4,12 @@ User Segmentation
 Calculates stickiness ratio and identifies power users.
 """
 
+import logging
 import math
 
 from pyspark.sql import DataFrame
+
+logger = logging.getLogger(__name__)
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StructField
 
@@ -137,6 +140,12 @@ def identify_power_users(
     elif power_users_count > MAX_POWER_USERS_COLLECT:
         # Safety limit: skip percentile_rank calculation for very large result sets
         # to avoid overwhelming driver memory
+        logger.warning(
+            f"Power users count ({power_users_count:,}) exceeds MAX_POWER_USERS_COLLECT "
+            f"({MAX_POWER_USERS_COLLECT:,}). Skipping percentile_rank calculation - "
+            f"column will contain NULL values. Consider increasing the percentile "
+            f"threshold to reduce the result set size."
+        )
         power_users = power_users.withColumn("percentile_rank", F.lit(None).cast("double"))
     else:
         # Collect, sort, compute rank mathematically, then recreate DataFrame

@@ -37,7 +37,7 @@ def calculate_cohort_retention(
         DataFrame with [cohort_week, week_number, cohort_size, active_users, retention_rate]
     """
     # Handle empty interactions dataframe (use head(1) to avoid full scan)
-    if interactions_df.head(1) == []:
+    if interactions_df.head(1):
         # Return empty dataframe with correct schema
         empty_schema = StructType(
             [

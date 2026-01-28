@@ -15,6 +15,8 @@ from pyspark.sql import functions as F
 from pyspark.sql.functions import session_window
 from pyspark.sql.types import BooleanType, DoubleType, LongType
 
+import re
+
 from src.schemas.columns import (
     COL_ACTION_COUNT,
     COL_BOUNCE_RATE,
@@ -26,6 +28,33 @@ from src.schemas.columns import (
     COL_TIMESTAMP,
     COL_USER_ID,
 )
+
+
+def _parse_session_timeout(session_timeout: str) -> int:
+    """
+    Parse session timeout string and return value in seconds.
+
+    Supported formats:
+        - "<number> seconds" (e.g., "1800 seconds")
+        - "<number> second" (e.g., "1 second")
+
+    Args:
+        session_timeout: Timeout string in supported format
+
+    Returns:
+        Timeout value in seconds
+
+    Raises:
+        ValueError: If format is not supported
+    """
+    pattern = r"^(\d+)\s+seconds?$"
+    match = re.match(pattern, session_timeout.strip())
+    if not match:
+        raise ValueError(
+            f"Invalid session_timeout format: '{session_timeout}'. "
+            f"Expected format: '<number> seconds' (e.g., '1800 seconds')"
+        )
+    return int(match.group(1))
 
 
 def calculate_session_metrics(
@@ -67,6 +96,9 @@ def calculate_session_metrics(
         >>> metrics_df.filter("is_bounce = true").count()
         1542  # Number of bounce sessions
     """
+    # Validate session_timeout format early (fail-fast)
+    timeout_seconds = _parse_session_timeout(session_timeout)
+
     # Validate required columns
     required_cols = [COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS]
     missing_cols = [col for col in required_cols if col not in interactions_df.columns]
@@ -129,7 +161,7 @@ def calculate_session_metrics(
             ).cast(LongType())
             -
             # Subtract the session gap since session_window.end includes it
-            (F.lit(int(session_timeout.split()[0])) * 1000).cast(LongType())
+            (F.lit(timeout_seconds) * 1000).cast(LongType())
             + F.col("last_action_duration_ms")
         ),
     )

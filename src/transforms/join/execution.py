@@ -13,6 +13,50 @@ from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from .optimization import apply_salting, explode_for_salting, identify_hot_keys
 
 
+def _perform_salted_join(
+    large_df: DataFrame,
+    small_df: DataFrame,
+    hot_keys_df: DataFrame,
+    join_key: str,
+    join_type: str,
+    salt_factor: int,
+) -> DataFrame:
+    """
+    Perform a salted join to handle skewed keys.
+
+    Args:
+        large_df: Large DataFrame to salt
+        small_df: Small DataFrame to explode
+        hot_keys_df: DataFrame containing hot keys
+        join_key: Column to join on
+        join_type: Type of join ("inner", "left", etc.)
+        salt_factor: Number of salt buckets
+
+    Returns:
+        Joined DataFrame with salt columns removed
+    """
+    # Apply salting to large_df
+    large_salted = apply_salting(
+        large_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
+    )
+
+    # Explode small_df to match salted keys - rename join_key to avoid ambiguity
+    small_exploded = explode_for_salting(
+        small_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
+    )
+    # Rename the join key in small table to avoid duplicate column after join
+    small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
+
+    # Join on salted keys
+    salted_key = f"{join_key}_salted"
+    result_df = large_salted.join(small_exploded, on=salted_key, how=join_type)
+
+    # Clean up salt columns and renamed join key
+    result_df = result_df.drop("salt", salted_key, f"{join_key}_small")
+
+    return result_df
+
+
 def optimized_join(
     large_df: DataFrame,
     small_df: DataFrame,
@@ -58,27 +102,10 @@ def optimized_join(
         raise ValueError(f"Column '{join_key}' not found in small DataFrame")
 
     # If hot_keys_df is explicitly provided, always use salting
-    if hot_keys_df.head(1) and enable_salting:
-        # Apply salting to large_df
-        large_salted = apply_salting(
-            large_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
+    if hot_keys_df is not None and hot_keys_df.head(1) and enable_salting:
+        return _perform_salted_join(
+            large_df, small_df, hot_keys_df, join_key, join_type, salt_factor
         )
-
-        # Explode small_df to match salted keys - rename join_key to avoid ambiguity
-        small_exploded = explode_for_salting(
-            small_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
-        )
-        # Rename the join key in small table to avoid duplicate column after join
-        small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
-
-        # Join on salted keys
-        salted_key = f"{join_key}_salted"
-        result_df = large_salted.join(small_exploded, on=salted_key, how=join_type)
-
-        # Clean up salt columns and renamed join key
-        result_df = result_df.drop("salt", salted_key, f"{join_key}_small")
-
-        return result_df
 
     # Strategy 1: Try broadcast join if enabled
     if enable_broadcast:
@@ -95,26 +122,9 @@ def optimized_join(
 
         # If hot keys found, apply salting
         if detected_hot_keys.head(1):
-            # Apply salting to large_df
-            large_salted = apply_salting(
-                large_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor
+            return _perform_salted_join(
+                large_df, small_df, detected_hot_keys, join_key, join_type, salt_factor
             )
-
-            # Explode small_df to match salted keys - rename join_key to avoid ambiguity
-            small_exploded = explode_for_salting(
-                small_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor
-            )
-            # Rename the join key in small table to avoid duplicate column after join
-            small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
-
-            # Join on salted keys
-            salted_key = f"{join_key}_salted"
-            result_df = large_salted.join(small_exploded, on=salted_key, how=join_type)
-
-            # Clean up salt columns and renamed join key
-            result_df = result_df.drop("salt", salted_key, f"{join_key}_small")
-
-            return result_df
 
     # Strategy 3: Standard join (no broadcast, no skew detected)
     result_df = large_df.join(small_df, on=join_key, how=join_type)

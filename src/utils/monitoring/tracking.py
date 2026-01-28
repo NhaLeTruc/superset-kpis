@@ -76,19 +76,16 @@ def track_partition_size(partition, context: dict[str, Any]):
         ... )
     """
     size = 0
-    rows = []
+
+    # Yield rows as we iterate, counting without materializing into memory
     for row in partition:
         size += 1
-        rows.append(row)
+        yield row
 
-    # Update partition skew detector
+    # Update partition skew detector after processing all rows
     context["partition_skew"].add(
         {"max_partition_size": size, "min_partition_size": size, "partition_count": 1}
     )
-
-    # Yield all rows
-    for row in rows:
-        yield row
 
 
 def get_monitoring_profile(profile_name: str) -> dict[str, Any]:
