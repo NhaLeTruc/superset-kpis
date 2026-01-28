@@ -5,6 +5,8 @@ Provides integration helpers for tracking data quality and partition metrics,
 plus pre-configured monitoring profiles.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 

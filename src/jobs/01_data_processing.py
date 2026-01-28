@@ -20,6 +20,8 @@ Usage (direct spark-submit):
         --output-path /app/data/processed/enriched_interactions.parquet'
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 import traceback

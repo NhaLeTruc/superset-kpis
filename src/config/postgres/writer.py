@@ -4,6 +4,8 @@ PostgreSQL Write Operations
 Handles writing Spark DataFrames to PostgreSQL with optimizations.
 """
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame
 
 from .connection import get_postgres_connection_props

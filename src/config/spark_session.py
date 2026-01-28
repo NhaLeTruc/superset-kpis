@@ -5,6 +5,8 @@ Provides factory function for creating optimized Spark sessions with
 production-ready configurations including AQE, memory management, and performance tuning.
 """
 
+from __future__ import annotations
+
 import os
 
 from pyspark.sql import SparkSession

@@ -4,6 +4,8 @@ Monitoring Reporting and Formatting
 Provides functions for formatting monitoring metrics and logging summaries.
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable
 from functools import wraps

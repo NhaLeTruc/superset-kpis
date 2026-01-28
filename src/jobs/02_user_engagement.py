@@ -24,6 +24,8 @@ Usage (direct spark-submit):
         --write-to-db'
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 
@@ -173,20 +175,22 @@ class UserEngagementJob(BaseAnalyticsJob):
         # Power Users Summary
         power_users_df = metrics["power_users"]
         power_user_count = power_users_df.count()
-        total_hours = power_users_df.agg({"hours_spent": "sum"}).collect()[0][0]
+        total_hours_result = power_users_df.agg({"hours_spent": "sum"}).collect()[0][0]
+        total_hours = total_hours_result if total_hours_result is not None else 0.0
         print("\nPower Users:")
         print(f"  Count: {power_user_count:,} (top 1%)")
         print(f"  Total Engagement: {total_hours:,.0f} hours")
 
         # Cohort Retention Summary
         cohort_df = metrics["cohort_retention"]
-        avg_retention = (
+        avg_retention_result = (
             cohort_df.filter("week_number = 0").agg({"retention_rate": "avg"}).collect()[0][0]
         )
-        week_12_retention = (
-            cohort_df.filter("week_number = 12").agg({"retention_rate": "avg"}).collect()[0]
+        avg_retention = avg_retention_result if avg_retention_result is not None else 0.0
+        week_12_result = (
+            cohort_df.filter("week_number = 12").agg({"retention_rate": "avg"}).collect()[0][0]
         )
-        week_12_avg = week_12_retention[0] if week_12_retention[0] else 0.0
+        week_12_avg = week_12_result if week_12_result is not None else 0.0
         print("\nCohort Retention:")
         print(f"  Average Week 0: {avg_retention:.2%}")
         print(f"  Average Week 12: {week_12_avg:.2%}")

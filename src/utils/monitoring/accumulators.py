@@ -8,6 +8,8 @@ Provides specialized accumulators for tracking metrics across Spark partitions:
 - Partition skew detection
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 from pyspark import AccumulatorParam

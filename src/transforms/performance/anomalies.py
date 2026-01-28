@@ -4,6 +4,8 @@ Statistical Anomaly Detection
 Implements Z-score based anomaly detection with iterative baseline refinement.
 """
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 

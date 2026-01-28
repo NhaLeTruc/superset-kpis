@@ -8,6 +8,8 @@ Uses Spark's native session_window() for efficient single-pass sessionization
 and aggregation.
 """
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.functions import session_window

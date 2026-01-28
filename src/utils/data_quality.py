@@ -5,6 +5,8 @@ NOTE: This is a stub file - functions not yet implemented.
 Following TDD: Tests written first, implementation comes after RED state.
 """
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType

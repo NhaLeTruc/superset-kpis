@@ -4,6 +4,8 @@ PostgreSQL Connection Management
 Handles connection configuration, connection string creation, and validation.
 """
 
+from __future__ import annotations
+
 import os
 
 

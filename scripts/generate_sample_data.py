@@ -20,10 +20,13 @@ Usage:
     python3 scripts/generate_sample_data.py --small --uniform
 """
 
+from __future__ import annotations
+
 import argparse
 import csv
 import math
 import random
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -253,8 +256,6 @@ def zipf_sample(n: int, s: float) -> int:
     Generate Zipf-distributed integer in range [1, n].
     Uses rejection sampling.
     """
-    # Precompute normalization constant
-    sum(1.0 / (k**s) for k in range(1, n + 1))
     while True:
         u = random.random()
         v = random.random()
@@ -598,7 +599,7 @@ def generate_user_interactions_realistic(
     - Burst events (optional)
     """
     if burst_events is None:
-        burst_events = []
+        burst_events = DEFAULT_BURST_EVENTS if include_burst_events else []
     print(f"Generating ~{target_interactions:,} interactions (realistic mode)...")
 
     # Create user profiles with lifecycle parameters
@@ -609,15 +610,8 @@ def generate_user_interactions_realistic(
     page_cdf = build_zipf_cdf(NUM_PAGES, PAGE_ZIPF_EXPONENT)
     session_gen = SessionGenerator(page_cdf)
 
-    # Use default burst events if not specified
-    if burst_events is None:
-        burst_events = DEFAULT_BURST_EVENTS if include_burst_events else []
-
     interactions = []
     total_days = (ACT_END_DATE - ACT_START_DATE).days
-
-    # Calculate interactions per day target
-    target_interactions / total_days
 
     # Generate day by day
     current_date = ACT_START_DATE
@@ -662,8 +656,6 @@ def generate_user_interactions_realistic(
     # Adjust to target if significantly off - preserve session integrity
     if actual_count > target_interactions * 1.2:
         # Group interactions by (user_id, date, hour) to approximate sessions
-        from collections import defaultdict
-
         sessions = defaultdict(list)
         for interaction in interactions:
             ts = interaction["timestamp"]
@@ -675,7 +667,7 @@ def generate_user_interactions_realistic(
         session_keys = list(sessions.keys())
         random.shuffle(session_keys)
 
-        sampled: list[dict] = []
+        sampled = []
         for key in session_keys:
             if len(sampled) >= target_interactions:
                 break
@@ -712,8 +704,6 @@ def write_csv(data: list, filename: str, fieldnames: list) -> None:
 
 def print_distribution_stats(interactions: list) -> None:
     """Print statistics about generated data distribution."""
-    from collections import Counter
-
     print("\n--- Distribution Statistics ---")
 
     # Hour distribution

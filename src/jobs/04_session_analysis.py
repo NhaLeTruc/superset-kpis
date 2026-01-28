@@ -22,6 +22,8 @@ Usage (direct spark-submit):
         --write-to-db'
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 
@@ -104,7 +106,11 @@ class SessionAnalysisJob(BaseAnalyticsJob):
             .withColumn("dimension_value", F.lit(None).cast("string"))
         )
 
-        print(f"   ✅ Overall bounce rate: {overall_bounce_df.collect()[0]['bounce_rate']:.2%}")
+        overall_bounce_row = overall_bounce_df.collect()
+        if overall_bounce_row and overall_bounce_row[0]["bounce_rate"] is not None:
+            print(f"   ✅ Overall bounce rate: {overall_bounce_row[0]['bounce_rate']:.2%}")
+        else:
+            print("   ✅ Overall bounce rate: N/A (no data)")
 
         # By Device Type
         device_bounce_df = calculate_bounce_rate(

@@ -22,6 +22,8 @@ Usage (direct spark-submit):
         --write-to-db'
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 from datetime import datetime
@@ -146,7 +148,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Show ANOVA results
         anova_stats = device_correlation_df.select("f_statistic", "eta_squared").first()
-        if anova_stats["f_statistic"] is not None:
+        if anova_stats and anova_stats["f_statistic"] is not None:
             print(f"   📈 F-statistic: {anova_stats['f_statistic']:.2f}")
             print(f"   📈 Eta-squared (effect size): {anova_stats['eta_squared']:.4f}")
         metrics["device_correlation"] = device_correlation_df

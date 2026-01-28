@@ -4,6 +4,8 @@ Monitoring Context Management
 Provides factory function for creating monitoring contexts with all accumulators initialized.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

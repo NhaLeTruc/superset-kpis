@@ -14,6 +14,8 @@ Jobs should inherit from BaseAnalyticsJob and implement:
 - get_argument_parser() - job-specific arguments
 """
 
+from __future__ import annotations
+
 import argparse
 import traceback
 from abc import ABC, abstractmethod
