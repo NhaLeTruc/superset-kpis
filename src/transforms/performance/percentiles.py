@@ -38,10 +38,10 @@ def calculate_percentiles(
         if col not in df.columns:
             raise ValueError(f"Column '{col}' not found in DataFrame")
 
-    # Validate percentiles
+    # Validate percentiles (Spark accepts 0.0 to 1.0 inclusive)
     for p in percentiles:
-        if p <= 0 or p >= 1:
-            raise ValueError(f"Percentile {p} must be between 0 and 1")
+        if p < 0 or p > 1:
+            raise ValueError(f"Percentile {p} must be between 0 and 1 (inclusive)")
 
     # Build aggregation expressions: stats + percentiles in a single pass
     agg_exprs = [
@@ -108,9 +108,30 @@ def calculate_device_correlation(
     )
 
     # --- One-way ANOVA: device_type (categorical) vs duration_ms (continuous) ---
-    overall_stats = joined_df.agg(
+    overall_stats_rows = joined_df.agg(
         F.avg(COL_DURATION_MS).alias("grand_mean"), F.count("*").alias("N")
-    ).collect()[0]
+    ).collect()
+
+    # Handle empty DataFrame case
+    if not overall_stats_rows or overall_stats_rows[0]["N"] == 0:
+        # Return empty result with expected schema
+        return (
+            device_metrics.withColumn("f_statistic", F.lit(None).cast("double"))
+            .withColumn("eta_squared", F.lit(None).cast("double"))
+            .drop("_group_variance")
+            .select(
+                COL_DEVICE_TYPE,
+                "avg_duration_ms",
+                "p95_duration_ms",
+                "total_interactions",
+                "unique_users",
+                "interactions_per_user",
+                "f_statistic",
+                "eta_squared",
+            )
+        )
+
+    overall_stats = overall_stats_rows[0]
     grand_mean = float(overall_stats["grand_mean"])
     N = int(overall_stats["N"])
 

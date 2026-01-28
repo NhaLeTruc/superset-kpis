@@ -7,12 +7,12 @@ Calculates user retention rates by cohort over time.
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
-    DateType,
     DoubleType,
     IntegerType,
     LongType,
     StructField,
     StructType,
+    TimestampType,
 )
 
 from src.schemas.columns import COL_REGISTRATION_DATE, COL_TIMESTAMP, COL_USER_ID
@@ -37,11 +37,11 @@ def calculate_cohort_retention(
         DataFrame with [cohort_week, week_number, cohort_size, active_users, retention_rate]
     """
     # Handle empty interactions dataframe (use head(1) to avoid full scan)
-    if interactions_df.head(1):
+    if not interactions_df.head(1):
         # Return empty dataframe with correct schema
         empty_schema = StructType(
             [
-                StructField("cohort_week", DateType(), nullable=False),
+                StructField("cohort_week", TimestampType(), nullable=False),
                 StructField("week_number", IntegerType(), nullable=False),
                 StructField("cohort_size", LongType(), nullable=False),
                 StructField("active_users", LongType(), nullable=False),

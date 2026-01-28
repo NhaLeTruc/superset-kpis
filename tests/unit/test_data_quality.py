@@ -113,8 +113,8 @@ class TestValidateSchema:
         assert is_valid is False
         assert len(errors) == 1
         assert "duration_ms" in errors[0]
-        assert "IntegerType" in errors[0] or "int" in errors[0].lower()
-        assert "LongType" in errors[0] or "long" in errors[0].lower()
+        assert "int" in errors[0].lower()
+        assert "bigint" in errors[0].lower() or "long" in errors[0].lower()
 
 
 class TestDetectNulls:

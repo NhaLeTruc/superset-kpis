@@ -54,7 +54,10 @@ def _parse_session_timeout(session_timeout: str) -> int:
             f"Invalid session_timeout format: '{session_timeout}'. "
             f"Expected format: '<number> seconds' (e.g., '1800 seconds')"
         )
-    return int(match.group(1))
+    timeout_value = int(match.group(1))
+    if timeout_value <= 0:
+        raise ValueError(f"Session timeout must be positive, got {timeout_value} seconds")
+    return timeout_value
 
 
 def calculate_session_metrics(

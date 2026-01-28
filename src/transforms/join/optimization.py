@@ -37,8 +37,8 @@ def identify_hot_keys(
     key_counts = df.groupBy(key_column).count()
 
     # Calculate the threshold value at the given percentile
-    # Using approxQuantile with higher accuracy (0.0001 for precision)
-    threshold_value = key_counts.approxQuantile("count", [threshold_percentile], 0.0001)[0]
+    # Using approxQuantile with 0.001 relative error for accuracy in edge cases
+    threshold_value = key_counts.approxQuantile("count", [threshold_percentile], 0.001)[0]
 
     # Filter to only keys strictly above the threshold (> to exclude uniform distributions)
     hot_keys = key_counts.filter(F.col("count") > threshold_value)
@@ -74,6 +74,10 @@ def apply_salting(
     # Validate key_column exists in df
     if key_column not in df.columns:
         raise ValueError(f"Column '{key_column}' not found in DataFrame")
+
+    # Validate key_column exists in hot_keys_df
+    if key_column not in hot_keys_df.columns:
+        raise ValueError(f"Column '{key_column}' not found in hot_keys DataFrame")
 
     # Left join with hot_keys to identify which keys are hot
     # Add a marker column to identify hot keys
@@ -126,7 +130,16 @@ def explode_for_salting(
         Output:
             - u001 repeated 10 times with salt 0-9
             - u002 appears once with salt 0
+
+    Raises:
+        ValueError: If key_column not in df or hot_keys_df
     """
+    # Validate key_column exists in both DataFrames
+    if key_column not in df.columns:
+        raise ValueError(f"Column '{key_column}' not found in DataFrame")
+    if key_column not in hot_keys_df.columns:
+        raise ValueError(f"Column '{key_column}' not found in hot_keys DataFrame")
+
     # Mark hot keys by left joining
     hot_keys_marked = hot_keys_df.select(key_column).withColumn("is_hot_key", F.lit(True))
     df_with_marker = df.join(hot_keys_marked, on=key_column, how="left")

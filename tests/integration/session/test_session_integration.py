@@ -247,7 +247,7 @@ class TestSessionization:
         bounces = user_metrics.filter(F.col("is_bounce")).count()
         assert bounces == 1, "Should have 1 bounce session"
 
-        non_bounces = user_metrics.filter(not F.col("is_bounce")).count()
+        non_bounces = user_metrics.filter(~F.col("is_bounce")).count()
         assert non_bounces == 2, "Should have 2 non-bounce sessions"
 
     def test_session_monitoring_integration(self, spark, sample_interactions_data):

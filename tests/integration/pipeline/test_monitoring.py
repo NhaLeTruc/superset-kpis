@@ -19,7 +19,7 @@ class TestPipelineMonitoring:
         from src.transforms.engagement import calculate_dau, calculate_mau
         from src.transforms.join import identify_hot_keys, optimized_join
         from src.transforms.performance import calculate_percentiles
-        from src.transforms.session import sessionize_interactions
+        from src.transforms.session import calculate_session_metrics
 
         start_time = time.time()
 
@@ -41,8 +41,8 @@ class TestPipelineMonitoring:
         )
         percentiles.count()
 
-        sessionized = sessionize_interactions(sample_interactions_data)
-        sessionized.count()
+        session_metrics = calculate_session_metrics(sample_interactions_data)
+        session_metrics.count()
 
         elapsed_time = time.time() - start_time
 
@@ -91,7 +91,7 @@ class TestPipelineMonitoring:
         from src.transforms.engagement import calculate_dau, calculate_mau
         from src.transforms.join import identify_hot_keys, optimized_join
         from src.transforms.performance import calculate_percentiles
-        from src.transforms.session import calculate_session_metrics, sessionize_interactions
+        from src.transforms.session import calculate_session_metrics
         from src.utils.monitoring import create_monitoring_context, format_monitoring_summary
 
         # Create monitoring
@@ -114,8 +114,7 @@ class TestPipelineMonitoring:
             enriched, "duration_ms", ["app_version"], [0.5, 0.95, 0.99]
         )
 
-        sessionized = sessionize_interactions(sample_interactions_data)
-        session_metrics = calculate_session_metrics(sessionized)
+        session_metrics = calculate_session_metrics(sample_interactions_data)
 
         # Generate monitoring summary
         summary = format_monitoring_summary(monitoring, "Comprehensive Pipeline Test")
