@@ -10,12 +10,12 @@ and aggregation.
 
 from __future__ import annotations
 
+import re
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.functions import session_window
 from pyspark.sql.types import BooleanType, DoubleType, LongType
-
-import re
 
 from src.schemas.columns import (
     COL_ACTION_COUNT,
