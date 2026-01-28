@@ -6,12 +6,14 @@ Provides join optimization functions:
 - Salting strategies for skew mitigation
 - Optimized join execution with automatic optimization
 """
-from .optimization import identify_hot_keys, apply_salting, explode_for_salting
+
 from .execution import optimized_join
+from .optimization import apply_salting, explode_for_salting, identify_hot_keys
+
 
 __all__ = [
-    "identify_hot_keys",
     "apply_salting",
     "explode_for_salting",
+    "identify_hot_keys",
     "optimized_join",
 ]

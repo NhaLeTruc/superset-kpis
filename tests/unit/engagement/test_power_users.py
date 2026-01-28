@@ -3,10 +3,11 @@ Unit tests for power user identification.
 
 Tests identify_power_users() function from engagement transforms.
 """
-from pyspark.sql.types import (
-    StructType, StructField, StringType, LongType, TimestampType
-)
+
 from datetime import datetime
+
+from pyspark.sql.types import LongType, StringType, StructField, StructType, TimestampType
+
 from src.transforms.engagement import identify_power_users
 
 
@@ -30,22 +31,26 @@ class TestIdentifyPowerUsers:
             duration = user_num * 1000  # 1000, 2000, ..., 100000
             interactions_data.append((user_id, datetime(2023, 1, 1, 10, 0, 0), duration, "page1"))
 
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False),
-            StructField("page_id", StringType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+                StructField("page_id", StringType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Metadata
         metadata_data = [(f"u{i:03d}", "US", "iPad", "premium") for i in range(1, 101)]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False),
-            StructField("subscription_type", StringType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
@@ -73,28 +78,33 @@ class TestIdentifyPowerUsers:
             ("u001", datetime(2023, 1, 1, 11, 0, 0), 120000, "page2"),
             ("u001", datetime(2023, 1, 1, 12, 0, 0), 50000000, "page3"),  # Outlier
         ]
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False),
-            StructField("page_id", StringType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+                StructField("page_id", StringType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         metadata_data = [("u001", "US", "iPad", "premium")]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False),
-            StructField("subscription_type", StringType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
         result_df = identify_power_users(
-            interactions_df, metadata_df,
+            interactions_df,
+            metadata_df,
             percentile=0.0,  # Include all users
-            max_duration_ms=28800000
+            max_duration_ms=28800000,
         )
 
         # Assert
@@ -111,24 +121,26 @@ class TestIdentifyPowerUsers:
             - Result includes country=US, device_type=iPad, subscription_type=premium
         """
         # Arrange
-        interactions_data = [
-            ("u001", datetime(2023, 1, 1, 10, 0, 0), 100000, "page1")
-        ]
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False),
-            StructField("page_id", StringType(), nullable=False)
-        ])
+        interactions_data = [("u001", datetime(2023, 1, 1, 10, 0, 0), 100000, "page1")]
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+                StructField("page_id", StringType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         metadata_data = [("u001", "US", "iPad", "premium")]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False),
-            StructField("subscription_type", StringType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
@@ -152,21 +164,25 @@ class TestIdentifyPowerUsers:
             ("u001", datetime(2023, 1, 1, 11, 0, 0), 20000, "page2"),
             ("u001", datetime(2023, 1, 2, 10, 0, 0), 30000, "page1"),  # Different day
         ]
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False),
-            StructField("page_id", StringType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+                StructField("page_id", StringType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         metadata_data = [("u001", "US", "iPad", "premium")]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False),
-            StructField("subscription_type", StringType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
@@ -178,5 +194,5 @@ class TestIdentifyPowerUsers:
         assert result["unique_pages"] == 2  # page1, page2
         assert result["days_active"] == 2  # Jan 1, Jan 2
         assert result["total_duration_ms"] == 60000
-        assert abs(result["hours_spent"] - 60000/3600000) < 0.01
+        assert abs(result["hours_spent"] - 60000 / 3600000) < 0.01
         assert result["avg_duration_per_interaction"] == 20000.0

@@ -5,10 +5,8 @@ This module tests the custom Spark accumulators used for monitoring
 data processing jobs, including record counting, data quality tracking,
 and partition skew detection.
 """
-import pytest
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, LongType
-from datetime import datetime
+
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 
 class TestMonitoringAccumulators:
@@ -28,12 +26,12 @@ class TestMonitoringAccumulators:
         # Process data with accumulator
         def count_records(partition):
             count = 0
-            for row in partition:
+            for _row in partition:
                 acc.add(1)
                 count += 1
             return iter([count])
 
-        result = df.rdd.mapPartitions(count_records).collect()
+        df.rdd.mapPartitions(count_records).collect()
 
         # Verify accumulator value
         assert acc.value == 100, f"Expected 100 records, got {acc.value}"
@@ -47,18 +45,18 @@ class TestMonitoringAccumulators:
 
         # Create test data with some invalid records
         data = [
-            (1, 100),   # valid
-            (2, -50),   # invalid (negative)
-            (3, 200),   # valid
-            (4, -10),   # invalid (negative)
-            (5, 150),   # valid
+            (1, 100),  # valid
+            (2, -50),  # invalid (negative)
+            (3, 200),  # valid
+            (4, -10),  # invalid (negative)
+            (5, 150),  # valid
         ]
         df = spark.createDataFrame(data, ["id", "value"])
 
         # Process data and skip negatives
         def filter_records(partition):
             for row in partition:
-                if row['value'] < 0:
+                if row["value"] < 0:
                     acc.add(1)
                 else:
                     yield row
@@ -85,9 +83,15 @@ class TestMonitoringAccumulators:
 
         # Verify accumulator value (dictionary of error counts)
         errors = acc.value
-        assert errors["null_user_id"] == 3, f"Expected 3 null_user_id errors, got {errors.get('null_user_id', 0)}"
-        assert errors["invalid_timestamp"] == 1, f"Expected 1 invalid_timestamp error, got {errors.get('invalid_timestamp', 0)}"
-        assert errors["negative_duration"] == 1, f"Expected 1 negative_duration error, got {errors.get('negative_duration', 0)}"
+        assert errors["null_user_id"] == 3, (
+            f"Expected 3 null_user_id errors, got {errors.get('null_user_id', 0)}"
+        )
+        assert errors["invalid_timestamp"] == 1, (
+            f"Expected 1 invalid_timestamp error, got {errors.get('invalid_timestamp', 0)}"
+        )
+        assert errors["negative_duration"] == 1, (
+            f"Expected 1 negative_duration error, got {errors.get('negative_duration', 0)}"
+        )
         assert sum(errors.values()) == 5, f"Expected 5 total errors, got {sum(errors.values())}"
 
     def test_partition_skew_detector(self, spark):
@@ -96,8 +100,8 @@ class TestMonitoringAccumulators:
 
         # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
         acc = spark.sparkContext.accumulator(
-            {"max_partition_size": 0, "min_partition_size": float('inf'), "partition_count": 0},
-            PartitionSkewDetector()
+            {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0},
+            PartitionSkewDetector(),
         )
 
         # Create test data - will be distributed across partitions
@@ -107,12 +111,12 @@ class TestMonitoringAccumulators:
         # Track partition sizes
         def track_partition_size(partition):
             size = 0
-            for row in partition:
+            for _row in partition:
                 size += 1
             acc.add({"max_partition_size": size, "min_partition_size": size, "partition_count": 1})
             return iter([size])
 
-        partition_sizes = df.rdd.mapPartitions(track_partition_size).collect()
+        df.rdd.mapPartitions(track_partition_size).collect()
 
         # Verify accumulator tracked partition info
         skew_info = acc.value
@@ -144,8 +148,8 @@ class TestMonitoringHelpers:
         assert context["data_quality_errors"].value == {}
         assert context["partition_skew"].value == {
             "max_partition_size": 0,
-            "min_partition_size": float('inf'),
-            "partition_count": 0
+            "min_partition_size": float("inf"),
+            "partition_count": 0,
         }
 
     def test_format_monitoring_summary(self, spark):
@@ -207,31 +211,33 @@ class TestMonitoringIntegration:
         # Create test data with quality issues
         data = [
             (1, "user1", 100, "2024-01-01 10:00:00"),  # valid
-            (2, None, 200, "2024-01-01 11:00:00"),     # null user_id
+            (2, None, 200, "2024-01-01 11:00:00"),  # null user_id
             (3, "user3", -50, "2024-01-01 12:00:00"),  # negative duration
-            (4, "user4", 150, None),                    # null timestamp
+            (4, "user4", 150, None),  # null timestamp
             (5, "user5", 300, "2024-01-01 13:00:00"),  # valid
         ]
 
-        schema = StructType([
-            StructField("id", IntegerType(), True),
-            StructField("user_id", StringType(), True),
-            StructField("duration_ms", IntegerType(), True),
-            StructField("timestamp", StringType(), True),
-        ])
+        schema = StructType(
+            [
+                StructField("id", IntegerType(), True),
+                StructField("user_id", StringType(), True),
+                StructField("duration_ms", IntegerType(), True),
+                StructField("timestamp", StringType(), True),
+            ]
+        )
 
         df = spark.createDataFrame(data, schema)
 
         # Validate and track errors
         def validate_row(row):
             errors = []
-            if row['user_id'] is None:
+            if row["user_id"] is None:
                 errors.append("null_user_id")
                 context["data_quality_errors"].add({"null_user_id": 1})
-            if row['duration_ms'] is not None and row['duration_ms'] < 0:
+            if row["duration_ms"] is not None and row["duration_ms"] < 0:
                 errors.append("negative_duration")
                 context["data_quality_errors"].add({"negative_duration": 1})
-            if row['timestamp'] is None:
+            if row["timestamp"] is None:
                 errors.append("null_timestamp")
                 context["data_quality_errors"].add({"null_timestamp": 1})
 
@@ -242,7 +248,7 @@ class TestMonitoringIntegration:
                 context["record_counter"].add(1)
                 return row
 
-        valid_rows = [r for r in df.collect() if validate_row(r) ]
+        [r for r in df.collect() if validate_row(r)]
 
         # Verify monitoring tracked all issues
         assert context["record_counter"].value == 2  # 2 valid records
@@ -268,10 +274,12 @@ class TestMonitoringIntegration:
         # Track partition sizes after grouping (which will create skew)
         def track_partition(partition):
             size = sum(1 for _ in partition)
-            context["partition_skew"].add({"max_partition_size": size, "min_partition_size": size, "partition_count": 1})
+            context["partition_skew"].add(
+                {"max_partition_size": size, "min_partition_size": size, "partition_count": 1}
+            )
             return iter([size])
 
-        partition_sizes = df.rdd.mapPartitions(track_partition).collect()
+        df.rdd.mapPartitions(track_partition).collect()
 
         # Verify skew was detected
         skew_info = context["partition_skew"].value

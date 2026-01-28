@@ -3,19 +3,20 @@ PostgreSQL Read Operations
 
 Handles reading data from PostgreSQL into Spark DataFrames.
 """
-from typing import Optional
+
 from pyspark.sql import DataFrame, SparkSession
+
 from .connection import get_postgres_connection_props
 
 
 def read_from_postgres(
     spark: SparkSession,
     table_name: str,
-    predicate_pushdown: Optional[str] = None,
-    num_partitions: Optional[int] = None,
-    partition_column: Optional[str] = None,
-    lower_bound: Optional[int] = None,
-    upper_bound: Optional[int] = None
+    predicate_pushdown: str | None = None,
+    num_partitions: int | None = None,
+    partition_column: str | None = None,
+    lower_bound: int | None = None,
+    upper_bound: int | None = None,
 ) -> DataFrame:
     """
     Read table from PostgreSQL into Spark DataFrame.
@@ -56,11 +57,7 @@ def read_from_postgres(
     """
     jdbc_url, properties = get_postgres_connection_props()
 
-    reader = spark.read.jdbc(
-        url=jdbc_url,
-        table=table_name,
-        properties=properties
-    )
+    reader = spark.read.jdbc(url=jdbc_url, table=table_name, properties=properties)
 
     # Apply predicate pushdown if specified
     if predicate_pushdown:
@@ -74,10 +71,12 @@ def read_from_postgres(
                 "partition_column, num_partitions, lower_bound, upper_bound"
             )
 
-        reader = reader.option("partitionColumn", partition_column) \
-                       .option("numPartitions", num_partitions) \
-                       .option("lowerBound", lower_bound) \
-                       .option("upperBound", upper_bound)
+        reader = (
+            reader.option("partitionColumn", partition_column)
+            .option("numPartitions", num_partitions)
+            .option("lowerBound", lower_bound)
+            .option("upperBound", upper_bound)
+        )
 
     df = reader.load()
     print(f"✅ Successfully read {df.count()} rows from {table_name}")
@@ -85,10 +84,7 @@ def read_from_postgres(
     return df
 
 
-def execute_sql(
-    spark: SparkSession,
-    sql_query: str
-) -> DataFrame:
+def execute_sql(spark: SparkSession, sql_query: str) -> DataFrame:
     """
     Execute arbitrary SQL query on PostgreSQL.
 
@@ -114,9 +110,7 @@ def execute_sql(
     jdbc_url, properties = get_postgres_connection_props()
 
     df = spark.read.jdbc(
-        url=jdbc_url,
-        table=f"({sql_query}) as query",
-        properties=properties
+        url=jdbc_url, table=f"({sql_query}) as query", properties=properties
     ).load()
 
     return df
@@ -142,7 +136,7 @@ def get_table_row_count(spark: SparkSession, table_name: str) -> int:
     count_df = spark.read.jdbc(
         url=jdbc_url,
         table=f"(SELECT COUNT(*) as count FROM {table_name}) as count_query",
-        properties=properties
+        properties=properties,
     ).load()
 
     return count_df.first()["count"]

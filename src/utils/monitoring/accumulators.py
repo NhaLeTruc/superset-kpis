@@ -7,8 +7,10 @@ Provides specialized accumulators for tracking metrics across Spark partitions:
 - Data quality error categorization
 - Partition skew detection
 """
+
+from typing import Any
+
 from pyspark import AccumulatorParam
-from typing import Dict, Any
 
 
 class RecordCounterAccumulator(AccumulatorParam):
@@ -57,11 +59,11 @@ class DataQualityErrorsAccumulator(AccumulatorParam):
     - etc.
     """
 
-    def zero(self, initial_value: Dict[str, int]) -> Dict[str, int]:
+    def zero(self, initial_value: dict[str, int]) -> dict[str, int]:
         """Return the zero value (empty dict) for this accumulator."""
         return {}
 
-    def addInPlace(self, v1: Dict[str, int], v2: Dict[str, int]) -> Dict[str, int]:
+    def addInPlace(self, v1: dict[str, int], v2: dict[str, int]) -> dict[str, int]:
         """Merge two error dictionaries."""
         result = v1.copy()
         for error_type, count in v2.items():
@@ -79,18 +81,14 @@ class PartitionSkewDetector(AccumulatorParam):
     - partition_count: Number of partitions processed
     """
 
-    def zero(self, initial_value: Dict[str, Any]) -> Dict[str, Any]:
+    def zero(self, initial_value: dict[str, Any]) -> dict[str, Any]:
         """Return the zero value for this accumulator."""
-        return {
-            "max_partition_size": 0,
-            "min_partition_size": float('inf'),
-            "partition_count": 0
-        }
+        return {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0}
 
-    def addInPlace(self, v1: Dict[str, Any], v2: Dict[str, Any]) -> Dict[str, Any]:
+    def addInPlace(self, v1: dict[str, Any], v2: dict[str, Any]) -> dict[str, Any]:
         """Merge two partition info dictionaries."""
         return {
             "max_partition_size": max(v1["max_partition_size"], v2["max_partition_size"]),
             "min_partition_size": min(v1["min_partition_size"], v2["min_partition_size"]),
-            "partition_count": v1["partition_count"] + v2["partition_count"]
+            "partition_count": v1["partition_count"] + v2["partition_count"],
         }

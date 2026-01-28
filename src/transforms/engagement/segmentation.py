@@ -3,11 +3,16 @@ User Segmentation
 
 Calculates stickiness ratio and identifies power users.
 """
+
+import math
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType, StructField
 
-from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS, COL_PAGE_ID
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
+from src.schemas.columns import COL_DURATION_MS, COL_PAGE_ID, COL_TIMESTAMP, COL_USER_ID
+
 
 # Safety limit for collecting power users to driver memory
 # At 10M users with 1% = 100K rows, 50K is a reasonable limit
@@ -38,8 +43,7 @@ def calculate_stickiness(dau_df: DataFrame, mau_df: DataFrame) -> DataFrame:
 
     # Calculate stickiness ratio as decimal (0.0 to 1.0)
     stickiness_df = stickiness_df.withColumn(
-        "stickiness_ratio",
-        (F.col("avg_dau") / F.col("monthly_active_users")).cast("double")
+        "stickiness_ratio", (F.col("avg_dau") / F.col("monthly_active_users")).cast("double")
     )
 
     return stickiness_df.select("month", "avg_dau", "monthly_active_users", "stickiness_ratio")
@@ -49,7 +53,7 @@ def identify_power_users(
     interactions_df: DataFrame,
     metadata_df: DataFrame,
     percentile: float = HOT_KEY_THRESHOLD_PERCENTILE,
-    max_duration_ms: int = 28800000
+    max_duration_ms: int = 28800000,
 ) -> DataFrame:
     """
     Identify power users (top percentile by total engagement).
@@ -77,7 +81,7 @@ def identify_power_users(
     agg_exprs = [
         F.sum(COL_DURATION_MS).alias("total_duration_ms"),
         F.count("*").alias("total_interactions"),
-        F.countDistinct("date").alias("days_active")
+        F.countDistinct("date").alias("days_active"),
     ]
 
     # Add unique_pages only if page_id column exists
@@ -93,23 +97,18 @@ def identify_power_users(
 
     # Calculate derived metrics
     user_metrics = user_metrics.withColumn(
-        "hours_spent",
-        (F.col("total_duration_ms") / 3600000.0).cast("double")
+        "hours_spent", (F.col("total_duration_ms") / 3600000.0).cast("double")
     )
     user_metrics = user_metrics.withColumn(
         "avg_duration_per_interaction",
-        (F.col("total_duration_ms") / F.col("total_interactions")).cast("double")
+        (F.col("total_duration_ms") / F.col("total_interactions")).cast("double"),
     )
     # Add alias for test compatibility
-    user_metrics = user_metrics.withColumn(
-        "avg_duration_ms",
-        F.col("avg_duration_per_interaction")
-    )
+    user_metrics = user_metrics.withColumn("avg_duration_ms", F.col("avg_duration_per_interaction"))
 
     # Calculate how many users to include based on percentile threshold
     # Original semantics: include users where percent_rank >= percentile
     # percent_rank = (rank - 1) / (n - 1), so we derive count from that formula
-    import math
     total_users = user_metrics.count()
 
     if total_users == 0:
@@ -124,7 +123,9 @@ def identify_power_users(
 
         # Sort by total_duration_ms descending and take top N
         # This avoids a global window function which would move all data to one partition
-        power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(users_to_include)
+        power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(
+            users_to_include
+        )
 
     # Calculate percentile rank without window function (avoids single-partition warning)
     # Power users is a small dataset (top 1%), so collect is usually safe
@@ -154,7 +155,6 @@ def identify_power_users(
             ranked_data.append((*row, float(pct_rank)))
 
         # Recreate DataFrame with percentile_rank column
-        from pyspark.sql.types import DoubleType, StructField
         new_schema = schema.add(StructField("percentile_rank", DoubleType(), True))
         power_users = spark.createDataFrame(ranked_data, schema=new_schema)
 

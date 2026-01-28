@@ -4,12 +4,16 @@ Data Quality Tracking and Monitoring Profiles
 Provides integration helpers for tracking data quality and partition metrics,
 plus pre-configured monitoring profiles.
 """
-from typing import Dict, Any, List, Optional
+
+from typing import Any
 
 
-def track_data_quality_errors(row: Dict[str, Any], context: Dict[str, Any],
-                              non_nullable_columns: List[str] = None,
-                              numeric_columns: List[str] = None) -> bool:
+def track_data_quality_errors(
+    row: dict[str, Any],
+    context: dict[str, Any],
+    non_nullable_columns: list[str] | None = None,
+    numeric_columns: list[str] | None = None,
+) -> bool:
     """
     Track data quality errors for a row and update monitoring context.
 
@@ -53,7 +57,7 @@ def track_data_quality_errors(row: Dict[str, Any], context: Dict[str, Any],
         return True
 
 
-def track_partition_size(partition, context: Dict[str, Any]):
+def track_partition_size(partition, context: dict[str, Any]):
     """
     Track the size of a partition for skew detection.
 
@@ -76,18 +80,16 @@ def track_partition_size(partition, context: Dict[str, Any]):
         rows.append(row)
 
     # Update partition skew detector
-    context["partition_skew"].add({
-        "max_partition_size": size,
-        "min_partition_size": size,
-        "partition_count": 1
-    })
+    context["partition_skew"].add(
+        {"max_partition_size": size, "min_partition_size": size, "partition_count": 1}
+    )
 
     # Yield all rows
     for row in rows:
         yield row
 
 
-def get_monitoring_profile(profile_name: str) -> Dict[str, Any]:
+def get_monitoring_profile(profile_name: str) -> dict[str, Any]:
     """
     Get a pre-configured monitoring profile.
 
@@ -126,7 +128,7 @@ def get_monitoring_profile(profile_name: str) -> Dict[str, Any]:
             "track_partition_skew": False,
             "fail_on_errors": False,
             "skew_threshold": 10.0,
-        }
+        },
     }
 
     return profiles.get(profile_name, profiles["standard"])

@@ -23,27 +23,35 @@ Usage (direct spark-submit):
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'
 """
+
 import argparse
 import sys
-from typing import Dict
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
-from src.jobs.base_job import BaseAnalyticsJob
-from src.schemas.columns import (
-    COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE,
-)
 from src.config.constants import (
     HOT_KEY_THRESHOLD_PERCENTILE,
-    TABLE_DAILY_ACTIVE_USERS, TABLE_MONTHLY_ACTIVE_USERS,
-    TABLE_USER_STICKINESS, TABLE_POWER_USERS, TABLE_COHORT_RETENTION,
+    TABLE_COHORT_RETENTION,
+    TABLE_DAILY_ACTIVE_USERS,
+    TABLE_MONTHLY_ACTIVE_USERS,
+    TABLE_POWER_USERS,
+    TABLE_USER_STICKINESS,
+)
+from src.jobs.base_job import BaseAnalyticsJob
+from src.schemas.columns import (
+    COL_COUNTRY,
+    COL_DEVICE_TYPE,
+    COL_REGISTRATION_DATE,
+    COL_SUBSCRIPTION_TYPE,
+    COL_USER_ID,
 )
 from src.transforms.engagement import (
+    calculate_cohort_retention,
     calculate_dau,
     calculate_mau,
     calculate_stickiness,
     identify_power_users,
-    calculate_cohort_retention
 )
 
 
@@ -51,23 +59,21 @@ class UserEngagementJob(BaseAnalyticsJob):
     """User Engagement Analytics Job."""
 
     def __init__(self):
-        super().__init__(
-            job_name="User Engagement Analytics",
-            job_type="analytics"
-        )
+        super().__init__(job_name="User Engagement Analytics", job_type="analytics")
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
         parser = argparse.ArgumentParser(description="GoodNote User Engagement Analytics")
-        parser.add_argument("--enriched-path", required=True,
-                          help="Path to enriched interactions Parquet")
-        parser.add_argument("--write-to-db", action="store_true",
-                          help="Write results to PostgreSQL")
-        parser.add_argument("--output-path",
-                          help="Optional: Write results to Parquet")
+        parser.add_argument(
+            "--enriched-path", required=True, help="Path to enriched interactions Parquet"
+        )
+        parser.add_argument(
+            "--write-to-db", action="store_true", help="Write results to PostgreSQL"
+        )
+        parser.add_argument("--output-path", help="Optional: Write results to Parquet")
         return parser
 
-    def compute_metrics(self) -> Dict[str, DataFrame]:
+    def compute_metrics(self) -> dict[str, DataFrame]:
         """
         Compute all engagement metrics.
 
@@ -80,9 +86,17 @@ class UserEngagementJob(BaseAnalyticsJob):
         metrics = {}
 
         # Extract metadata_df once and cache it (used by power_users and cohort_retention)
-        metadata_df = enriched_df.select(
-            COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE
-        ).distinct().persist()
+        metadata_df = (
+            enriched_df.select(
+                COL_USER_ID,
+                COL_REGISTRATION_DATE,
+                COL_COUNTRY,
+                COL_DEVICE_TYPE,
+                COL_SUBSCRIPTION_TYPE,
+            )
+            .distinct()
+            .persist()
+        )
 
         # 1. Daily Active Users (DAU)
         print("\n📊 Calculating Daily Active Users (DAU)...")
@@ -105,9 +119,7 @@ class UserEngagementJob(BaseAnalyticsJob):
         # 4. Power Users (Top 1%)
         print("\n📊 Identifying Power Users...")
         power_users_df = identify_power_users(
-            enriched_df,
-            metadata_df,
-            percentile=HOT_KEY_THRESHOLD_PERCENTILE
+            enriched_df, metadata_df, percentile=HOT_KEY_THRESHOLD_PERCENTILE
         )
         print("   ✅ Power users identification complete")
         metrics["power_users"] = power_users_df
@@ -115,10 +127,7 @@ class UserEngagementJob(BaseAnalyticsJob):
         # 5. Cohort Retention (Weekly cohorts, 6 months)
         print("\n📊 Calculating Cohort Retention...")
         cohort_df = calculate_cohort_retention(
-            enriched_df,
-            metadata_df,
-            cohort_period="week",
-            retention_weeks=26
+            enriched_df, metadata_df, cohort_period="week", retention_weeks=26
         )
         print("   ✅ Cohort retention calculation complete")
         metrics["cohort_retention"] = cohort_df
@@ -129,7 +138,7 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         return metrics
 
-    def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
         """Print summary of computed metrics."""
         print("\n" + "=" * 60)
         print("📊 Engagement Metrics Summary")
@@ -137,13 +146,10 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         # DAU Summary
         dau_df = metrics["dau"]
-        from pyspark.sql import functions as F
         dau_stats = dau_df.select(
-            F.avg("daily_active_users"),
-            F.max("daily_active_users"),
-            F.min("daily_active_users")
+            F.avg("daily_active_users"), F.max("daily_active_users"), F.min("daily_active_users")
         ).collect()[0]
-        print(f"\nDaily Active Users:")
+        print("\nDaily Active Users:")
         print(f"  Average DAU: {dau_stats[0]:,.0f}")
         print(f"  Max DAU: {dau_stats[1]:,}")
         print(f"  Min DAU: {dau_stats[2]:,}")
@@ -151,17 +157,15 @@ class UserEngagementJob(BaseAnalyticsJob):
         # MAU Summary
         mau_df = metrics["mau"]
         mau_stats = mau_df.agg({"monthly_active_users": "avg"}).collect()[0]
-        print(f"\nMonthly Active Users:")
+        print("\nMonthly Active Users:")
         print(f"  Average MAU: {mau_stats[0]:,.0f}")
 
         # Stickiness Summary
         stickiness_df = metrics["stickiness"]
         stickiness_stats = stickiness_df.select(
-            F.avg("stickiness_ratio"),
-            F.max("stickiness_ratio"),
-            F.min("stickiness_ratio")
+            F.avg("stickiness_ratio"), F.max("stickiness_ratio"), F.min("stickiness_ratio")
         ).collect()[0]
-        print(f"\nStickiness Ratio:")
+        print("\nStickiness Ratio:")
         print(f"  Average: {stickiness_stats[0]:.2%}")
         print(f"  Max: {stickiness_stats[1]:.2%}")
         print(f"  Min: {stickiness_stats[2]:.2%}")
@@ -170,22 +174,26 @@ class UserEngagementJob(BaseAnalyticsJob):
         power_users_df = metrics["power_users"]
         power_user_count = power_users_df.count()
         total_hours = power_users_df.agg({"hours_spent": "sum"}).collect()[0][0]
-        print(f"\nPower Users:")
+        print("\nPower Users:")
         print(f"  Count: {power_user_count:,} (top 1%)")
         print(f"  Total Engagement: {total_hours:,.0f} hours")
 
         # Cohort Retention Summary
         cohort_df = metrics["cohort_retention"]
-        avg_retention = cohort_df.filter("week_number = 0").agg({"retention_rate": "avg"}).collect()[0][0]
-        week_12_retention = cohort_df.filter("week_number = 12").agg({"retention_rate": "avg"}).collect()[0]
+        avg_retention = (
+            cohort_df.filter("week_number = 0").agg({"retention_rate": "avg"}).collect()[0][0]
+        )
+        week_12_retention = (
+            cohort_df.filter("week_number = 12").agg({"retention_rate": "avg"}).collect()[0]
+        )
         week_12_avg = week_12_retention[0] if week_12_retention[0] else 0.0
-        print(f"\nCohort Retention:")
+        print("\nCohort Retention:")
         print(f"  Average Week 0: {avg_retention:.2%}")
         print(f"  Average Week 12: {week_12_avg:.2%}")
 
         print("=" * 60)
 
-    def get_table_mapping(self) -> Dict[str, str]:
+    def get_table_mapping(self) -> dict[str, str]:
         """Get database table mapping."""
         return {
             "dau": TABLE_DAILY_ACTIVE_USERS,

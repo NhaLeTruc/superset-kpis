@@ -10,27 +10,25 @@ Provides comprehensive PostgreSQL connectivity for Spark:
 
 All public APIs are re-exported for convenience.
 """
+
 from .connection import (
-    get_postgres_connection_props,
     create_connection_string,
-    validate_database_config
+    get_postgres_connection_props,
+    validate_database_config,
 )
-from .reader import (
-    read_from_postgres,
-    execute_sql,
-    get_table_row_count
-)
+from .reader import execute_sql, get_table_row_count, read_from_postgres
 from .writer import write_to_postgres
 
+
 __all__ = [
+    "create_connection_string",
+    "execute_sql",
     # Connection
     "get_postgres_connection_props",
-    "create_connection_string",
-    "validate_database_config",
+    "get_table_row_count",
     # Reader
     "read_from_postgres",
-    "execute_sql",
-    "get_table_row_count",
+    "validate_database_config",
     # Writer
     "write_to_postgres",
 ]

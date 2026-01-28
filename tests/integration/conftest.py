@@ -5,13 +5,14 @@ This module provides shared fixtures for integration testing,
 including Spark session setup, test data generation, and
 database connection management.
 """
-import pytest
-import tempfile
-import shutil
+
 import os
-from pathlib import Path
-from pyspark.sql import SparkSession
+import shutil
+import tempfile
 from datetime import datetime, timedelta
+
+import pytest
+from pyspark.sql import SparkSession
 
 
 @pytest.fixture(scope="session")
@@ -22,8 +23,7 @@ def spark():
     This session is configured for local testing with minimal resources.
     """
     spark = (
-        SparkSession.builder
-        .appName("GoodNote_Integration_Tests")
+        SparkSession.builder.appName("GoodNote_Integration_Tests")
         .master("local[2]")
         .config("spark.driver.memory", "2g")
         .config("spark.executor.memory", "2g")
@@ -85,7 +85,7 @@ def sample_interactions_data(spark):
     Returns:
         DataFrame with realistic user interactions
     """
-    from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+    from pyspark.sql.types import IntegerType, StringType, StructField, StructType, TimestampType
 
     # Generate 1000 interactions over 30 days
     base_date = datetime(2024, 1, 1)
@@ -97,21 +97,17 @@ def sample_interactions_data(spark):
         timestamp = base_date + timedelta(days=i % 30, hours=i % 24, minutes=i % 60)
         duration_ms = 100 + (i % 5000)
 
-        interactions.append((
-            f"interaction_{i}",
-            user_id,
-            action_type,
-            timestamp,
-            duration_ms
-        ))
+        interactions.append((f"interaction_{i}", user_id, action_type, timestamp, duration_ms))
 
-    schema = StructType([
-        StructField("interaction_id", StringType(), False),
-        StructField("user_id", StringType(), False),
-        StructField("action_type", StringType(), False),
-        StructField("timestamp", TimestampType(), False),
-        StructField("duration_ms", IntegerType(), False),
-    ])
+    schema = StructType(
+        [
+            StructField("interaction_id", StringType(), False),
+            StructField("user_id", StringType(), False),
+            StructField("action_type", StringType(), False),
+            StructField("timestamp", TimestampType(), False),
+            StructField("duration_ms", IntegerType(), False),
+        ]
+    )
 
     return spark.createDataFrame(interactions, schema)
 
@@ -124,7 +120,7 @@ def sample_metadata_data(spark):
     Returns:
         DataFrame with user metadata
     """
-    from pyspark.sql.types import StructType, StructField, StringType, TimestampType
+    from pyspark.sql.types import StringType, StructField, StructType, TimestampType
 
     # Generate metadata for 100 users
     metadata = []
@@ -137,23 +133,20 @@ def sample_metadata_data(spark):
         subscription_type = ["free", "premium", "enterprise"][i % 3]
         registration_date = base_date + timedelta(days=i)
 
-        metadata.append((
-            user_id,
-            country,
-            device_type,
-            subscription_type,
-            registration_date,
-            "1.0.0"
-        ))
+        metadata.append(
+            (user_id, country, device_type, subscription_type, registration_date, "1.0.0")
+        )
 
-    schema = StructType([
-        StructField("user_id", StringType(), False),
-        StructField("country", StringType(), False),
-        StructField("device_type", StringType(), False),
-        StructField("subscription_type", StringType(), False),
-        StructField("registration_date", TimestampType(), False),
-        StructField("app_version", StringType(), False),
-    ])
+    schema = StructType(
+        [
+            StructField("user_id", StringType(), False),
+            StructField("country", StringType(), False),
+            StructField("device_type", StringType(), False),
+            StructField("subscription_type", StringType(), False),
+            StructField("registration_date", TimestampType(), False),
+            StructField("app_version", StringType(), False),
+        ]
+    )
 
     return spark.createDataFrame(metadata, schema)
 
@@ -166,7 +159,7 @@ def sample_skewed_interactions(spark):
     Returns:
         DataFrame with 90% of interactions from 10% of users (power law distribution)
     """
-    from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+    from pyspark.sql.types import IntegerType, StringType, StructField, StructType, TimestampType
 
     interactions = []
     base_date = datetime(2024, 1, 1)
@@ -174,35 +167,41 @@ def sample_skewed_interactions(spark):
 
     # Power users (10% of users, 90% of interactions)
     for user_idx in range(10):  # 10 power users
-        for i in range(900):  # 900 interactions each
-            interactions.append((
-                f"interaction_{interaction_id}",
-                f"power_user_{user_idx}",
-                "edit_note",
-                base_date + timedelta(hours=interaction_id % 720),
-                200 + (interaction_id % 3000)
-            ))
+        for _i in range(900):  # 900 interactions each
+            interactions.append(
+                (
+                    f"interaction_{interaction_id}",
+                    f"power_user_{user_idx}",
+                    "edit_note",
+                    base_date + timedelta(hours=interaction_id % 720),
+                    200 + (interaction_id % 3000),
+                )
+            )
             interaction_id += 1
 
     # Normal users (90% of users, 10% of interactions)
     for user_idx in range(90):  # 90 normal users
-        for i in range(10):  # 10 interactions each
-            interactions.append((
-                f"interaction_{interaction_id}",
-                f"normal_user_{user_idx}",
-                "open_note",
-                base_date + timedelta(hours=interaction_id % 720),
-                100 + (interaction_id % 1000)
-            ))
+        for _i in range(10):  # 10 interactions each
+            interactions.append(
+                (
+                    f"interaction_{interaction_id}",
+                    f"normal_user_{user_idx}",
+                    "open_note",
+                    base_date + timedelta(hours=interaction_id % 720),
+                    100 + (interaction_id % 1000),
+                )
+            )
             interaction_id += 1
 
-    schema = StructType([
-        StructField("interaction_id", StringType(), False),
-        StructField("user_id", StringType(), False),
-        StructField("action_type", StringType(), False),
-        StructField("timestamp", TimestampType(), False),
-        StructField("duration_ms", IntegerType(), False),
-    ])
+    schema = StructType(
+        [
+            StructField("interaction_id", StringType(), False),
+            StructField("user_id", StringType(), False),
+            StructField("action_type", StringType(), False),
+            StructField("timestamp", TimestampType(), False),
+            StructField("duration_ms", IntegerType(), False),
+        ]
+    )
 
     return spark.createDataFrame(interactions, schema)
 
@@ -220,5 +219,5 @@ def db_config():
         "port": 5432,
         "database": "goodnote_test",
         "user": "test_user",
-        "password": "test_password"
+        "password": "test_password",
     }

@@ -19,19 +19,20 @@ Usage (direct spark-submit):
         --metadata-path /app/data/raw/user_metadata.csv \
         --output-path /app/data/processed/enriched_interactions.parquet'
 """
+
 import argparse
 import sys
+import traceback
 from datetime import datetime
-from typing import Dict, Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas import INTERACTIONS_SCHEMA, METADATA_SCHEMA
-from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_ACTION_TYPE, COL_DEVICE_TYPE
-from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
-from src.transforms.join.execution import optimized_join, identify_hot_keys
+from src.schemas.columns import COL_ACTION_TYPE, COL_DEVICE_TYPE, COL_TIMESTAMP, COL_USER_ID
+from src.transforms.join.execution import identify_hot_keys, optimized_join
 from src.utils.monitoring import log_monitoring_summary
 
 
@@ -42,20 +43,18 @@ class DataProcessingJob(BaseAnalyticsJob):
         super().__init__(
             job_name="Data Processing",
             job_type="etl",
-            data_size_gb=0.15  # Estimated data size for dynamic partitioning
+            data_size_gb=0.15,  # Estimated data size for dynamic partitioning
         )
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
         parser = argparse.ArgumentParser(description="GoodNote Data Processing Job")
-        parser.add_argument("--interactions-path", required=True,
-                          help="Path to interactions Parquet")
-        parser.add_argument("--metadata-path", required=True,
-                          help="Path to metadata Parquet")
-        parser.add_argument("--output-path", required=True,
-                          help="Path to write enriched data")
-        parser.add_argument("--skip-validation", action="store_true",
-                          help="Skip data validation")
+        parser.add_argument(
+            "--interactions-path", required=True, help="Path to interactions Parquet"
+        )
+        parser.add_argument("--metadata-path", required=True, help="Path to metadata Parquet")
+        parser.add_argument("--output-path", required=True, help="Path to write enriched data")
+        parser.add_argument("--skip-validation", action="store_true", help="Skip data validation")
         return parser
 
     def enrich_interactions(self, interactions_df: DataFrame, metadata_df: DataFrame) -> DataFrame:
@@ -74,7 +73,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         hot_keys_df = identify_hot_keys(
             interactions_df,
             key_column=COL_USER_ID,
-            threshold_percentile=HOT_KEY_THRESHOLD_PERCENTILE
+            threshold_percentile=HOT_KEY_THRESHOLD_PERCENTILE,
         ).persist()
 
         hot_key_count = hot_keys_df.count()
@@ -90,19 +89,16 @@ class DataProcessingJob(BaseAnalyticsJob):
             small_df=metadata_df,
             join_key=COL_USER_ID,
             join_type="left",
-            hot_keys_df=hot_keys_df
+            hot_keys_df=hot_keys_df,
         )
 
         # Add processing metadata
-        enriched_df = enriched_df.withColumn(
-            "processing_timestamp",
-            F.lit(datetime.now())
-        )
+        enriched_df = enriched_df.withColumn("processing_timestamp", F.lit(datetime.now()))
 
         hot_keys_df.unpersist()
         return enriched_df
 
-    def compute_metrics(self) -> Dict[str, DataFrame]:
+    def compute_metrics(self) -> dict[str, DataFrame]:
         """
         Read and enrich interaction data.
 
@@ -110,14 +106,8 @@ class DataProcessingJob(BaseAnalyticsJob):
             Dictionary with enriched DataFrame
         """
         # Read input data
-        interactions_df = self.read_csv(
-            self.args.interactions_path,
-            name="interactions"
-        )
-        metadata_df = self.read_csv(
-            self.args.metadata_path,
-            name="user metadata"
-        )
+        interactions_df = self.read_csv(self.args.interactions_path, name="interactions")
+        metadata_df = self.read_csv(self.args.metadata_path, name="user metadata")
 
         # Track initial record count
         interaction_count = interactions_df.count()
@@ -129,12 +119,14 @@ class DataProcessingJob(BaseAnalyticsJob):
             print("\n🔍 Validating input data quality...")
 
             warnings = []
-            warnings.extend(self.validate_dataframe(
-                interactions_df, name="interactions", schema=INTERACTIONS_SCHEMA
-            ))
-            warnings.extend(self.validate_dataframe(
-                metadata_df, name="metadata", schema=METADATA_SCHEMA
-            ))
+            warnings.extend(
+                self.validate_dataframe(
+                    interactions_df, name="interactions", schema=INTERACTIONS_SCHEMA
+                )
+            )
+            warnings.extend(
+                self.validate_dataframe(metadata_df, name="metadata", schema=METADATA_SCHEMA)
+            )
 
             for warning in warnings:
                 print(f"   ⚠️  {warning}")
@@ -154,7 +146,7 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         return {"enriched_interactions": enriched_df}
 
-    def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
         """Print summary statistics of enriched data."""
         enriched_df = metrics["enriched_interactions"].persist()
 
@@ -163,8 +155,7 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         # Date range
         date_stats = enriched_df.agg(
-            F.min(COL_TIMESTAMP).alias("min_date"),
-            F.max(COL_TIMESTAMP).alias("max_date")
+            F.min(COL_TIMESTAMP).alias("min_date"), F.max(COL_TIMESTAMP).alias("max_date")
         ).collect()[0]
 
         print(f"Date Range: {date_stats['min_date']} to {date_stats['max_date']}")
@@ -191,7 +182,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         enriched_df.unpersist()
         print("=" * 60)
 
-    def get_table_mapping(self) -> Optional[Dict[str, str]]:
+    def get_table_mapping(self) -> dict[str, str] | None:
         """This job writes to Parquet, not database."""
         return None
 
@@ -223,11 +214,7 @@ class DataProcessingJob(BaseAnalyticsJob):
             self.print_summary(metrics)
 
             # Write enriched output with date partitioning
-            self.write_to_parquet(
-                metrics,
-                self.args.output_path,
-                partition_by=["date"]
-            )
+            self.write_to_parquet(metrics, self.args.output_path, partition_by=["date"])
 
             # Log monitoring summary
             if self.monitoring_ctx:
@@ -241,9 +228,8 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         except Exception as e:
             print("\n" + "=" * 60)
-            print(f"❌ Job failed with error: {str(e)}")
+            print(f"❌ Job failed with error: {e!s}")
             print("=" * 60)
-            import traceback
             traceback.print_exc()
 
             self.print_job_footer(success=False)

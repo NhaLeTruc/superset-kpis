@@ -4,11 +4,13 @@ Join Execution - Optimized Join Implementation
 Implements automatic join optimization with broadcast hints,
 skew detection, and salting strategies.
 """
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
-from .optimization import identify_hot_keys, apply_salting, explode_for_salting
+
+from .optimization import apply_salting, explode_for_salting, identify_hot_keys
 
 
 def optimized_join(
@@ -20,7 +22,7 @@ def optimized_join(
     enable_broadcast: bool = True,
     enable_salting: bool = True,
     skew_threshold: float = HOT_KEY_THRESHOLD_PERCENTILE,
-    salt_factor: int = 10
+    salt_factor: int = 10,
 ) -> DataFrame:
     """
     Perform optimized join with automatic skew detection and mitigation.
@@ -58,10 +60,14 @@ def optimized_join(
     # If hot_keys_df is explicitly provided, always use salting
     if hot_keys_df.head(1) and enable_salting:
         # Apply salting to large_df
-        large_salted = apply_salting(large_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor)
+        large_salted = apply_salting(
+            large_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
+        )
 
         # Explode small_df to match salted keys - rename join_key to avoid ambiguity
-        small_exploded = explode_for_salting(small_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor)
+        small_exploded = explode_for_salting(
+            small_df, hot_keys_df, key_column=join_key, salt_factor=salt_factor
+        )
         # Rename the join key in small table to avoid duplicate column after join
         small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
 
@@ -83,15 +89,21 @@ def optimized_join(
     # Strategy 2: Check for skew and apply salting if needed
     if enable_salting:
         # Detect hot keys in large_df
-        detected_hot_keys = identify_hot_keys(large_df, key_column=join_key, threshold_percentile=skew_threshold)
+        detected_hot_keys = identify_hot_keys(
+            large_df, key_column=join_key, threshold_percentile=skew_threshold
+        )
 
         # If hot keys found, apply salting
         if detected_hot_keys.head(1):
             # Apply salting to large_df
-            large_salted = apply_salting(large_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor)
+            large_salted = apply_salting(
+                large_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor
+            )
 
             # Explode small_df to match salted keys - rename join_key to avoid ambiguity
-            small_exploded = explode_for_salting(small_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor)
+            small_exploded = explode_for_salting(
+                small_df, detected_hot_keys, key_column=join_key, salt_factor=salt_factor
+            )
             # Rename the join key in small table to avoid duplicate column after join
             small_exploded = small_exploded.withColumnRenamed(join_key, f"{join_key}_small")
 

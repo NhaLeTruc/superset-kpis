@@ -3,14 +3,17 @@ Monitoring Reporting and Formatting
 
 Provides functions for formatting monitoring metrics and logging summaries.
 """
-from typing import Dict, Any, Callable
-from functools import wraps
+
 import logging
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 
 logger = logging.getLogger(__name__)
 
 
-def format_monitoring_summary(context: Dict[str, Any], job_name: str) -> str:
+def format_monitoring_summary(context: dict[str, Any], job_name: str) -> str:
     """
     Format monitoring metrics into a human-readable summary.
 
@@ -65,10 +68,7 @@ def format_monitoring_summary(context: Dict[str, Any], job_name: str) -> str:
     if skew_info["partition_count"] > 0:
         max_size = skew_info["max_partition_size"]
         min_size = skew_info["min_partition_size"]
-        if min_size != float('inf') and min_size > 0:
-            skew_ratio = max_size / min_size
-        else:
-            skew_ratio = 0
+        skew_ratio = max_size / min_size if min_size != float("inf") and min_size > 0 else 0
 
         lines.append("📦 Partition Distribution:")
         lines.append(f"   - Partitions Processed: {skew_info['partition_count']}")
@@ -86,7 +86,7 @@ def format_monitoring_summary(context: Dict[str, Any], job_name: str) -> str:
     return "\n".join(lines)
 
 
-def log_monitoring_summary(context: Dict[str, Any], job_name: str):
+def log_monitoring_summary(context: dict[str, Any], job_name: str):
     """
     Log the monitoring summary to logger.
 
@@ -115,6 +115,7 @@ def with_monitoring(operation_name: str) -> Callable:
         ...     monitoring_context["record_counter"].add(df.count())
         ...     return df.groupBy("date").agg(...)
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -124,7 +125,9 @@ def with_monitoring(operation_name: str) -> Callable:
                 logger.info(f"✅ Completed operation: {operation_name}")
                 return result
             except Exception as e:
-                logger.error(f"❌ Failed operation: {operation_name} - {str(e)}")
+                logger.error(f"❌ Failed operation: {operation_name} - {e!s}")
                 raise
+
         return wrapper
+
     return decorator

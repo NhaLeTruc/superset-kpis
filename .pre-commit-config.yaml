@@ -1,0 +1,85 @@
+# Pre-commit configuration for superset-kpis
+# Install: pip install pre-commit && pre-commit install
+
+# Minimum pre-commit version
+minimum_pre_commit_version: "3.0.0"
+
+# Default settings
+default_language_version:
+  python: python3
+
+# CI configuration
+ci:
+  autofix_commit_msg: "style: auto-fix by pre-commit hooks"
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+
+repos:
+  # ============================================================
+  # General file checks
+  # ============================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom tags in docker-compose
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-case-conflict
+
+  # ============================================================
+  # Ruff - Linting + Formatting + Import Sorting (ALL-IN-ONE)
+  # ============================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      # Linter (includes isort)
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      # Formatter (replaces Black)
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # ============================================================
+  # Type Checking (optional - run manually with: pre-commit run mypy)
+  # ============================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-requests
+          - pandas-stubs
+        args: [--ignore-missing-imports, --no-error-summary]
+        pass_filenames: true
+        stages: [manual]  # Skip by default, run with: pre-commit run mypy --hook-stage manual
+
+  # ============================================================
+  # Security Analysis
+  # ============================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: tests/
+
+  # ============================================================
+  # Custom TDD Hook (Existing)
+  # ============================================================
+  - repo: local
+    hooks:
+      - id: tdd-compliance
+        name: TDD Compliance Check
+        entry: .githooks/pre-commit
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

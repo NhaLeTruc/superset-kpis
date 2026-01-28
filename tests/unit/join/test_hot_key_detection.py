@@ -3,8 +3,10 @@ Unit tests for hot key detection.
 
 Tests identify_hot_keys() function from join transforms.
 """
+
 import pytest
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
+
 from src.transforms.join import identify_hot_keys
 
 
@@ -20,13 +22,15 @@ class TestIdentifyHotKeys:
             - u001 has count=10,000
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
         # Create u001 with 10,000 interactions
-        hot_key_data = [(f"u001", i) for i in range(10000)]
+        hot_key_data = [("u001", i) for i in range(10000)]
 
         # Create 99 other users with 100 interactions each
         normal_data = []
@@ -56,10 +60,12 @@ class TestIdentifyHotKeys:
         THEN: Returns empty DataFrame
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
         # Create 100 users with exactly 100 interactions each (uniform)
         data = []
@@ -83,10 +89,12 @@ class TestIdentifyHotKeys:
         THEN: Returns DataFrame with 5 rows (top 5 users)
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
         # Create top 5 users with 5,000 interactions each
         hot_keys_data = []
@@ -124,10 +132,12 @@ class TestIdentifyHotKeys:
         THEN: Raises ValueError with message "Column 'nonexistent_column' not found"
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("count", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("count", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("u001", 100), ("u002", 200)]
         df = spark.createDataFrame(data, schema=schema)

@@ -3,11 +3,11 @@ Custom Test Assertions
 
 Provides reusable assertion helpers for common test patterns.
 """
-from typing import List, Optional
+
 from pyspark.sql import DataFrame
 
 
-def assert_dataframe_schema(df: DataFrame, expected_columns: List[str]) -> None:
+def assert_dataframe_schema(df: DataFrame, expected_columns: list[str]) -> None:
     """
     Assert DataFrame has expected columns.
 
@@ -45,12 +45,10 @@ def assert_column_exists(df: DataFrame, column_name: str) -> None:
         AssertionError: If column doesn't exist
     """
     if column_name not in df.columns:
-        raise AssertionError(
-            f"Column '{column_name}' not found. Available: {df.columns}"
-        )
+        raise AssertionError(f"Column '{column_name}' not found. Available: {df.columns}")
 
 
-def assert_no_nulls(df: DataFrame, columns: List[str]) -> None:
+def assert_no_nulls(df: DataFrame, columns: list[str]) -> None:
     """
     Assert specified columns have no NULL values.
 
@@ -68,16 +66,10 @@ def assert_no_nulls(df: DataFrame, columns: List[str]) -> None:
 
         null_count = df.filter(F.col(col).isNull()).count()
         if null_count > 0:
-            raise AssertionError(
-                f"Column '{col}' has {null_count} NULL values"
-            )
+            raise AssertionError(f"Column '{col}' has {null_count} NULL values")
 
 
-def assert_percentile_accuracy(
-    actual: float,
-    expected: float,
-    tolerance_pct: float = 5.0
-) -> None:
+def assert_percentile_accuracy(actual: float, expected: float, tolerance_pct: float = 5.0) -> None:
     """
     Assert percentile calculation is within tolerance.
 
@@ -93,9 +85,7 @@ def assert_percentile_accuracy(
     """
     if expected == 0:
         if actual != 0:
-            raise AssertionError(
-                f"Expected 0 but got {actual}"
-            )
+            raise AssertionError(f"Expected 0 but got {actual}")
         return
 
     diff_pct = abs((actual - expected) / expected) * 100
@@ -112,7 +102,7 @@ def assert_retention_curve(
     week_number: int,
     expected_rate_min: float,
     expected_rate_max: float,
-    cohort_week: Optional[str] = None
+    cohort_week: str | None = None,
 ) -> None:
     """
     Assert retention rate is within expected range for a given week.
@@ -135,20 +125,17 @@ def assert_retention_curve(
     # Further filter by cohort if specified
     if cohort_week:
         from datetime import datetime
+
         cohort_date = datetime.strptime(cohort_week, "%Y-%m-%d").date()
         filtered = filtered.filter(F.col("cohort_week") == cohort_date)
 
     if filtered.count() == 0:
-        raise AssertionError(
-            f"No retention data found for week {week_number}"
-        )
+        raise AssertionError(f"No retention data found for week {week_number}")
 
     # Get retention rate
     retention_row = filtered.select("retention_rate").first()
     if not retention_row:
-        raise AssertionError(
-            f"No retention rate found for week {week_number}"
-        )
+        raise AssertionError(f"No retention rate found for week {week_number}")
 
     actual_rate = retention_row["retention_rate"]
 
@@ -160,10 +147,7 @@ def assert_retention_curve(
 
 
 def assert_value_in_range(
-    actual: float,
-    min_val: float,
-    max_val: float,
-    label: str = "Value"
+    actual: float, min_val: float, max_val: float, label: str = "Value"
 ) -> None:
     """
     Assert value is within expected range.
@@ -178,16 +162,11 @@ def assert_value_in_range(
         AssertionError: If value is out of range
     """
     if not (min_val <= actual <= max_val):
-        raise AssertionError(
-            f"{label} {actual} is outside expected range [{min_val}, {max_val}]"
-        )
+        raise AssertionError(f"{label} {actual} is outside expected range [{min_val}, {max_val}]")
 
 
 def assert_approximately_equal(
-    actual: float,
-    expected: float,
-    tolerance: float = 0.01,
-    label: str = "Value"
+    actual: float, expected: float, tolerance: float = 0.01, label: str = "Value"
 ) -> None:
     """
     Assert two float values are approximately equal.
@@ -221,16 +200,10 @@ def assert_row_count(df: DataFrame, expected: int) -> None:
     """
     actual = df.count()
     if actual != expected:
-        raise AssertionError(
-            f"Expected {expected} rows, got {actual}"
-        )
+        raise AssertionError(f"Expected {expected} rows, got {actual}")
 
 
-def assert_distinct_count(
-    df: DataFrame,
-    column: str,
-    expected: int
-) -> None:
+def assert_distinct_count(df: DataFrame, column: str, expected: int) -> None:
     """
     Assert distinct count for a column matches expected.
 
@@ -246,6 +219,4 @@ def assert_distinct_count(
 
     actual = df.select(column).distinct().count()
     if actual != expected:
-        raise AssertionError(
-            f"Expected {expected} distinct values in '{column}', got {actual}"
-        )
+        raise AssertionError(f"Expected {expected} distinct values in '{column}', got {actual}")

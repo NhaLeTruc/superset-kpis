@@ -3,19 +3,21 @@ Integration tests for pipeline edge cases and error handling.
 
 Tests data lineage and error handling scenarios.
 """
-import pytest
-from pyspark.sql import functions as F
+
 from datetime import datetime
+
+from pyspark.sql import functions as F
 
 
 class TestPipelineEdgeCases:
     """Edge case and error handling tests for pipeline."""
 
-    def test_pipeline_data_lineage(self, spark, test_data_paths,
-                                   sample_interactions_data, sample_metadata_data):
+    def test_pipeline_data_lineage(
+        self, spark, test_data_paths, sample_interactions_data, sample_metadata_data
+    ):
         """Test data flows correctly through entire pipeline without loss."""
-        from src.transforms.join import identify_hot_keys, optimized_join
         from src.transforms.engagement import calculate_dau
+        from src.transforms.join import identify_hot_keys, optimized_join
         from src.transforms.session import calculate_session_metrics
 
         # Track record counts through pipeline
@@ -28,18 +30,17 @@ class TestPipelineEdgeCases:
         )
         enriched_count = enriched_df.count()
 
-        assert enriched_count == original_count, \
+        assert enriched_count == original_count, (
             f"Enrichment should not lose data: {original_count} -> {enriched_count}"
+        )
 
         # Session metrics should be created from interactions
         session_metrics_df = calculate_session_metrics(
-            sample_interactions_data,
-            session_timeout="1800 seconds"
+            sample_interactions_data, session_timeout="1800 seconds"
         )
         session_count = session_metrics_df.count()
 
-        assert session_count > 0, \
-            f"Should create sessions from {original_count} interactions"
+        assert session_count > 0, f"Should create sessions from {original_count} interactions"
 
         # DAU should have users from original data
         dau_df = calculate_dau(sample_interactions_data)
@@ -47,30 +48,40 @@ class TestPipelineEdgeCases:
 
         # Total unique users across all days should match or be close to original unique users
         original_users = sample_interactions_data.select("user_id").distinct().count()
-        assert dau_users >= original_users, \
+        assert dau_users >= original_users, (
             f"DAU should account for all users: {original_users} users, DAU total: {dau_users}"
+        )
 
     def test_pipeline_error_handling(self, spark, test_data_paths):
         """Test pipeline handles data quality issues gracefully."""
-        from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+        from pyspark.sql.types import (
+            IntegerType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
+
         from src.utils.data_quality import detect_nulls, detect_outliers
         from src.utils.monitoring import create_monitoring_context
 
         # Create data with quality issues
-        schema = StructType([
-            StructField("interaction_id", StringType(), True),
-            StructField("user_id", StringType(), True),
-            StructField("action_type", StringType(), True),
-            StructField("timestamp", TimestampType(), True),
-            StructField("duration_ms", IntegerType(), True),
-        ])
+        schema = StructType(
+            [
+                StructField("interaction_id", StringType(), True),
+                StructField("user_id", StringType(), True),
+                StructField("action_type", StringType(), True),
+                StructField("timestamp", TimestampType(), True),
+                StructField("duration_ms", IntegerType(), True),
+            ]
+        )
 
         bad_data = [
             ("int_1", "user_1", "open", datetime(2024, 1, 1), 100),  # Good
-            ("int_2", None, "edit", datetime(2024, 1, 2), 200),      # Null user
+            ("int_2", None, "edit", datetime(2024, 1, 2), 200),  # Null user
             ("int_3", "user_3", "save", datetime(2024, 1, 3), -50),  # Negative duration
-            ("int_4", "user_4", None, datetime(2024, 1, 4), 150),    # Null action
-            ("int_5", "user_5", "close", None, 120),                 # Null timestamp
+            ("int_4", "user_4", None, datetime(2024, 1, 4), 150),  # Null action
+            ("int_5", "user_5", "close", None, 120),  # Null timestamp
         ]
 
         df = spark.createDataFrame(bad_data, schema)
@@ -87,7 +98,7 @@ class TestPipelineEdgeCases:
             "duration_ms",
             method="threshold",
             threshold_min=0,
-            threshold_max=10000
+            threshold_max=10000,
         )
         assert outliers.count() > 0, "Should detect outliers"
 
@@ -97,10 +108,10 @@ class TestPipelineEdgeCases:
 
         # Filter to clean data
         clean_df = df.filter(
-            F.col("user_id").isNotNull() &
-            F.col("action_type").isNotNull() &
-            F.col("timestamp").isNotNull() &
-            (F.col("duration_ms") > 0)
+            F.col("user_id").isNotNull()
+            & F.col("action_type").isNotNull()
+            & F.col("timestamp").isNotNull()
+            & (F.col("duration_ms") > 0)
         )
 
         clean_count = clean_df.count()

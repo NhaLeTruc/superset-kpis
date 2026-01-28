@@ -3,19 +3,19 @@ Percentile and Correlation Analysis
 
 Functions for calculating percentile metrics and device-performance correlations.
 """
-from typing import List
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from src.schemas.columns import COL_USER_ID, COL_DURATION_MS, COL_DEVICE_TYPE
 from src.config.constants import DEFAULT_PERCENTILES
+from src.schemas.columns import COL_DEVICE_TYPE, COL_DURATION_MS, COL_USER_ID
 
 
 def calculate_percentiles(
     df: DataFrame,
     value_column: str,
-    group_by_columns: List[str],
-    percentiles: List[float] = DEFAULT_PERCENTILES
+    group_by_columns: list[str],
+    percentiles: list[float] = DEFAULT_PERCENTILES,
 ) -> DataFrame:
     """
     Calculate percentile metrics grouped by dimensions.
@@ -45,24 +45,19 @@ def calculate_percentiles(
     agg_exprs = [
         F.count("*").alias("count"),
         F.avg(value_column).alias(f"avg_{value_column}"),
-        F.stddev(value_column).alias(f"stddev_{value_column}")
+        F.stddev(value_column).alias(f"stddev_{value_column}"),
     ]
 
     for p in percentiles:
         percentile_name = f"p{int(p * 100)}"
-        agg_exprs.append(
-            F.percentile_approx(value_column, p).alias(percentile_name)
-        )
+        agg_exprs.append(F.percentile_approx(value_column, p).alias(percentile_name))
 
     result_df = df.groupBy(*group_by_columns).agg(*agg_exprs)
 
     return result_df
 
 
-def calculate_device_correlation(
-    interactions_df: DataFrame,
-    metadata_df: DataFrame
-) -> DataFrame:
+def calculate_device_correlation(interactions_df: DataFrame, metadata_df: DataFrame) -> DataFrame:
     """
     Identify correlation between device type and app performance using one-way ANOVA.
 
@@ -91,18 +86,17 @@ def calculate_device_correlation(
         F.count("*").alias("total_interactions"),
         F.countDistinct(COL_USER_ID).alias("unique_users"),
         F.percentile_approx(COL_DURATION_MS, 0.95).alias("p95_duration_ms"),
-        F.variance(COL_DURATION_MS).alias("_group_variance")
+        F.variance(COL_DURATION_MS).alias("_group_variance"),
     )
 
     device_metrics = device_metrics.withColumn(
         "interactions_per_user",
-        (F.col("total_interactions") / F.col("unique_users")).cast("double")
+        (F.col("total_interactions") / F.col("unique_users")).cast("double"),
     )
 
     # --- One-way ANOVA: device_type (categorical) vs duration_ms (continuous) ---
     overall_stats = joined_df.agg(
-        F.avg(COL_DURATION_MS).alias("grand_mean"),
-        F.count("*").alias("N")
+        F.avg(COL_DURATION_MS).alias("grand_mean"), F.count("*").alias("N")
     ).collect()[0]
     grand_mean = float(overall_stats["grand_mean"])
     N = int(overall_stats["N"])
@@ -115,10 +109,11 @@ def calculate_device_correlation(
             F.col("total_interactions") * F.pow(F.col("avg_duration_ms") - F.lit(grand_mean), 2)
         ).alias("SSB"),
         F.sum(
-            F.when(F.col("_group_variance").isNotNull(),
-                   (F.col("total_interactions") - 1) * F.col("_group_variance"))
-            .otherwise(0.0)
-        ).alias("SSW")
+            F.when(
+                F.col("_group_variance").isNotNull(),
+                (F.col("total_interactions") - 1) * F.col("_group_variance"),
+            ).otherwise(0.0)
+        ).alias("SSW"),
     ).collect()[0]
 
     SSB = float(anova_components["SSB"])
@@ -126,21 +121,17 @@ def calculate_device_correlation(
     SST = SSB + SSW
 
     # F-statistic requires k > 1 and SSW > 0 (non-zero within-group variance)
-    if k > 1 and N > k and SSW > 0:
-        f_statistic = (SSB / (k - 1)) / (SSW / (N - k))
-    else:
-        f_statistic = None
+    f_statistic = SSB / (k - 1) / (SSW / (N - k)) if k > 1 and k < N and SSW > 0 else None
 
     eta_squared = SSB / SST if SST > 0 else None
 
     # Attach ANOVA results as columns for downstream consumption
-    result_df = device_metrics \
-        .withColumn("f_statistic",
-                    F.lit(f_statistic).cast("double")) \
-        .withColumn("eta_squared",
-                    F.lit(eta_squared).cast("double")) \
-        .drop("_group_variance") \
+    result_df = (
+        device_metrics.withColumn("f_statistic", F.lit(f_statistic).cast("double"))
+        .withColumn("eta_squared", F.lit(eta_squared).cast("double"))
+        .drop("_group_variance")
         .orderBy(F.col("avg_duration_ms").desc())
+    )
 
     return result_df.select(
         COL_DEVICE_TYPE,
@@ -150,5 +141,5 @@ def calculate_device_correlation(
         "unique_users",
         "interactions_per_user",
         "f_statistic",
-        "eta_squared"
+        "eta_squared",
     )

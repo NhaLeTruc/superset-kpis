@@ -3,10 +3,11 @@ Active User Metrics
 
 Calculates Daily Active Users (DAU) and Monthly Active Users (MAU).
 """
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS
+from src.schemas.columns import COL_DURATION_MS, COL_TIMESTAMP, COL_USER_ID
 
 
 def calculate_dau(interactions_df: DataFrame) -> DataFrame:
@@ -36,13 +37,13 @@ def calculate_dau(interactions_df: DataFrame) -> DataFrame:
     dau_df = df_with_date.groupBy("date").agg(
         F.countDistinct(COL_USER_ID).alias("daily_active_users"),
         F.count("*").alias("total_interactions"),
-        F.sum(COL_DURATION_MS).alias("total_duration_ms")
+        F.sum(COL_DURATION_MS).alias("total_duration_ms"),
     )
 
     # Calculate avg_duration_per_user
     dau_df = dau_df.withColumn(
         "avg_duration_per_user",
-        (F.col("total_duration_ms") / F.col("daily_active_users")).cast("double")
+        (F.col("total_duration_ms") / F.col("daily_active_users")).cast("double"),
     )
 
     return dau_df
@@ -69,15 +70,12 @@ def calculate_mau(interactions_df: DataFrame) -> DataFrame:
         raise ValueError(f"Required column '{COL_TIMESTAMP}' not found in DataFrame")
 
     # Extract month (first day of month)
-    df_with_month = interactions_df.withColumn(
-        "month",
-        F.trunc(F.col(COL_TIMESTAMP), "month")
-    )
+    df_with_month = interactions_df.withColumn("month", F.trunc(F.col(COL_TIMESTAMP), "month"))
 
     # Group by month and calculate MAU
     mau_df = df_with_month.groupBy("month").agg(
         F.countDistinct(COL_USER_ID).alias("monthly_active_users"),
-        F.count("*").alias("total_interactions")
+        F.count("*").alias("total_interactions"),
     )
 
     return mau_df

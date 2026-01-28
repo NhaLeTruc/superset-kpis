@@ -1,0 +1,138 @@
+[project]
+name = "superset-kpis"
+version = "1.0.0"
+description = "Apache Spark ETL/Analytics Platform for GoodNote"
+requires-python = ">=3.10"
+
+# =============================================================================
+# Ruff Configuration (Linting + Formatting + Import Sorting)
+# =============================================================================
+[tool.ruff]
+# Target Python 3.10+ (Spark 3.5 requirement)
+target-version = "py310"
+
+# Line length (match Black default)
+line-length = 100
+
+# Exclude patterns
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    "venv",
+    ".tox",
+    ".pytest_cache",
+    "htmlcov",
+    "data",
+    "logs",
+]
+
+# Source directories
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+# Enable these rule sets
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "PL",     # Pylint
+    "RUF",    # Ruff-specific rules
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",    # Line too long (handled by formatter)
+    "PLR0913", # Too many arguments (Spark functions often need many)
+    "PLR2004", # Magic value comparison (common in data analysis)
+    "PLW2901", # Loop variable overwritten (common pattern in Spark)
+    "PTH",     # pathlib vs os.path (stylistic preference)
+    "SIM108",  # ternary operator (readability preference)
+    "RUF002",  # ambiguous unicode (Greek letters in math docs are intentional)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+# isort configuration
+known-first-party = ["src"]
+known-third-party = ["pyspark", "pandas", "numpy", "pytest", "chispa"]
+force-single-line = false
+lines-after-imports = 2
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.per-file-ignores]
+# Allow unused imports in __init__.py
+"__init__.py" = ["F401"]
+# Allow assert, inline imports, unused args, long functions in tests
+"tests/**/*.py" = ["S101", "PLR2004", "PLC0415", "ARG001", "ARG002", "PLR0915"]
+# Allow print in jobs (they're scripts)
+"src/jobs/**/*.py" = ["T201"]
+# Allow inline imports and unused args in scripts
+"scripts/**/*.py" = ["PLC0415", "ARG001", "ARG002", "PLR0915"]
+# Accumulators require unused initial_value parameter by Spark API
+"src/utils/monitoring/accumulators.py" = ["ARG002"]
+
+[tool.ruff.format]
+# Use double quotes (Black default)
+quote-style = "double"
+# Use spaces for indentation
+indent-style = "space"
+# Respect magic trailing comma
+skip-magic-trailing-comma = false
+# Auto-detect line ending
+line-ending = "auto"
+
+# =============================================================================
+# mypy Configuration (Static Type Checking)
+# =============================================================================
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false  # Too noisy with Spark
+warn_unused_ignores = false
+disallow_untyped_defs = false  # Start permissive, tighten later
+ignore_missing_imports = true   # PySpark stubs incomplete
+check_untyped_defs = false  # Skip checking untyped functions
+strict_optional = false  # Allow None without explicit Optional
+exclude = [
+    "venv",
+    "build",
+    "dist",
+    ".tox",
+    "scripts",  # Scripts have many type annotation issues
+    "src/jobs",  # Jobs have structural typing issues with self.args
+]
+
+# Per-module overrides for strict checking
+[[tool.mypy.overrides]]
+module = "src.schemas.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "pyspark.*"
+ignore_missing_imports = true
+
+# =============================================================================
+# Bandit Configuration (Security Analysis)
+# =============================================================================
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".tox"]
+skips = [
+    "B101",  # assert_used - common in validation
+    "B108",  # hardcoded_tmp_directory - intentional defaults, overrideable via env vars
+    "B311",  # random - using standard random for sample data generation is fine
+    "B608",  # hardcoded_sql - table names come from internal constants, not user input
+]

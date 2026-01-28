@@ -21,3 +21,11 @@ numpy>=1.24.4
 
 # Utilities
 python-dotenv>=1.0.0  # Environment variable management
+
+# =============================================================================
+# Development & Code Quality
+# =============================================================================
+ruff>=0.9.0           # Linting, formatting, import sorting
+mypy>=1.14.0          # Static type checking
+bandit>=1.8.0         # Security analysis
+pre-commit>=4.0.0     # Pre-commit hook framework

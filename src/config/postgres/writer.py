@@ -3,8 +3,9 @@ PostgreSQL Write Operations
 
 Handles writing Spark DataFrames to PostgreSQL with optimizations.
 """
-from typing import Optional
+
 from pyspark.sql import DataFrame
+
 from .connection import get_postgres_connection_props
 
 
@@ -13,7 +14,7 @@ def write_to_postgres(
     table_name: str,
     mode: str = "append",
     batch_size: int = 10000,
-    num_partitions: Optional[int] = None
+    num_partitions: int | None = None,
 ) -> None:
     """
     Write Spark DataFrame to PostgreSQL table.
@@ -65,15 +66,10 @@ def write_to_postgres(
         properties["batchsize"] = str(batch_size)
         properties["isolationLevel"] = "READ_COMMITTED"
 
-        df.write.jdbc(
-            url=jdbc_url,
-            table=table_name,
-            mode=mode,
-            properties=properties
-        )
+        df.write.jdbc(url=jdbc_url, table=table_name, mode=mode, properties=properties)
 
         print(f"✅ Successfully wrote to {table_name}")
 
     except Exception as e:
-        print(f"❌ Failed to write to {table_name}: {str(e)}")
+        print(f"❌ Failed to write to {table_name}: {e!s}")
         raise

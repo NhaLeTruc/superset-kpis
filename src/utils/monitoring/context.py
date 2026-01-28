@@ -3,19 +3,22 @@ Monitoring Context Management
 
 Provides factory function for creating monitoring contexts with all accumulators initialized.
 """
-from typing import Dict, Any
+
 import logging
+from typing import Any
+
 from .accumulators import (
+    DataQualityErrorsAccumulator,
+    PartitionSkewDetector,
     RecordCounterAccumulator,
     SkippedRecordsAccumulator,
-    DataQualityErrorsAccumulator,
-    PartitionSkewDetector
 )
+
 
 logger = logging.getLogger(__name__)
 
 
-def create_monitoring_context(spark_context, job_name: str) -> Dict[str, Any]:
+def create_monitoring_context(spark_context, job_name: str) -> dict[str, Any]:
     """
     Create a monitoring context with all accumulators initialized.
 
@@ -45,8 +48,8 @@ def create_monitoring_context(spark_context, job_name: str) -> Dict[str, Any]:
 
     # Partition skew detector
     context["partition_skew"] = spark_context.accumulator(
-        {"max_partition_size": 0, "min_partition_size": float('inf'), "partition_count": 0},
-        PartitionSkewDetector()
+        {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0},
+        PartitionSkewDetector(),
     )
 
     logger.info(f"📊 Monitoring context created for job: {job_name}")

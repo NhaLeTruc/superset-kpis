@@ -3,9 +3,10 @@ Integration tests for DAU/MAU/stickiness calculations.
 
 Tests daily active users, monthly active users, and stickiness ratio metrics.
 """
+
+from datetime import datetime
+
 import pytest
-from pyspark.sql import functions as F
-from datetime import datetime, timedelta
 
 
 class TestDAUMAU:
@@ -13,17 +14,26 @@ class TestDAUMAU:
 
     def test_dau_calculation_accuracy(self, spark):
         """Test DAU calculation with known data."""
+        from pyspark.sql.types import (
+            IntegerType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
+
         from src.transforms.engagement import calculate_dau
-        from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType
 
         # Create specific test data
-        schema = StructType([
-            StructField("interaction_id", StringType(), False),
-            StructField("user_id", StringType(), False),
-            StructField("action_type", StringType(), False),
-            StructField("timestamp", TimestampType(), False),
-            StructField("duration_ms", IntegerType(), False),
-        ])
+        schema = StructType(
+            [
+                StructField("interaction_id", StringType(), False),
+                StructField("user_id", StringType(), False),
+                StructField("action_type", StringType(), False),
+                StructField("timestamp", TimestampType(), False),
+                StructField("duration_ms", IntegerType(), False),
+            ]
+        )
 
         # Day 1: 3 unique users
         # Day 2: 2 unique users (user_1 appears both days)
@@ -48,28 +58,35 @@ class TestDAUMAU:
 
     def test_mau_calculation_accuracy(self, spark):
         """Test MAU calculation with known data."""
-        from src.transforms.engagement import calculate_mau
-        from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType
+        from pyspark.sql.types import (
+            IntegerType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
 
-        schema = StructType([
-            StructField("interaction_id", StringType(), False),
-            StructField("user_id", StringType(), False),
-            StructField("action_type", StringType(), False),
-            StructField("timestamp", TimestampType(), False),
-            StructField("duration_ms", IntegerType(), False),
-        ])
+        from src.transforms.engagement import calculate_mau
+
+        schema = StructType(
+            [
+                StructField("interaction_id", StringType(), False),
+                StructField("user_id", StringType(), False),
+                StructField("action_type", StringType(), False),
+                StructField("timestamp", TimestampType(), False),
+                StructField("duration_ms", IntegerType(), False),
+            ]
+        )
 
         # Create data spanning January and February
         data = []
         for i in range(5):
             # January interactions (5 unique users)
-            data.append((f"jan_{i}", f"user_{i}", "open",
-                        datetime(2024, 1, 15), 100))
+            data.append((f"jan_{i}", f"user_{i}", "open", datetime(2024, 1, 15), 100))
 
         for i in range(3):
             # February interactions (3 unique users, 2 overlap with January)
-            data.append((f"feb_{i}", f"user_{i}", "open",
-                        datetime(2024, 2, 15), 100))
+            data.append((f"feb_{i}", f"user_{i}", "open", datetime(2024, 2, 15), 100))
 
         df = spark.createDataFrame(data, schema)
         mau_df = calculate_mau(df)
@@ -84,19 +101,24 @@ class TestDAUMAU:
 
     def test_stickiness_ratio_calculation(self, spark):
         """Test stickiness ratio calculation."""
+        from pyspark.sql.types import IntegerType, StringType, StructField, StructType
+
         from src.transforms.engagement import calculate_stickiness
-        from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
         # Create test DAU and MAU data
-        dau_schema = StructType([
-            StructField("date", StringType(), False),
-            StructField("daily_active_users", IntegerType(), False),
-        ])
+        dau_schema = StructType(
+            [
+                StructField("date", StringType(), False),
+                StructField("daily_active_users", IntegerType(), False),
+            ]
+        )
 
-        mau_schema = StructType([
-            StructField("month", StringType(), False),
-            StructField("monthly_active_users", IntegerType(), False),
-        ])
+        mau_schema = StructType(
+            [
+                StructField("month", StringType(), False),
+                StructField("monthly_active_users", IntegerType(), False),
+            ]
+        )
 
         # January has MAU of 100, DAU ranges from 20-30
         dau_data = [
@@ -123,11 +145,11 @@ class TestDAUMAU:
         # Stickiness = 25 / 100 = 0.25
         assert results[0]["stickiness_ratio"] == pytest.approx(0.25, rel=0.01)
 
-    def test_engagement_metrics_complete(self, spark, sample_interactions_data, sample_metadata_data):
+    def test_engagement_metrics_complete(
+        self, spark, sample_interactions_data, sample_metadata_data
+    ):
         """Test DAU/MAU/stickiness pipeline."""
-        from src.transforms.engagement import (
-            calculate_dau, calculate_mau, calculate_stickiness
-        )
+        from src.transforms.engagement import calculate_dau, calculate_mau, calculate_stickiness
 
         # Calculate DAU
         dau_df = calculate_dau(sample_interactions_data)
@@ -155,8 +177,9 @@ class TestDAUMAU:
             ratio = row["stickiness_ratio"]
             assert 0 <= ratio <= 1, f"Stickiness should be 0.0-1.0, got {ratio}"
 
-    def test_engagement_metrics_with_monitoring(self, spark, sample_interactions_data,
-                                               sample_metadata_data):
+    def test_engagement_metrics_with_monitoring(
+        self, spark, sample_interactions_data, sample_metadata_data
+    ):
         """Test engagement calculations with monitoring integration."""
         from src.transforms.engagement import calculate_dau
         from src.utils.monitoring import create_monitoring_context
@@ -165,7 +188,7 @@ class TestDAUMAU:
         context = create_monitoring_context(spark.sparkContext, "test_engagement")
 
         # Calculate DAU
-        dau_df = calculate_dau(sample_interactions_data)
+        calculate_dau(sample_interactions_data)
 
         # Track processing
         context["record_counter"].add(sample_interactions_data.count())
@@ -176,9 +199,8 @@ class TestDAUMAU:
     def test_engagement_performance(self, spark, sample_interactions_data, sample_metadata_data):
         """Test engagement calculations complete in reasonable time."""
         import time
-        from src.transforms.engagement import (
-            calculate_dau, calculate_mau, identify_power_users
-        )
+
+        from src.transforms.engagement import calculate_dau, calculate_mau, identify_power_users
 
         start_time = time.time()
 
@@ -190,14 +212,14 @@ class TestDAUMAU:
         mau_count = mau_df.count()
 
         power_users_df = identify_power_users(
-            sample_interactions_data,
-            sample_metadata_data,
-            percentile=0.90
+            sample_interactions_data, sample_metadata_data, percentile=0.90
         )
         power_count = power_users_df.count()
 
         elapsed_time = time.time() - start_time
 
         # Should complete in under 30 seconds
-        assert elapsed_time < 30, f"Engagement calculations took {elapsed_time:.2f}s, expected < 30s"
+        assert elapsed_time < 30, (
+            f"Engagement calculations took {elapsed_time:.2f}s, expected < 30s"
+        )
         assert dau_count > 0 and mau_count > 0 and power_count > 0

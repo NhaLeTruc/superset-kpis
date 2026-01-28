@@ -4,19 +4,13 @@ Unit tests for performance metrics transforms.
 Following TDD approach - tests written before implementation.
 Reference: docs/TDD_SPEC.md - Task 3 (Performance Metrics Specifications)
 """
-import pytest
-from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType, LongType,
-    TimestampType, DateType, DoubleType
-)
-from datetime import datetime, date
-from src.transforms.performance import (
-    calculate_percentiles,
-    calculate_device_correlation,
-    detect_anomalies_statistical
-)
+
+from datetime import date
+
+from pyspark.sql.types import DateType, IntegerType, LongType, StringType, StructField, StructType
 from tests.unit.helpers.assertions import assert_percentile_accuracy
+
+from src.transforms.performance import calculate_device_correlation, calculate_percentiles
 
 
 class TestCalculatePercentiles:
@@ -33,18 +27,14 @@ class TestCalculatePercentiles:
             - count = 5
         """
         # Arrange
-        schema = StructType([
-            StructField("app_version", StringType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("app_version", StringType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
-        data = [
-            ("1.0.0", 1000),
-            ("1.0.0", 2000),
-            ("1.0.0", 3000),
-            ("1.0.0", 4000),
-            ("1.0.0", 5000)
-        ]
+        data = [("1.0.0", 1000), ("1.0.0", 2000), ("1.0.0", 3000), ("1.0.0", 4000), ("1.0.0", 5000)]
         df = spark.createDataFrame(data, schema=schema)
 
         # Act
@@ -52,7 +42,7 @@ class TestCalculatePercentiles:
             df,
             value_column="duration_ms",
             group_by_columns=["app_version"],
-            percentiles=[0.50, 0.95]
+            percentiles=[0.50, 0.95],
         )
 
         # Assert
@@ -76,11 +66,13 @@ class TestCalculatePercentiles:
             - Each row has correct percentiles for its group
         """
         # Arrange
-        schema = StructType([
-            StructField("app_version", StringType(), nullable=False),
-            StructField("date", DateType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("app_version", StringType(), nullable=False),
+                StructField("date", DateType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             # Group 1: v1.0.0, 2023-01-01
@@ -94,7 +86,7 @@ class TestCalculatePercentiles:
             # Group 3: v2.0.0, 2023-01-01
             ("2.0.0", date(2023, 1, 1), 500),
             ("2.0.0", date(2023, 1, 1), 1000),
-            ("2.0.0", date(2023, 1, 1), 1500)
+            ("2.0.0", date(2023, 1, 1), 1500),
         ]
         df = spark.createDataFrame(data, schema=schema)
 
@@ -103,7 +95,7 @@ class TestCalculatePercentiles:
             df,
             value_column="duration_ms",
             group_by_columns=["app_version", "date"],
-            percentiles=[0.50]
+            percentiles=[0.50],
         )
 
         # Assert
@@ -132,20 +124,19 @@ class TestCalculatePercentiles:
             - p99 ≈ 9900 (±1% error acceptable)
         """
         # Arrange
-        schema = StructType([
-            StructField("group", StringType(), nullable=False),
-            StructField("value", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("group", StringType(), nullable=False),
+                StructField("value", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("A", i) for i in range(1, 10001)]
         df = spark.createDataFrame(data, schema=schema)
 
         # Act
         result_df = calculate_percentiles(
-            df,
-            value_column="value",
-            group_by_columns=["group"],
-            percentiles=[0.50, 0.95, 0.99]
+            df, value_column="value", group_by_columns=["group"], percentiles=[0.50, 0.95, 0.99]
         )
 
         # Assert using custom helper
@@ -167,20 +158,19 @@ class TestCalculatePercentiles:
         THEN: All percentiles equal the single value
         """
         # Arrange
-        schema = StructType([
-            StructField("group", StringType(), nullable=False),
-            StructField("value", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("group", StringType(), nullable=False),
+                StructField("value", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("A", 5000)]
         df = spark.createDataFrame(data, schema=schema)
 
         # Act
         result_df = calculate_percentiles(
-            df,
-            value_column="value",
-            group_by_columns=["group"],
-            percentiles=[0.50, 0.95, 0.99]
+            df, value_column="value", group_by_columns=["group"], percentiles=[0.50, 0.95, 0.99]
         )
 
         # Assert
@@ -196,20 +186,19 @@ class TestCalculatePercentiles:
         THEN: All percentiles equal the value, stddev is 0
         """
         # Arrange
-        schema = StructType([
-            StructField("group", StringType(), nullable=False),
-            StructField("value", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("group", StringType(), nullable=False),
+                StructField("value", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("A", 1000)] * 100
         df = spark.createDataFrame(data, schema=schema)
 
         # Act
         result_df = calculate_percentiles(
-            df,
-            value_column="value",
-            group_by_columns=["group"],
-            percentiles=[0.50, 0.95]
+            df, value_column="value", group_by_columns=["group"], percentiles=[0.50, 0.95]
         )
 
         # Assert
@@ -235,21 +224,23 @@ class TestCalculateDeviceCorrelation:
             - All metrics calculated correctly
         """
         # Arrange - interactions
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         interactions_data = []
         # iPad: 1000 interactions with avg=2000ms
         for i in range(1000):
-            interactions_data.append((f"ipad_user_{i%10}", 2000))
+            interactions_data.append((f"ipad_user_{i % 10}", 2000))
         # iPhone: 500 interactions with avg=3000ms
         for i in range(500):
-            interactions_data.append((f"iphone_user_{i%10}", 3000))
+            interactions_data.append((f"iphone_user_{i % 10}", 3000))
         # Mac: 200 interactions with avg=1500ms
         for i in range(200):
-            interactions_data.append((f"mac_user_{i%10}", 1500))
+            interactions_data.append((f"mac_user_{i % 10}", 1500))
 
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
@@ -260,10 +251,12 @@ class TestCalculateDeviceCorrelation:
             metadata_data.append((f"iphone_user_{i}", "iPhone"))
             metadata_data.append((f"mac_user_{i}", "Mac"))
 
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
@@ -297,29 +290,29 @@ class TestCalculateDeviceCorrelation:
         """
         # Arrange - interactions
         interactions_data = []
-        for i in range(100):
+        for _i in range(100):
             interactions_data.append(("u001", 1000))
-        for i in range(50):
+        for _i in range(50):
             interactions_data.append(("u002", 1500))
-        for i in range(50):
+        for _i in range(50):
             interactions_data.append(("u003", 2000))
 
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Metadata
-        metadata_data = [
-            ("u001", "iPad"),
-            ("u002", "iPad"),
-            ("u003", "iPad")
-        ]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False)
-        ])
+        metadata_data = [("u001", "iPad"), ("u002", "iPad"), ("u003", "iPad")]
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Act
@@ -331,5 +324,3 @@ class TestCalculateDeviceCorrelation:
         assert result["unique_users"] == 3
         assert result["total_interactions"] == 200
         assert abs(result["interactions_per_user"] - 66.67) < 0.1
-
-

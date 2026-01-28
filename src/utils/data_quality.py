@@ -4,17 +4,15 @@ Data quality validation functions.
 NOTE: This is a stub file - functions not yet implemented.
 Following TDD: Tests written first, implementation comes after RED state.
 """
-from typing import Tuple, List
+
 from pyspark.sql import DataFrame
-from pyspark.sql.types import StructType
 from pyspark.sql import functions as F
+from pyspark.sql.types import StructType
 
 
 def validate_schema(
-    df: DataFrame,
-    expected_schema: StructType,
-    strict: bool = True
-) -> Tuple[bool, List[str]]:
+    df: DataFrame, expected_schema: StructType, strict: bool = True
+) -> tuple[bool, list[str]]:
     """
     Validate DataFrame schema.
 
@@ -46,12 +44,12 @@ def validate_schema(
             errors.append(f"Missing column: '{col_name}'")
 
     # Check for type mismatches
-    for col_name in expected_fields:
+    for col_name, expected_field in expected_fields.items():
         if col_name in actual_fields:
-            expected_type = expected_fields[col_name].dataType
+            expected_type = expected_field.dataType
             actual_type = actual_fields[col_name].dataType
 
-            if type(expected_type) != type(actual_type):
+            if not isinstance(actual_type, type(expected_type)):
                 expected_type_name = type(expected_type).__name__
                 actual_type_name = type(actual_type).__name__
                 errors.append(
@@ -68,10 +66,7 @@ def validate_schema(
     return is_valid, errors
 
 
-def detect_nulls(
-    df: DataFrame,
-    non_nullable_columns: List[str]
-) -> DataFrame:
+def detect_nulls(df: DataFrame, non_nullable_columns: list[str]) -> DataFrame:
     """
     Detect NULL values in specified columns.
 
@@ -104,17 +99,11 @@ def detect_nulls(
     # Build null_columns array: list which columns are NULL for each row
     # Using array() with when() to conditionally include column names
     null_columns_expr = F.array(
-        *[
-            F.when(F.col(col_name).isNull(), F.lit(col_name))
-            for col_name in non_nullable_columns
-        ]
+        *[F.when(F.col(col_name).isNull(), F.lit(col_name)) for col_name in non_nullable_columns]
     )
 
     # Filter out None values from the array (columns that are NOT null)
-    null_columns_filtered = F.array_except(
-        null_columns_expr,
-        F.array(F.lit(None).cast("string"))
-    )
+    null_columns_filtered = F.array_except(null_columns_expr, F.array(F.lit(None).cast("string")))
 
     # Add the null_columns column
     result_df = rows_with_nulls.withColumn("null_columns", null_columns_filtered)
@@ -127,8 +116,8 @@ def detect_outliers(
     column: str,
     method: str = "iqr",
     iqr_multiplier: float = 1.5,
-    threshold_min: float = None,
-    threshold_max: float = None
+    threshold_min: float | None = None,
+    threshold_max: float | None = None,
 ) -> DataFrame:
     """
     Detect outliers in a numeric column.
@@ -161,9 +150,7 @@ def detect_outliers(
         upper_bound = q3 + iqr_multiplier * iqr
 
         # Filter outliers
-        outliers = df.filter(
-            (F.col(column) < lower_bound) | (F.col(column) > upper_bound)
-        )
+        outliers = df.filter((F.col(column) < lower_bound) | (F.col(column) > upper_bound))
 
         # Add outlier_reason and outlier_value
         result_df = outliers.withColumn("outlier_value", F.col(column).cast("double"))
@@ -171,7 +158,7 @@ def detect_outliers(
             "outlier_reason",
             F.when(F.col(column) < lower_bound, F.lit("iqr_outlier_below"))
             .when(F.col(column) > upper_bound, F.lit("iqr_outlier_above"))
-            .otherwise(F.lit("iqr_outlier"))
+            .otherwise(F.lit("iqr_outlier")),
         )
 
         return result_df
@@ -192,7 +179,11 @@ def detect_outliers(
 
         # If no thresholds provided, return empty DataFrame
         if filter_condition is None:
-            return df.limit(0).withColumn("outlier_reason", F.lit("")).withColumn("outlier_value", F.lit(0.0))
+            return (
+                df.limit(0)
+                .withColumn("outlier_reason", F.lit(""))
+                .withColumn("outlier_value", F.lit(0.0))
+            )
 
         # Filter outliers
         outliers = df.filter(filter_condition)
@@ -203,8 +194,9 @@ def detect_outliers(
         # Determine reason based on which threshold was violated
         reason_expr = None
         if threshold_min is not None and threshold_max is not None:
-            reason_expr = F.when(F.col(column) < threshold_min, F.lit("below_min")) \
-                          .when(F.col(column) > threshold_max, F.lit("above_max"))
+            reason_expr = F.when(F.col(column) < threshold_min, F.lit("below_min")).when(
+                F.col(column) > threshold_max, F.lit("above_max")
+            )
         elif threshold_min is not None:
             reason_expr = F.lit("below_min")
         elif threshold_max is not None:

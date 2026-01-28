@@ -3,9 +3,10 @@ Integration tests for bounce rate calculations.
 
 Tests bounce rate analysis and grouped bounce rate calculations.
 """
-import pytest
-from pyspark.sql import functions as F
+
 from datetime import datetime, timedelta
+
+import pytest
 
 
 class TestBounceRates:
@@ -13,16 +14,25 @@ class TestBounceRates:
 
     def test_bounce_rate_calculation(self, spark):
         """Test bounce rate calculation."""
-        from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
-        from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+        from pyspark.sql.types import (
+            IntegerType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
 
-        schema = StructType([
-            StructField("interaction_id", StringType(), False),
-            StructField("user_id", StringType(), False),
-            StructField("action_type", StringType(), False),
-            StructField("timestamp", TimestampType(), False),
-            StructField("duration_ms", IntegerType(), False),
-        ])
+        from src.transforms.session import calculate_bounce_rate, calculate_session_metrics
+
+        schema = StructType(
+            [
+                StructField("interaction_id", StringType(), False),
+                StructField("user_id", StringType(), False),
+                StructField("action_type", StringType(), False),
+                StructField("timestamp", TimestampType(), False),
+                StructField("duration_ms", IntegerType(), False),
+            ]
+        )
 
         base_time = datetime(2024, 1, 1, 10, 0, 0)
 
@@ -36,8 +46,15 @@ class TestBounceRates:
         # 7 non-bounce sessions
         for i in range(7):
             data.append((f"non_bounce_{i}_1", f"user_active_{i}", "open", base_time, 100))
-            data.append((f"non_bounce_{i}_2", f"user_active_{i}", "edit",
-                        base_time + timedelta(minutes=5), 200))
+            data.append(
+                (
+                    f"non_bounce_{i}_2",
+                    f"user_active_{i}",
+                    "edit",
+                    base_time + timedelta(minutes=5),
+                    200,
+                )
+            )
 
         df = spark.createDataFrame(data, schema)
 
@@ -55,16 +72,25 @@ class TestBounceRates:
 
     def test_grouped_bounce_rate(self, spark, sample_metadata_data):
         """Test bounce rate calculation grouped by dimensions."""
-        from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
-        from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+        from pyspark.sql.types import (
+            IntegerType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
 
-        interaction_schema = StructType([
-            StructField("interaction_id", StringType(), False),
-            StructField("user_id", StringType(), False),
-            StructField("action_type", StringType(), False),
-            StructField("timestamp", TimestampType(), False),
-            StructField("duration_ms", IntegerType(), False),
-        ])
+        from src.transforms.session import calculate_bounce_rate, calculate_session_metrics
+
+        interaction_schema = StructType(
+            [
+                StructField("interaction_id", StringType(), False),
+                StructField("user_id", StringType(), False),
+                StructField("action_type", StringType(), False),
+                StructField("timestamp", TimestampType(), False),
+                StructField("duration_ms", IntegerType(), False),
+            ]
+        )
 
         base_time = datetime(2024, 1, 1, 10, 0, 0)
 
@@ -78,8 +104,9 @@ class TestBounceRates:
                 data.append((f"int_ios_{i}", user_id, "open", base_time, 100))
             else:  # Others have multiple actions
                 data.append((f"int_ios_{i}_1", user_id, "open", base_time, 100))
-                data.append((f"int_ios_{i}_2", user_id, "edit",
-                            base_time + timedelta(minutes=5), 200))
+                data.append(
+                    (f"int_ios_{i}_2", user_id, "edit", base_time + timedelta(minutes=5), 200)
+                )
 
         df = spark.createDataFrame(data, interaction_schema)
 

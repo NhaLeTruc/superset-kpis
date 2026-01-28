@@ -3,9 +3,10 @@ Unit tests for optimized join execution.
 
 Tests optimized_join() function from join transforms.
 """
+
 from chispa.dataframe_comparer import assert_df_equality
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
+
 from src.transforms.join import optimized_join
 
 
@@ -23,19 +24,23 @@ class TestOptimizedJoin:
             - All rows joined correctly
         """
         # Arrange - large DataFrame
-        large_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        large_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
-        large_data = [(f"u{i%10:03d}", i) for i in range(1000)]
+        large_data = [(f"u{i % 10:03d}", i) for i in range(1000)]
         large_df = spark.createDataFrame(large_data, schema=large_schema)
 
         # Arrange - small DataFrame (metadata)
-        small_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False)
-        ])
+        small_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+            ]
+        )
 
         small_data = [(f"u{i:03d}", f"Country{i}") for i in range(10)]
         small_df = spark.createDataFrame(small_data, schema=small_schema)
@@ -63,10 +68,12 @@ class TestOptimizedJoin:
             - No salt columns in output
         """
         # Arrange - large DataFrame with skew
-        large_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        large_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
         # 500 interactions for u001 (hot key) + 500 for others
         hot_key_data = [("u001", i) for i in range(500)]
@@ -75,18 +82,24 @@ class TestOptimizedJoin:
         large_df = spark.createDataFrame(large_data, schema=large_schema)
 
         # Small DataFrame (metadata)
-        small_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False)
-        ])
+        small_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+            ]
+        )
 
         small_data = [(f"u{i:03d}", f"Country{i}") for i in range(1, 11)]
         small_df = spark.createDataFrame(small_data, schema=small_schema)
 
         # Act
         result_df = optimized_join(
-            large_df, small_df, join_key="user_id", join_type="inner",
-            enable_broadcast=False, enable_salting=True
+            large_df,
+            small_df,
+            join_key="user_id",
+            join_type="inner",
+            enable_broadcast=False,
+            enable_salting=True,
         )
 
         # Assert
@@ -105,19 +118,23 @@ class TestOptimizedJoin:
             - Join completes successfully
         """
         # Arrange - uniformly distributed large DataFrame
-        large_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        large_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
-        large_data = [(f"u{i%10:03d}", i) for i in range(1000)]  # Uniform distribution
+        large_data = [(f"u{i % 10:03d}", i) for i in range(1000)]  # Uniform distribution
         large_df = spark.createDataFrame(large_data, schema=large_schema)
 
         # Small DataFrame
-        small_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False)
-        ])
+        small_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+            ]
+        )
 
         small_data = [(f"u{i:03d}", f"Country{i}") for i in range(10)]
         small_df = spark.createDataFrame(small_data, schema=small_schema)
@@ -142,38 +159,40 @@ class TestOptimizedJoin:
             - u003 has NULL values for metadata columns
         """
         # Arrange - large DataFrame
-        large_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False)
-        ])
+        large_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+            ]
+        )
 
         large_data = [("u001", 1), ("u002", 2), ("u003", 3)]
         large_df = spark.createDataFrame(large_data, schema=large_schema)
 
         # Small DataFrame (missing u003)
-        small_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("country", StringType(), nullable=False)
-        ])
+        small_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("country", StringType(), nullable=False),
+            ]
+        )
 
         small_data = [("u001", "US"), ("u002", "UK")]
         small_df = spark.createDataFrame(small_data, schema=small_schema)
 
         # Act
-        result_df = optimized_join(
-            large_df, small_df, join_key="user_id", join_type="left"
-        )
+        result_df = optimized_join(large_df, small_df, join_key="user_id", join_type="left")
 
         # Assert using chispa
-        expected_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("interaction_id", IntegerType(), nullable=False),
-            StructField("country", StringType(), nullable=True)
-        ])
-        expected_df = spark.createDataFrame([
-            ("u001", 1, "US"),
-            ("u002", 2, "UK"),
-            ("u003", 3, None)
-        ], schema=expected_schema)
+        expected_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("interaction_id", IntegerType(), nullable=False),
+                StructField("country", StringType(), nullable=True),
+            ]
+        )
+        expected_df = spark.createDataFrame(
+            [("u001", 1, "US"), ("u002", 2, "UK"), ("u003", 3, None)], schema=expected_schema
+        )
 
         assert_df_equality(result_df, expected_df, ignore_row_order=True, ignore_nullable=True)

@@ -3,11 +3,12 @@ Unit tests for cohort retention analysis.
 
 Tests calculate_cohort_retention() function from engagement transforms.
 """
+
+from datetime import date, datetime, timedelta
+
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType, StructField, StringType, DateType, TimestampType
-)
-from datetime import datetime, timedelta, date
+from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
+
 from src.transforms.engagement import calculate_cohort_retention
 
 
@@ -24,10 +25,12 @@ class TestCalculateCohortRetention:
         """
         # Arrange - metadata (join dates)
         metadata_data = [(f"u{i:03d}", date(2023, 1, 1)) for i in range(1, 11)]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("registration_date", DateType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Interactions - all users active all 4 weeks
@@ -35,21 +38,21 @@ class TestCalculateCohortRetention:
         for user_num in range(1, 11):
             user_id = f"u{user_num:03d}"
             for week in range(4):
-                interactions_data.append((
-                    user_id,
-                    datetime(2023, 1, 1, 10, 0, 0) + timedelta(weeks=week)
-                ))
+                interactions_data.append(
+                    (user_id, datetime(2023, 1, 1, 10, 0, 0) + timedelta(weeks=week))
+                )
 
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Act
         result_df = calculate_cohort_retention(
-            interactions_df, metadata_df,
-            cohort_period="week", retention_weeks=4
+            interactions_df, metadata_df, cohort_period="week", retention_weeks=4
         )
 
         # Assert
@@ -67,10 +70,12 @@ class TestCalculateCohortRetention:
         """
         # Arrange - metadata
         metadata_data = [(f"u{i:03d}", date(2023, 1, 1)) for i in range(1, 101)]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("registration_date", DateType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Interactions
@@ -88,16 +93,17 @@ class TestCalculateCohortRetention:
         for i in range(1, 51):
             interactions_data.append((f"u{i:03d}", datetime(2023, 1, 22, 10, 0, 0)))
 
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Act
         result_df = calculate_cohort_retention(
-            interactions_df, metadata_df,
-            cohort_period="week", retention_weeks=4
+            interactions_df, metadata_df, cohort_period="week", retention_weeks=4
         )
 
         # Assert
@@ -126,10 +132,12 @@ class TestCalculateCohortRetention:
         for i in range(51, 81):
             metadata_data.append((f"u{i:03d}", date(2023, 1, 8)))
 
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("registration_date", DateType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         # Interactions - all users active week 0
@@ -139,16 +147,17 @@ class TestCalculateCohortRetention:
         for i in range(51, 81):
             interactions_data.append((f"u{i:03d}", datetime(2023, 1, 8, 10, 0, 0)))
 
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Act
         result_df = calculate_cohort_retention(
-            interactions_df, metadata_df,
-            cohort_period="week", retention_weeks=2
+            interactions_df, metadata_df, cohort_period="week", retention_weeks=2
         )
 
         # Assert
@@ -176,28 +185,31 @@ class TestCalculateCohortRetention:
         """
         # Arrange
         metadata_data = [("u001", date(2023, 1, 1))]
-        metadata_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("registration_date", DateType(), nullable=False)
-        ])
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+            ]
+        )
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
         interactions_data = [
-            ("u001", datetime(2023, 1, 1, 10, 0, 0)),   # Week 0
-            ("u001", datetime(2023, 1, 8, 10, 0, 0)),   # Week 1
+            ("u001", datetime(2023, 1, 1, 10, 0, 0)),  # Week 0
+            ("u001", datetime(2023, 1, 8, 10, 0, 0)),  # Week 1
             # NO interaction in week 2 (2023-01-15)
             ("u001", datetime(2023, 1, 22, 10, 0, 0)),  # Week 3
         ]
-        interactions_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
         interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
 
         # Act
         result_df = calculate_cohort_retention(
-            interactions_df, metadata_df,
-            cohort_period="week", retention_weeks=4
+            interactions_df, metadata_df, cohort_period="week", retention_weeks=4
         )
 
         # Assert

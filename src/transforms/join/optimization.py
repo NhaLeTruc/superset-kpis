@@ -4,6 +4,7 @@ Join Optimization - Hot Key Detection and Salting
 Functions for identifying data skew and applying salting techniques
 to mitigate hot key problems in distributed joins.
 """
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
@@ -11,9 +12,7 @@ from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 
 
 def identify_hot_keys(
-    df: DataFrame,
-    key_column: str,
-    threshold_percentile: float = HOT_KEY_THRESHOLD_PERCENTILE
+    df: DataFrame, key_column: str, threshold_percentile: float = HOT_KEY_THRESHOLD_PERCENTILE
 ) -> DataFrame:
     """
     Identify hot keys (skewed values) in a DataFrame.
@@ -48,10 +47,7 @@ def identify_hot_keys(
 
 
 def apply_salting(
-    df: DataFrame,
-    hot_keys_df: DataFrame,
-    key_column: str,
-    salt_factor: int = 10
+    df: DataFrame, hot_keys_df: DataFrame, key_column: str, salt_factor: int = 10
 ) -> DataFrame:
     """
     Apply salting to hot keys by adding random salt suffix.
@@ -90,17 +86,15 @@ def apply_salting(
     # For non-hot keys: salt = 0
     df_with_salt = df_with_marker.withColumn(
         "salt",
-        F.when(
-            F.col("is_hot_key").isNotNull(),
-            (F.rand() * salt_factor).cast("int")
-        ).otherwise(F.lit(0))
+        F.when(F.col("is_hot_key").isNotNull(), (F.rand() * salt_factor).cast("int")).otherwise(
+            F.lit(0)
+        ),
     )
 
     # Create {key_column}_salted column
     salted_column_name = f"{key_column}_salted"
     df_with_salted = df_with_salt.withColumn(
-        salted_column_name,
-        F.concat(F.col(key_column), F.lit("_"), F.col("salt").cast("string"))
+        salted_column_name, F.concat(F.col(key_column), F.lit("_"), F.col("salt").cast("string"))
     )
 
     # Remove the marker column
@@ -110,10 +104,7 @@ def apply_salting(
 
 
 def explode_for_salting(
-    df: DataFrame,
-    hot_keys_df: DataFrame,
-    key_column: str,
-    salt_factor: int = 10
+    df: DataFrame, hot_keys_df: DataFrame, key_column: str, salt_factor: int = 10
 ) -> DataFrame:
     """
     Explode rows for hot keys to match salt factor.
@@ -146,9 +137,8 @@ def explode_for_salting(
     df_with_salt_array = df_with_marker.withColumn(
         "salt_array",
         F.when(
-            F.col("is_hot_key").isNotNull(),
-            F.array(*[F.lit(i) for i in range(salt_factor)])
-        ).otherwise(F.array(F.lit(0)))
+            F.col("is_hot_key").isNotNull(), F.array(*[F.lit(i) for i in range(salt_factor)])
+        ).otherwise(F.array(F.lit(0))),
     )
 
     # Explode the salt array to create multiple rows
@@ -157,8 +147,7 @@ def explode_for_salting(
     # Create {key_column}_salted column
     salted_column_name = f"{key_column}_salted"
     df_with_salted = df_exploded.withColumn(
-        salted_column_name,
-        F.concat(F.col(key_column), F.lit("_"), F.col("salt").cast("string"))
+        salted_column_name, F.concat(F.col(key_column), F.lit("_"), F.col("salt").cast("string"))
     )
 
     # Remove temporary columns

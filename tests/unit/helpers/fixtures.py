@@ -4,9 +4,11 @@ Test Data Generators
 Provides reusable functions for generating test data.
 Eliminates duplication of data generation logic across tests.
 """
-from datetime import datetime, timedelta, date
-from typing import List, Tuple, Optional
+
+from datetime import date, datetime, timedelta
+
 from pyspark.sql import DataFrame, SparkSession
+
 from .schemas import interactions_schema, metadata_schema
 
 
@@ -16,9 +18,9 @@ def generate_interactions(
     interactions_per_user: int = 10,
     start_date: date = date(2023, 1, 1),
     num_days: int = 30,
-    action_types: Optional[List[str]] = None,
+    action_types: list[str] | None = None,
     include_page_id: bool = True,
-    include_app_version: bool = True
+    include_app_version: bool = True,
 ) -> DataFrame:
     """
     Generate synthetic interaction data.
@@ -59,7 +61,9 @@ def generate_interactions(
             duration_ms = base_duration + (interaction_idx * 500)
 
             # Action type (cycle through)
-            action_type = action_types[interaction_idx % len(action_types)] if action_types else None
+            action_type = (
+                action_types[interaction_idx % len(action_types)] if action_types else None
+            )
 
             # Page ID
             page_id = f"page_{interaction_idx % 20}" if include_page_id else None
@@ -77,9 +81,9 @@ def generate_metadata(
     spark: SparkSession,
     n_users: int = 100,
     start_join_date: date = date(2022, 1, 1),
-    countries: Optional[List[str]] = None,
-    device_types: Optional[List[str]] = None,
-    subscription_types: Optional[List[str]] = None
+    countries: list[str] | None = None,
+    device_types: list[str] | None = None,
+    subscription_types: list[str] | None = None,
 ) -> DataFrame:
     """
     Generate synthetic user metadata.
@@ -129,7 +133,7 @@ def generate_skewed_data(
     normal_keys: int = 90,
     interactions_per_hot_key: int = 10000,
     interactions_per_normal_key: int = 100,
-    start_date: date = date(2023, 1, 1)
+    start_date: date = date(2023, 1, 1),
 ) -> DataFrame:
     """
     Generate data with power-law distribution (data skew).
@@ -156,21 +160,15 @@ def generate_skewed_data(
         for interaction_idx in range(interactions_per_hot_key):
             day_offset = interaction_idx % 30
             timestamp = datetime.combine(
-                start_date + timedelta(days=day_offset),
-                datetime.min.time()
+                start_date + timedelta(days=day_offset), datetime.min.time()
             )
             timestamp = timestamp.replace(hour=(interaction_idx % 24))
 
             duration_ms = 5000 + (interaction_idx % 10000)
 
-            data.append((
-                user_id,
-                timestamp,
-                duration_ms,
-                "view",
-                f"page_{interaction_idx % 100}",
-                "1.0.0"
-            ))
+            data.append(
+                (user_id, timestamp, duration_ms, "view", f"page_{interaction_idx % 100}", "1.0.0")
+            )
 
     # Generate normal key data
     for user_idx in range(normal_keys):
@@ -179,21 +177,15 @@ def generate_skewed_data(
         for interaction_idx in range(interactions_per_normal_key):
             day_offset = interaction_idx % 30
             timestamp = datetime.combine(
-                start_date + timedelta(days=day_offset),
-                datetime.min.time()
+                start_date + timedelta(days=day_offset), datetime.min.time()
             )
             timestamp = timestamp.replace(hour=(interaction_idx % 24))
 
             duration_ms = 5000 + (interaction_idx % 1000)
 
-            data.append((
-                user_id,
-                timestamp,
-                duration_ms,
-                "view",
-                f"page_{interaction_idx % 10}",
-                "1.0.0"
-            ))
+            data.append(
+                (user_id, timestamp, duration_ms, "view", f"page_{interaction_idx % 10}", "1.0.0")
+            )
 
     schema = interactions_schema()
     return spark.createDataFrame(data, schema=schema)
@@ -204,8 +196,8 @@ def generate_cohort_data(
     num_cohorts: int = 4,
     cohort_size: int = 100,
     num_weeks: int = 12,
-    retention_rates: Optional[List[float]] = None
-) -> Tuple[DataFrame, DataFrame]:
+    retention_rates: list[float] | None = None,
+) -> tuple[DataFrame, DataFrame]:
     """
     Generate cohort data for retention analysis.
 
@@ -234,13 +226,7 @@ def generate_cohort_data(
             user_id = f"cohort{cohort_idx}_user{user_idx:03d}"
 
             # Add to metadata
-            metadata.append((
-                user_id,
-                cohort_start,
-                "US",
-                "iOS",
-                "premium"
-            ))
+            metadata.append((user_id, cohort_start, "US", "iOS", "premium"))
 
             # Generate interactions based on retention curve
             for week_idx in range(num_weeks):
@@ -260,14 +246,16 @@ def generate_cohort_data(
                         timestamp = datetime.combine(interaction_day, datetime.min.time())
                         timestamp = timestamp.replace(hour=(interaction_idx * 3) % 24)
 
-                        interactions.append((
-                            user_id,
-                            timestamp,
-                            5000 + (interaction_idx * 1000),
-                            "view",
-                            f"page_{interaction_idx}",
-                            "1.0.0"
-                        ))
+                        interactions.append(
+                            (
+                                user_id,
+                                timestamp,
+                                5000 + (interaction_idx * 1000),
+                                "view",
+                                f"page_{interaction_idx}",
+                                "1.0.0",
+                            )
+                        )
 
     interactions_schema_obj = interactions_schema()
     metadata_schema_obj = metadata_schema()
@@ -278,11 +266,7 @@ def generate_cohort_data(
     return interactions_df, metadata_df
 
 
-def generate_date_series(
-    start_date: date,
-    num_days: int,
-    metric_value_fn=None
-) -> List[Tuple]:
+def generate_date_series(start_date: date, num_days: int, metric_value_fn=None) -> list[tuple]:
     """
     Generate time series data.
 
@@ -295,7 +279,9 @@ def generate_date_series(
         List of tuples (date, value)
     """
     if metric_value_fn is None:
-        metric_value_fn = lambda day_idx: 100 + (day_idx * 5)
+
+        def metric_value_fn(day_idx):
+            return 100 + (day_idx * 5)
 
     data = []
     for day_idx in range(num_days):

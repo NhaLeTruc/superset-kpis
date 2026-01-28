@@ -19,6 +19,7 @@ Usage:
     # Backward compatible uniform distribution:
     python3 scripts/generate_sample_data.py --small --uniform
 """
+
 import argparse
 import csv
 import math
@@ -26,7 +27,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+
 
 # =============================================================================
 # DATE RANGES
@@ -42,19 +43,9 @@ SESSION_TIMEOUT_SECONDS = 1800
 # =============================================================================
 # BASIC DISTRIBUTIONS (used by both uniform and realistic modes)
 # =============================================================================
-ACTION_DISTRIBUTION = {
-    "VIEW": 0.50,
-    "EDIT": 0.30,
-    "SHARE": 0.15,
-    "EXPORT": 0.05
-}
+ACTION_DISTRIBUTION = {"VIEW": 0.50, "EDIT": 0.30, "SHARE": 0.15, "EXPORT": 0.05}
 
-DEVICE_DISTRIBUTION = {
-    "iPhone": 0.40,
-    "iPad": 0.25,
-    "Android Phone": 0.25,
-    "Android Tablet": 0.10
-}
+DEVICE_DISTRIBUTION = {"iPhone": 0.40, "iPad": 0.25, "Android Phone": 0.25, "Android Tablet": 0.10}
 
 COUNTRY_DISTRIBUTION = {
     "US": 0.35,
@@ -66,22 +57,12 @@ COUNTRY_DISTRIBUTION = {
     "AU": 0.05,
     "CN": 0.08,
     "IN": 0.06,
-    "BR": 0.03
+    "BR": 0.03,
 }
 
-SUBSCRIPTION_DISTRIBUTION = {
-    "free": 0.60,
-    "premium": 0.30,
-    "enterprise": 0.10
-}
+SUBSCRIPTION_DISTRIBUTION = {"free": 0.60, "premium": 0.30, "enterprise": 0.10}
 
-VERSION_DISTRIBUTION = {
-    "3.0.0": 0.10,
-    "3.0.1": 0.15,
-    "3.1.0": 0.25,
-    "3.1.1": 0.30,
-    "3.2.0": 0.20
-}
+VERSION_DISTRIBUTION = {"3.0.0": 0.10, "3.0.1": 0.15, "3.1.0": 0.25, "3.1.1": 0.30, "3.2.0": 0.20}
 
 # =============================================================================
 # TEMPORAL PATTERNS (for realistic mode)
@@ -90,21 +71,84 @@ VERSION_DISTRIBUTION = {
 HOUR_WEIGHTS = {
     # Enterprise: peaks at 9-11am and 2-4pm (work hours)
     "enterprise": [
-        0.05, 0.03, 0.02, 0.02, 0.02, 0.05, 0.15, 0.40,
-        0.80, 1.00, 1.00, 0.90, 0.70, 0.85, 0.95, 0.90,
-        0.70, 0.50, 0.30, 0.20, 0.15, 0.10, 0.08, 0.06
+        0.05,
+        0.03,
+        0.02,
+        0.02,
+        0.02,
+        0.05,
+        0.15,
+        0.40,
+        0.80,
+        1.00,
+        1.00,
+        0.90,
+        0.70,
+        0.85,
+        0.95,
+        0.90,
+        0.70,
+        0.50,
+        0.30,
+        0.20,
+        0.15,
+        0.10,
+        0.08,
+        0.06,
     ],
     # Free: peaks at 8-10am and 7-10pm (before/after work)
     "free": [
-        0.08, 0.05, 0.03, 0.02, 0.02, 0.05, 0.20, 0.50,
-        0.90, 1.00, 0.85, 0.60, 0.50, 0.50, 0.45, 0.50,
-        0.55, 0.65, 0.80, 1.00, 1.10, 0.90, 0.50, 0.20
+        0.08,
+        0.05,
+        0.03,
+        0.02,
+        0.02,
+        0.05,
+        0.20,
+        0.50,
+        0.90,
+        1.00,
+        0.85,
+        0.60,
+        0.50,
+        0.50,
+        0.45,
+        0.50,
+        0.55,
+        0.65,
+        0.80,
+        1.00,
+        1.10,
+        0.90,
+        0.50,
+        0.20,
     ],
     # Premium: blend of both patterns
     "premium": [
-        0.06, 0.04, 0.03, 0.02, 0.02, 0.05, 0.18, 0.45,
-        0.85, 1.00, 0.92, 0.75, 0.60, 0.68, 0.70, 0.70,
-        0.62, 0.58, 0.55, 0.60, 0.62, 0.50, 0.30, 0.12
+        0.06,
+        0.04,
+        0.03,
+        0.02,
+        0.02,
+        0.05,
+        0.18,
+        0.45,
+        0.85,
+        1.00,
+        0.92,
+        0.75,
+        0.60,
+        0.68,
+        0.70,
+        0.70,
+        0.62,
+        0.58,
+        0.55,
+        0.60,
+        0.62,
+        0.50,
+        0.30,
+        0.12,
     ],
 }
 
@@ -117,15 +161,15 @@ DAY_WEIGHTS = {
 
 # Seasonal events: (start_month, start_day, end_month, end_day, multiplier)
 SEASONAL_EVENTS = [
-    (8, 15, 9, 15, 1.30),   # Back to school
-    (12, 20, 12, 31, 0.55), # Holiday dip
-    (1, 1, 1, 7, 1.40),     # New Year surge
+    (8, 15, 9, 15, 1.30),  # Back to school
+    (12, 20, 12, 31, 0.55),  # Holiday dip
+    (1, 1, 1, 7, 1.40),  # New Year surge
 ]
 
 # Burst events: (month, day, duration_days, multiplier)
 DEFAULT_BURST_EVENTS = [
-    (3, 15, 3, 3.0),   # Spring marketing campaign
-    (6, 1, 2, 4.0),    # Product launch
+    (3, 15, 3, 3.0),  # Spring marketing campaign
+    (6, 1, 2, 4.0),  # Product launch
     (10, 10, 5, 2.5),  # Fall promotion
 ]
 
@@ -142,9 +186,9 @@ ACTION_TRANSITIONS = {
 
 # Duration log-normal parameters by action type (mu, sigma for ln(ms))
 ACTION_DURATION_PARAMS = {
-    "VIEW": (7.5, 1.2),    # median ~1800ms, range ~200ms-30s
-    "EDIT": (9.2, 1.4),    # median ~10000ms, range ~1s-3min
-    "SHARE": (8.0, 1.0),   # median ~3000ms, range ~500ms-20s
+    "VIEW": (7.5, 1.2),  # median ~1800ms, range ~200ms-30s
+    "EDIT": (9.2, 1.4),  # median ~10000ms, range ~1s-3min
+    "SHARE": (8.0, 1.0),  # median ~3000ms, range ~500ms-20s
     "EXPORT": (8.5, 0.9),  # median ~5000ms, range ~1s-25s
 }
 
@@ -163,7 +207,7 @@ LIFECYCLE_STAGES = {
     "settling": {"max_days": 42, "activity_multiplier": 1.5},
     "active": {"max_days": 365, "activity_multiplier": 1.0},
     "dormant": {"max_days": 90, "activity_multiplier": 0.1},
-    "churned": {"max_days": float('inf'), "activity_multiplier": 0.0},
+    "churned": {"max_days": float("inf"), "activity_multiplier": 0.0},
 }
 
 
@@ -210,20 +254,20 @@ def zipf_sample(n: int, s: float) -> int:
     Uses rejection sampling.
     """
     # Precompute normalization constant
-    h_n = sum(1.0 / (k ** s) for k in range(1, n + 1))
+    sum(1.0 / (k**s) for k in range(1, n + 1))
     while True:
         u = random.random()
         v = random.random()
         x = int((n ** (1 - s) - 1) * u + 1) ** (1 / (1 - s))
         k = max(1, min(n, int(x + 0.5)))
         # Rejection test
-        if v * k ** s <= 1.0:
+        if v * k**s <= 1.0:
             return k
 
 
 def build_zipf_cdf(n: int, s: float) -> list:
     """Pre-compute Zipf CDF for efficient sampling."""
-    weights = [1.0 / (k ** s) for k in range(1, n + 1)]
+    weights = [1.0 / (k**s) for k in range(1, n + 1)]
     total = sum(weights)
     cdf = []
     cumulative = 0.0
@@ -255,13 +299,14 @@ def get_seasonal_multiplier(date: datetime) -> float:
     for start_m, start_d, end_m, end_d, mult in SEASONAL_EVENTS:
         # Handle year wrap (e.g., Dec 20 - Jan 7)
         if start_m <= end_m:
-            if (month > start_m or (month == start_m and day >= start_d)) and \
-               (month < end_m or (month == end_m and day <= end_d)):
+            if (month > start_m or (month == start_m and day >= start_d)) and (
+                month < end_m or (month == end_m and day <= end_d)
+            ):
                 return mult
-        else:
-            if (month > start_m or (month == start_m and day >= start_d)) or \
-               (month < end_m or (month == end_m and day <= end_d)):
-                return mult
+        elif (month > start_m or (month == start_m and day >= start_d)) or (
+            month < end_m or (month == end_m and day <= end_d)
+        ):
+            return mult
     return 1.0
 
 
@@ -287,6 +332,7 @@ def sample_hour_weighted(subscription_type: str) -> int:
 @dataclass
 class UserProfile:
     """Model user behavior and lifecycle."""
+
     user_id: str
     subscription_type: str
     registration_date: datetime
@@ -295,7 +341,7 @@ class UserProfile:
 
     # Lifecycle parameters (set during initialization)
     base_activity_level: float = 1.0
-    churn_week: Optional[int] = None
+    churn_week: int | None = None
     avg_sessions_per_active_day: float = 2.0
     avg_actions_per_session: float = 4.0
 
@@ -326,14 +372,13 @@ class UserProfile:
 
         # Day of week multiplier
         day_of_week = current_date.weekday()
-        dow_mult = DAY_WEIGHTS.get(
-            self.subscription_type, DAY_WEIGHTS["free"]
-        )[day_of_week]
+        dow_mult = DAY_WEIGHTS.get(self.subscription_type, DAY_WEIGHTS["free"])[day_of_week]
 
         return self.base_activity_level * stage_mult * dow_mult
 
-    def should_be_active(self, current_date: datetime, seasonal_mult: float,
-                         burst_mult: float) -> bool:
+    def should_be_active(
+        self, current_date: datetime, seasonal_mult: float, burst_mult: float
+    ) -> bool:
         """Probabilistically determine if user is active on this date."""
         if current_date < self.registration_date:
             return False
@@ -361,20 +406,19 @@ class SessionGenerator:
     def __init__(self, page_cdf: list):
         self.page_cdf = page_cdf
 
-    def generate_session(self, user: UserProfile, session_start: datetime,
-                         app_version: str) -> list:
+    def generate_session(
+        self, user: UserProfile, session_start: datetime, app_version: str
+    ) -> list:
         """Generate a complete session with realistic action sequence."""
         interactions = []
         current_time = session_start
 
         # Determine session length (log-normal distributed action count)
-        num_actions = max(1, int(log_normal_sample(
-            math.log(user.avg_actions_per_session), 0.8
-        )))
+        num_actions = max(1, int(log_normal_sample(math.log(user.avg_actions_per_session), 0.8)))
 
         # First action is usually VIEW
-        current_action = "VIEW" if random.random() < 0.85 else weighted_random_choice(
-            ACTION_DISTRIBUTION
+        current_action = (
+            "VIEW" if random.random() < 0.85 else weighted_random_choice(ACTION_DISTRIBUTION)
         )
 
         for i in range(num_actions):
@@ -400,8 +444,7 @@ class SessionGenerator:
             if i < num_actions - 1:
                 gap_mu, gap_sigma = INTRA_SESSION_GAP_PARAMS
                 gap_seconds = min(
-                    SESSION_TIMEOUT_SECONDS - 1,
-                    max(1, int(log_normal_sample(gap_mu, gap_sigma)))
+                    SESSION_TIMEOUT_SECONDS - 1, max(1, int(log_normal_sample(gap_mu, gap_sigma)))
                 )
                 current_time += timedelta(seconds=gap_seconds)
 
@@ -415,9 +458,12 @@ class SessionGenerator:
 # =============================================================================
 # DATA GENERATION FUNCTIONS
 # =============================================================================
-def generate_user_metadata(num_users: int, realistic_lifecycle: bool = False,
-                           pareto_alpha: float = 1.5,
-                           churn_rate: float = 0.15) -> list:
+def generate_user_metadata(
+    num_users: int,
+    realistic_lifecycle: bool = False,
+    pareto_alpha: float = 1.5,
+    churn_rate: float = 0.15,
+) -> list:
     """Generate user metadata dataset."""
     print(f"Generating metadata for {num_users:,} users...")
 
@@ -441,8 +487,7 @@ def generate_user_metadata(num_users: int, realistic_lifecycle: bool = False,
     return users
 
 
-def create_user_profiles(users: list, pareto_alpha: float = 1.5,
-                         churn_rate: float = 0.15) -> list:
+def create_user_profiles(users: list, pareto_alpha: float = 1.5, churn_rate: float = 0.15) -> list:
     """Convert user metadata to UserProfile objects with lifecycle params."""
     profiles = []
     for u in users:
@@ -476,8 +521,9 @@ def create_user_profiles(users: list, pareto_alpha: float = 1.5,
     return profiles
 
 
-def generate_user_interactions_uniform(num_interactions: int, users: list,
-                                       include_skew: bool = False) -> list:
+def generate_user_interactions_uniform(
+    num_interactions: int, users: list, include_skew: bool = False
+) -> list:
     """
     Generate interactions with UNIFORM distribution (original behavior).
     Preserved for backward compatibility.
@@ -492,9 +538,8 @@ def generate_user_interactions_uniform(num_interactions: int, users: list,
         normal_users = [uid for uid in user_ids if uid not in power_users]
         power_user_interactions = int(num_interactions * 0.80)
         normal_user_interactions = num_interactions - power_user_interactions
-        user_pool = (
-            power_users * (power_user_interactions // num_power_users) +
-            normal_users * (normal_user_interactions // len(normal_users))
+        user_pool = power_users * (power_user_interactions // num_power_users) + normal_users * (
+            normal_user_interactions // len(normal_users)
         )
         random.shuffle(user_pool)
         print(f"   Data skew: {num_power_users:,} power users generate 80% of interactions")
@@ -510,7 +555,7 @@ def generate_user_interactions_uniform(num_interactions: int, users: list,
             days=random.randint(0, date_range),
             hours=random.randint(0, 23),
             minutes=random.randint(0, 59),
-            seconds=random.randint(0, 59)
+            seconds=random.randint(0, 59),
         )
 
         duration_category = random.random()
@@ -527,7 +572,7 @@ def generate_user_interactions_uniform(num_interactions: int, users: list,
             "action_type": weighted_random_choice(ACTION_DISTRIBUTION),
             "page_id": f"p{random.randint(1, 100):03d}",
             "duration_ms": duration_ms,
-            "app_version": weighted_random_choice(VERSION_DISTRIBUTION)
+            "app_version": weighted_random_choice(VERSION_DISTRIBUTION),
         }
         interactions.append(interaction)
 
@@ -542,7 +587,7 @@ def generate_user_interactions_realistic(
     pareto_alpha: float = 1.5,
     churn_rate: float = 0.15,
     include_burst_events: bool = True,
-    burst_events: list = [],
+    burst_events: list | None = None,
 ) -> list:
     """
     Generate interactions with REALISTIC patterns:
@@ -552,6 +597,8 @@ def generate_user_interactions_realistic(
     - User lifecycle modeling
     - Burst events (optional)
     """
+    if burst_events is None:
+        burst_events = []
     print(f"Generating ~{target_interactions:,} interactions (realistic mode)...")
 
     # Create user profiles with lifecycle parameters
@@ -570,7 +617,7 @@ def generate_user_interactions_realistic(
     total_days = (ACT_END_DATE - ACT_START_DATE).days
 
     # Calculate interactions per day target
-    avg_per_day = target_interactions / total_days
+    target_interactions / total_days
 
     # Generate day by day
     current_date = ACT_START_DATE
@@ -599,9 +646,7 @@ def generate_user_interactions_realistic(
                 hour = sample_hour_weighted(profile.subscription_type)
                 minute = random.randint(0, 59)
                 second = random.randint(0, 59)
-                session_start = current_date.replace(
-                    hour=hour, minute=minute, second=second
-                )
+                session_start = current_date.replace(hour=hour, minute=minute, second=second)
 
                 # Generate session interactions
                 session_interactions = session_gen.generate_session(
@@ -618,6 +663,7 @@ def generate_user_interactions_realistic(
     if actual_count > target_interactions * 1.2:
         # Group interactions by (user_id, date, hour) to approximate sessions
         from collections import defaultdict
+
         sessions = defaultdict(list)
         for interaction in interactions:
             ts = interaction["timestamp"]
@@ -629,7 +675,7 @@ def generate_user_interactions_realistic(
         session_keys = list(sessions.keys())
         random.shuffle(session_keys)
 
-        sampled = []
+        sampled: list[dict] = []
         for key in session_keys:
             if len(sampled) >= target_interactions:
                 break
@@ -638,8 +684,10 @@ def generate_user_interactions_realistic(
         interactions = sampled
         print(f"   Downsampled to {len(interactions):,} interactions (preserving sessions)")
     elif actual_count < target_interactions * 0.8:
-        print(f"   Warning: Generated fewer interactions than target. "
-              f"Consider adjusting --pareto-alpha or --churn-rate")
+        print(
+            "   Warning: Generated fewer interactions than target. "
+            "Consider adjusting --pareto-alpha or --churn-rate"
+        )
 
     # Sort by timestamp
     interactions.sort(key=lambda x: x["timestamp"])
@@ -653,7 +701,7 @@ def write_csv(data: list, filename: str, fieldnames: list) -> None:
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Writing to {filepath}...")
-    with open(filepath, 'w', newline='') as f:
+    with open(filepath, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data)
@@ -673,7 +721,9 @@ def print_distribution_stats(interactions: list) -> None:
     for i in interactions:
         hour = int(i["timestamp"].split()[1].split(":")[0])
         hours[hour] += 1
-    print(f"Hour distribution (sample): 6am={hours[6]}, 12pm={hours[12]}, 6pm={hours[18]}, 12am={hours[0]}")
+    print(
+        f"Hour distribution (sample): 6am={hours[6]}, 12pm={hours[12]}, 6pm={hours[18]}, 12am={hours[0]}"
+    )
 
     # Day of week distribution
     days = Counter()
@@ -685,63 +735,83 @@ def print_distribution_stats(interactions: list) -> None:
     # Action distribution
     actions = Counter(i["action_type"] for i in interactions)
     total = sum(actions.values())
-    print(f"Action distribution: {{{', '.join(f'{k}: {v/total:.1%}' for k, v in actions.items())}}}")
+    print(
+        f"Action distribution: {{{', '.join(f'{k}: {v / total:.1%}' for k, v in actions.items())}}}"
+    )
 
     # User activity distribution
     user_counts = Counter(i["user_id"] for i in interactions)
     counts = sorted(user_counts.values(), reverse=True)
-    top_10_pct = sum(counts[:len(counts)//10]) / sum(counts) * 100 if counts else 0
+    top_10_pct = sum(counts[: len(counts) // 10]) / sum(counts) * 100 if counts else 0
     print(f"Top 10% users generate {top_10_pct:.1f}% of interactions")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate sample data for GoodNote Analytics"
-    )
+    parser = argparse.ArgumentParser(description="Generate sample data for GoodNote Analytics")
 
     # Preset sizes
-    parser.add_argument("--small", action="store_true",
-                        help="Small dataset (1K users, 10K interactions)")
-    parser.add_argument("--medium", action="store_true",
-                        help="Medium dataset (10K users, 100K interactions)")
-    parser.add_argument("--large", action="store_true",
-                        help="Large dataset (100K users, 1M interactions)")
+    parser.add_argument(
+        "--small", action="store_true", help="Small dataset (1K users, 10K interactions)"
+    )
+    parser.add_argument(
+        "--medium", action="store_true", help="Medium dataset (10K users, 100K interactions)"
+    )
+    parser.add_argument(
+        "--large", action="store_true", help="Large dataset (100K users, 1M interactions)"
+    )
 
     # Custom sizes
-    parser.add_argument("--num-users", type=int,
-                        help="Number of users to generate")
-    parser.add_argument("--num-interactions", type=int,
-                        help="Number of interactions to generate")
+    parser.add_argument("--num-users", type=int, help="Number of users to generate")
+    parser.add_argument("--num-interactions", type=int, help="Number of interactions to generate")
 
     # Realism flags
-    parser.add_argument("--realistic-temporal", action="store_true",
-                        help="Enable time-of-day, day-of-week, seasonal patterns")
-    parser.add_argument("--realistic-sessions", action="store_true",
-                        help="Generate session-based activity")
-    parser.add_argument("--realistic-lifecycle", action="store_true",
-                        help="Model user onboarding, settling, churn patterns")
-    parser.add_argument("--realistic-all", action="store_true",
-                        help="Enable all realistic data patterns")
-    parser.add_argument("--burst-events", action="store_true",
-                        help="Include simulated marketing campaigns/viral moments")
+    parser.add_argument(
+        "--realistic-temporal",
+        action="store_true",
+        help="Enable time-of-day, day-of-week, seasonal patterns",
+    )
+    parser.add_argument(
+        "--realistic-sessions", action="store_true", help="Generate session-based activity"
+    )
+    parser.add_argument(
+        "--realistic-lifecycle",
+        action="store_true",
+        help="Model user onboarding, settling, churn patterns",
+    )
+    parser.add_argument(
+        "--realistic-all", action="store_true", help="Enable all realistic data patterns"
+    )
+    parser.add_argument(
+        "--burst-events",
+        action="store_true",
+        help="Include simulated marketing campaigns/viral moments",
+    )
 
     # Distribution tuning
-    parser.add_argument("--pareto-alpha", type=float, default=1.5,
-                        help="Pareto distribution shape parameter (default: 1.5)")
-    parser.add_argument("--churn-rate", type=float, default=0.15,
-                        help="Base weekly churn probability (default: 0.15)")
+    parser.add_argument(
+        "--pareto-alpha",
+        type=float,
+        default=1.5,
+        help="Pareto distribution shape parameter (default: 1.5)",
+    )
+    parser.add_argument(
+        "--churn-rate",
+        type=float,
+        default=0.15,
+        help="Base weekly churn probability (default: 0.15)",
+    )
 
     # Backward compatibility
-    parser.add_argument("--uniform", action="store_true",
-                        help="Use original uniform distribution")
-    parser.add_argument("--is-skew", action="store_true",
-                        help="Enable 80/20 data skew (uniform mode only)")
+    parser.add_argument("--uniform", action="store_true", help="Use original uniform distribution")
+    parser.add_argument(
+        "--is-skew", action="store_true", help="Enable 80/20 data skew (uniform mode only)"
+    )
 
     # Other options
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed for reproducibility")
-    parser.add_argument("--stats", action="store_true",
-                        help="Print distribution statistics after generation")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument(
+        "--stats", action="store_true", help="Print distribution statistics after generation"
+    )
 
     args = parser.parse_args()
 
@@ -773,25 +843,25 @@ def main():
 
     # Determine generation mode
     use_realistic = (
-        args.realistic_all or
-        args.realistic_temporal or
-        args.realistic_sessions or
-        args.realistic_lifecycle or
-        args.burst_events
+        args.realistic_all
+        or args.realistic_temporal
+        or args.realistic_sessions
+        or args.realistic_lifecycle
+        or args.burst_events
     ) and not args.uniform
 
     mode_name = "REALISTIC" if use_realistic else "UNIFORM"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Generating GoodNote Analytics Sample Data ({mode_name} mode)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Generate metadata
     users = generate_user_metadata(num_users)
     write_csv(
         users,
         "user_metadata.csv",
-        ["user_id", "device_type", "country", "subscription_type", "registration_date"]
+        ["user_id", "device_type", "country", "subscription_type", "registration_date"],
     )
 
     # Generate interactions
@@ -805,23 +875,21 @@ def main():
         )
     else:
         interactions = generate_user_interactions_uniform(
-            num_interactions,
-            users,
-            include_skew=args.is_skew
+            num_interactions, users, include_skew=args.is_skew
         )
 
     write_csv(
         interactions,
         "user_interactions.csv",
-        ["user_id", "timestamp", "action_type", "page_id", "duration_ms", "app_version"]
+        ["user_id", "timestamp", "action_type", "page_id", "duration_ms", "app_version"],
     )
 
     if args.stats or use_realistic:
         print_distribution_stats(interactions)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Sample data generation complete!")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     print("Files created:")
     print("   data/raw/user_interactions.csv")

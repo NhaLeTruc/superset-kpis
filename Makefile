@@ -1,7 +1,7 @@
 # GoodNote Analytics Platform - Makefile
 # Simplified commands for development and testing
 
-.PHONY: help quickstart setup test clean status logs
+.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
 
 # Default target - show help
 help:
@@ -17,6 +17,16 @@ help:
 	@echo "  make test-unit      - Run unit tests only"
 	@echo "  make test-integration - Run integration tests"
 	@echo "  make test-coverage  - Run tests with coverage report"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  make lint           - Run Ruff linter"
+	@echo "  make format         - Format code with Ruff"
+	@echo "  make fix            - Auto-fix all code issues"
+	@echo "  make check          - Check formatting and linting"
+	@echo "  make typecheck      - Run mypy type checker"
+	@echo "  make security       - Run Bandit security scan"
+	@echo "  make quality        - Run all quality checks"
+	@echo "  make install-hooks  - Install pre-commit hooks"
 	@echo ""
 	@echo "Data & Jobs:"
 	@echo "  make generate-data  - Generate sample data (medium size)"
@@ -112,7 +122,7 @@ logs-superset:
 # Testing
 # ============================================================================
 
-test: test-unit test-integration 
+test: test-unit test-integration
 	@echo "✅ All tests completed"
 
 test-unit:
@@ -292,6 +302,74 @@ clean-data:
 	docker exec goodnote-spark-master rm -rf /opt/spark-apps/data/raw/*
 	docker exec goodnote-spark-master rm -rf /opt/spark-apps/data/processed/*
 	@echo "✅ Data cleaned"
+
+# ============================================================================
+# Code Quality
+# ============================================================================
+
+.PHONY: lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
+
+# Run Ruff linter (no fixes)
+lint:
+	@echo "Running Ruff linter..."
+	ruff check src tests scripts
+	@echo "Linting complete"
+
+# Format code with Ruff
+format:
+	@echo "Formatting code with Ruff..."
+	ruff format src tests scripts
+	@echo "Formatting complete"
+
+# Check formatting and linting without changes
+check:
+	@echo "Checking code formatting and linting..."
+	ruff format --check src tests scripts
+	ruff check src tests scripts
+	@echo "All checks passed"
+
+# Auto-fix all issues
+fix:
+	@echo "Auto-fixing code issues..."
+	ruff check --fix src tests scripts
+	ruff format src tests scripts
+	@echo "Auto-fix complete"
+
+# Run type checking with mypy
+typecheck:
+	@echo "Running mypy type checker..."
+	mypy src --ignore-missing-imports
+	@echo "Type checking complete"
+
+# Security scan with Bandit
+security:
+	@echo "Running security scan with Bandit..."
+	bandit -r src -c pyproject.toml
+	@echo "Security scan complete"
+
+# Full quality check (all tools)
+quality: lint typecheck security
+	@echo ""
+	@echo "All quality checks passed!"
+
+# Install pre-commit hooks
+install-hooks:
+	@echo "Installing pre-commit hooks..."
+	pip install pre-commit
+	pre-commit install
+	@echo "Pre-commit hooks installed"
+
+# Run pre-commit on all files
+pre-commit-all:
+	@echo "Running pre-commit on all files..."
+	pre-commit run --all-files
+	@echo "Pre-commit complete"
+
+# Update pre-commit hooks
+update-hooks:
+	@echo "Updating pre-commit hooks..."
+	pre-commit autoupdate
+	@echo "Hooks updated"
 
 # ============================================================================
 # TDD Compliance

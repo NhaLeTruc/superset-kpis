@@ -6,22 +6,24 @@ from the new postgres package structure.
 
 New code should import directly from src.config.postgres instead.
 """
+
 from .postgres import (
-    get_postgres_connection_props,
     create_connection_string,
-    validate_database_config,
-    read_from_postgres,
     execute_sql,
+    get_postgres_connection_props,
     get_table_row_count,
-    write_to_postgres
+    read_from_postgres,
+    validate_database_config,
+    write_to_postgres,
 )
 
+
 __all__ = [
-    "get_postgres_connection_props",
     "create_connection_string",
-    "validate_database_config",
-    "read_from_postgres",
     "execute_sql",
+    "get_postgres_connection_props",
     "get_table_row_count",
+    "read_from_postgres",
+    "validate_database_config",
     "write_to_postgres",
 ]

@@ -3,15 +3,19 @@ Unit tests for session metrics transforms.
 
 Tests calculate_session_metrics() and calculate_bounce_rate() functions from session transforms.
 """
-import pytest
-from chispa.dataframe_comparer import assert_df_equality
-from pyspark.sql import functions as F
+
+from datetime import datetime
+
 from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType, LongType,
-    TimestampType, DoubleType, BooleanType
+    IntegerType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
 )
-from datetime import datetime, timedelta
-from src.transforms.session import calculate_session_metrics, calculate_bounce_rate
+
+from src.transforms.session import calculate_bounce_rate, calculate_session_metrics
 
 
 class TestCalculateSessionMetrics:
@@ -27,12 +31,14 @@ class TestCalculateSessionMetrics:
             - session_duration_ms=duration of single action
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             ("u001", "s001", datetime(2023, 1, 1, 10, 0, 0), 5000),
@@ -59,12 +65,14 @@ class TestCalculateSessionMetrics:
             - session_duration_ms=time from first to last + last duration
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             ("u001", "s001", datetime(2023, 1, 1, 10, 0, 0), 5000),
@@ -91,12 +99,14 @@ class TestCalculateSessionMetrics:
         THEN: Returns separate metrics for each session
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             # u001, s001 - bounce
@@ -136,12 +146,14 @@ class TestCalculateSessionMetrics:
         THEN: Returns empty DataFrame with output schema
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         empty_df = spark.createDataFrame([], schema=schema)
 
@@ -160,12 +172,14 @@ class TestCalculateSessionMetrics:
         THEN: Handles zero duration correctly
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [("u001", "s001", datetime(2023, 1, 1, 10, 0, 0), 0)]
         df = spark.createDataFrame(data, schema=schema)
@@ -189,13 +203,15 @@ class TestCalculateBounceRate:
         THEN: bounce_rate=1.0 (100%)
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("is_bounce", IntegerType(), nullable=False),
-            StructField("action_count", IntegerType(), nullable=False),
-            StructField("session_duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("is_bounce", IntegerType(), nullable=False),
+                StructField("action_count", IntegerType(), nullable=False),
+                StructField("session_duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             ("u001", "s001", 1, 1, 5000),
@@ -221,13 +237,15 @@ class TestCalculateBounceRate:
         THEN: bounce_rate=0.0 (0%)
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("is_bounce", IntegerType(), nullable=False),
-            StructField("action_count", IntegerType(), nullable=False),
-            StructField("session_duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("is_bounce", IntegerType(), nullable=False),
+                StructField("action_count", IntegerType(), nullable=False),
+                StructField("session_duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             ("u001", "s001", 0, 2, 125000),
@@ -253,13 +271,15 @@ class TestCalculateBounceRate:
         THEN: bounce_rate=0.4 (40%)
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("is_bounce", IntegerType(), nullable=False),
-            StructField("action_count", IntegerType(), nullable=False),
-            StructField("session_duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("is_bounce", IntegerType(), nullable=False),
+                StructField("action_count", IntegerType(), nullable=False),
+                StructField("session_duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             ("u001", "s001", 1, 1, 5000),
@@ -287,14 +307,16 @@ class TestCalculateBounceRate:
         THEN: Separate bounce rates per device_type
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("session_id", StringType(), nullable=False),
-            StructField("device_type", StringType(), nullable=False),
-            StructField("is_bounce", IntegerType(), nullable=False),
-            StructField("action_count", IntegerType(), nullable=False),
-            StructField("session_duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("session_id", StringType(), nullable=False),
+                StructField("device_type", StringType(), nullable=False),
+                StructField("is_bounce", IntegerType(), nullable=False),
+                StructField("action_count", IntegerType(), nullable=False),
+                StructField("session_duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             # iPad: 1 bounce out of 2

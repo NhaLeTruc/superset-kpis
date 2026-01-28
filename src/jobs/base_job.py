@@ -13,17 +13,17 @@ Jobs should inherit from BaseAnalyticsJob and implement:
 - print_summary() - custom reporting
 - get_argument_parser() - job-specific arguments
 """
+
 import argparse
-import sys
+import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StructType
 
-from src.config.spark_config import create_spark_session, configure_job_specific_settings
 from src.config.database_config import write_to_postgres
+from src.config.spark_config import configure_job_specific_settings, create_spark_session
 from src.utils.data_quality import detect_nulls
 from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 
@@ -36,12 +36,7 @@ class BaseAnalyticsJob(ABC):
     Subclasses implement job-specific logic.
     """
 
-    def __init__(
-        self,
-        job_name: str,
-        job_type: str = "analytics",
-        data_size_gb: float = 0.0
-    ):
+    def __init__(self, job_name: str, job_type: str = "analytics", data_size_gb: float = 0.0):
         """
         Initialize base job.
 
@@ -55,8 +50,8 @@ class BaseAnalyticsJob(ABC):
         self.job_name = job_name
         self.job_type = job_type
         self.data_size_gb = data_size_gb
-        self.spark: Optional[SparkSession] = None
-        self.monitoring_ctx: Optional[Dict] = None
+        self.spark: SparkSession | None = None
+        self.monitoring_ctx: dict | None = None
         self.args = None
 
     def read_parquet(self, path: str, name: str = "data") -> DataFrame:
@@ -81,12 +76,7 @@ class BaseAnalyticsJob(ABC):
         print(f"   ✅ Loaded {record_count:,} records. Please unpersist when done.")
         return df
 
-    def read_csv(
-            self, 
-            path: str, 
-            name: str = "data",
-            num_partitions: int = 0
-        ) -> DataFrame:
+    def read_csv(self, path: str, name: str = "data", num_partitions: int = 0) -> DataFrame:
         """
         Generic method to read any CSV file.
 
@@ -114,11 +104,11 @@ class BaseAnalyticsJob(ABC):
     def validate_dataframe(
         self,
         df: DataFrame,
-        required_columns: Optional[List[str]] = None,
-        not_null_columns: Optional[List[str]] = None,
+        required_columns: list[str] | None = None,
+        not_null_columns: list[str] | None = None,
         name: str = "DataFrame",
-        schema: Optional[StructType] = None
-    ) -> List[str]:
+        schema: StructType | None = None,
+    ) -> list[str]:
         """
         Validate a DataFrame's structure and data quality.
 
@@ -172,11 +162,14 @@ class BaseAnalyticsJob(ABC):
 
         return warnings
 
-    def write_to_database(self, metrics: Dict[str, DataFrame],
-                         table_mapping: Dict[str, str],
-                         mode: str = "overwrite",
-                         batch_size: int = 10000,
-                         num_partitions: Optional[int] = None) -> None:
+    def write_to_database(
+        self,
+        metrics: dict[str, DataFrame],
+        table_mapping: dict[str, str],
+        mode: str = "overwrite",
+        batch_size: int = 10000,
+        num_partitions: int | None = None,
+    ) -> None:
         """
         Write multiple DataFrames to PostgreSQL.
 
@@ -203,19 +196,19 @@ class BaseAnalyticsJob(ABC):
                     table_name=table_name,
                     mode=mode,
                     batch_size=batch_size,
-                    num_partitions=num_partitions
+                    num_partitions=num_partitions,
                 )
 
             except Exception as e:
-                print(f"   ❌ Failed to write {metric_name}: {str(e)}")
+                print(f"   ❌ Failed to write {metric_name}: {e!s}")
                 raise
 
     def write_to_parquet(
         self,
-        metrics: Dict[str, DataFrame],
+        metrics: dict[str, DataFrame],
         output_path: str,
-        partition_by: Optional[List[str]] = None,
-        coalesce_partitions: Optional[int] = None
+        partition_by: list[str] | None = None,
+        coalesce_partitions: int | None = None,
     ) -> None:
         """
         Write multiple DataFrames to Parquet files.
@@ -241,9 +234,7 @@ class BaseAnalyticsJob(ABC):
         """Create and configure Spark session."""
         self.spark = create_spark_session(app_name=f"GoodNote - {self.job_name}")
         configure_job_specific_settings(
-            self.spark,
-            job_type=self.job_type,
-            data_size_gb=self.data_size_gb
+            self.spark, job_type=self.job_type, data_size_gb=self.data_size_gb
         )
 
     def setup_monitoring(self, context_name: str) -> None:
@@ -253,10 +244,7 @@ class BaseAnalyticsJob(ABC):
         Args:
             context_name: Name for monitoring context (e.g., "user_engagement")
         """
-        self.monitoring_ctx = create_monitoring_context(
-            self.spark.sparkContext,
-            context_name
-        )
+        self.monitoring_ctx = create_monitoring_context(self.spark.sparkContext, context_name)
 
     def print_job_header(self) -> None:
         """Print job startup header."""
@@ -304,7 +292,7 @@ class BaseAnalyticsJob(ABC):
         pass
 
     @abstractmethod
-    def compute_metrics(self) -> Dict[str, DataFrame]:
+    def compute_metrics(self) -> dict[str, DataFrame]:
         """
         Core job computation logic.
 
@@ -320,7 +308,7 @@ class BaseAnalyticsJob(ABC):
         pass
 
     @abstractmethod
-    def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
         """
         Print job-specific summary.
 
@@ -331,9 +319,9 @@ class BaseAnalyticsJob(ABC):
             print("DAU Average:", metrics["dau"].agg({"dau": "avg"}).collect()[0][0])
         """
         pass
-    
+
     @abstractmethod
-    def get_table_mapping(self) -> Optional[Dict[str, str]]:
+    def get_table_mapping(self) -> dict[str, str] | None:
         """
         Get mapping from metric names to database table names.
 
@@ -403,9 +391,8 @@ class BaseAnalyticsJob(ABC):
 
         except Exception as e:
             print("\n" + "=" * 60)
-            print(f"❌ Job failed with error: {str(e)}")
+            print(f"❌ Job failed with error: {e!s}")
             print("=" * 60)
-            import traceback
             traceback.print_exc()
 
             self.print_job_footer(success=False)

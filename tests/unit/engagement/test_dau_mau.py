@@ -3,12 +3,19 @@ Unit tests for DAU and MAU calculation.
 
 Tests calculate_dau() and calculate_mau() functions from engagement transforms.
 """
+
+from datetime import date, datetime, timedelta
+
 import pytest
 from chispa.dataframe_comparer import assert_df_equality
 from pyspark.sql.types import (
-    StructType, StructField, StringType, LongType, TimestampType, DateType, IntegerType
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
 )
-from datetime import datetime, timedelta, date
+
 from src.transforms.engagement import calculate_dau, calculate_mau
 
 
@@ -26,11 +33,13 @@ class TestCalculateDAU:
             - 2023-01-02: dau=2, total_interactions=2
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             # 2023-01-01: u001 (3 interactions), u002 (2 interactions)
@@ -49,16 +58,21 @@ class TestCalculateDAU:
         result_df = calculate_dau(df)
 
         # Assert using chispa
-        expected_df = spark.createDataFrame([
-            (date(2023, 1, 1), 2, 5, 20000),
-            (date(2023, 1, 2), 2, 2, 10000),
-        ], ["date", "daily_active_users", "total_interactions", "total_duration_ms"])
+        expected_df = spark.createDataFrame(
+            [
+                (date(2023, 1, 1), 2, 5, 20000),
+                (date(2023, 1, 2), 2, 2, 10000),
+            ],
+            ["date", "daily_active_users", "total_interactions", "total_duration_ms"],
+        )
 
         assert_df_equality(
-            result_df.select("date", "daily_active_users", "total_interactions", "total_duration_ms"),
+            result_df.select(
+                "date", "daily_active_users", "total_interactions", "total_duration_ms"
+            ),
             expected_df,
             ignore_row_order=True,
-            ignore_nullable=True
+            ignore_nullable=True,
         )
 
     def test_calculate_dau_single_user(self, spark):
@@ -70,15 +84,16 @@ class TestCalculateDAU:
             - Each date has dau=1
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
-            ("u001", datetime(2023, 1, 1, 10, 0, 0) + timedelta(days=i), 5000)
-            for i in range(7)
+            ("u001", datetime(2023, 1, 1, 10, 0, 0) + timedelta(days=i), 5000) for i in range(7)
         ]
         df = spark.createDataFrame(data, schema=schema)
 
@@ -100,16 +115,15 @@ class TestCalculateDAU:
             - total_interactions=10
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
-        data = [
-            ("u001", datetime(2023, 1, 1, 10, i, 0), 1000)
-            for i in range(10)
-        ]
+        data = [("u001", datetime(2023, 1, 1, 10, i, 0), 1000) for i in range(10)]
         df = spark.createDataFrame(data, schema=schema)
 
         # Act
@@ -127,11 +141,13 @@ class TestCalculateDAU:
         THEN: Returns empty DataFrame with output schema
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         df = spark.createDataFrame([], schema=schema)
 
@@ -150,10 +166,12 @@ class TestCalculateDAU:
         THEN: Raises ValueError
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         df = spark.createDataFrame([("u001", 1000)], schema=schema)
 
@@ -177,10 +195,12 @@ class TestCalculateMAU:
             - Feb 2023: mau=2
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
 
         data = [
             # January: u001, u002
@@ -198,16 +218,19 @@ class TestCalculateMAU:
         result_df = calculate_mau(df)
 
         # Assert using chispa
-        expected_df = spark.createDataFrame([
-            (date(2023, 1, 1), 2),
-            (date(2023, 2, 1), 2),
-        ], ["month", "monthly_active_users"])
+        expected_df = spark.createDataFrame(
+            [
+                (date(2023, 1, 1), 2),
+                (date(2023, 2, 1), 2),
+            ],
+            ["month", "monthly_active_users"],
+        )
 
         assert_df_equality(
             result_df.select("month", "monthly_active_users"),
             expected_df,
             ignore_row_order=True,
-            ignore_nullable=True
+            ignore_nullable=True,
         )
 
     def test_calculate_mau_daily_active_user(self, spark):
@@ -218,15 +241,14 @@ class TestCalculateMAU:
             - Jan 2023: mau=1 (counted once, not 31 times)
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("timestamp", TimestampType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
 
-        data = [
-            ("u001", datetime(2023, 1, day, 10, 0, 0))
-            for day in range(1, 32)
-        ]
+        data = [("u001", datetime(2023, 1, day, 10, 0, 0)) for day in range(1, 32)]
         df = spark.createDataFrame(data, schema=schema)
 
         # Act

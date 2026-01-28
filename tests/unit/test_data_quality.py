@@ -4,11 +4,20 @@ Unit tests for data quality validation functions.
 Following TDD approach - tests written before implementation.
 Reference: docs/TDD_SPEC.md - Task 5 (Data Quality Specifications)
 """
-import pytest
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, TimestampType
-from src.utils.data_quality import validate_schema, detect_nulls, detect_outliers
+
 from datetime import datetime
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    IntegerType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
+
+from src.utils.data_quality import detect_nulls, detect_outliers, validate_schema
 
 
 class TestValidateSchema:
@@ -21,10 +30,12 @@ class TestValidateSchema:
         THEN: Returns (True, [])
         """
         # Arrange
-        expected_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("count", IntegerType(), nullable=False)
-        ])
+        expected_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("count", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("u001", 100), ("u002", 200)]
         df = spark.createDataFrame(data, schema=expected_schema)
@@ -43,17 +54,21 @@ class TestValidateSchema:
         THEN: Returns (False, ["Missing column: 'app_version'"])
         """
         # Arrange
-        expected_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("count", IntegerType(), nullable=False),
-            StructField("app_version", StringType(), nullable=False)
-        ])
+        expected_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("count", IntegerType(), nullable=False),
+                StructField("app_version", StringType(), nullable=False),
+            ]
+        )
 
         # DataFrame with only user_id and count (missing app_version)
-        actual_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("count", IntegerType(), nullable=False)
-        ])
+        actual_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("count", IntegerType(), nullable=False),
+            ]
+        )
 
         data = [("u001", 100), ("u002", 200)]
         df = spark.createDataFrame(data, schema=actual_schema)
@@ -73,16 +88,20 @@ class TestValidateSchema:
         THEN: Returns (False, ["Column 'duration_ms' has type IntegerType but expected LongType"])
         """
         # Arrange
-        expected_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        expected_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         # DataFrame with duration_ms as IntegerType (wrong!)
-        actual_schema = StructType([
-            StructField("user_id", StringType(), nullable=False),
-            StructField("duration_ms", IntegerType(), nullable=False)  # Wrong type
-        ])
+        actual_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("duration_ms", IntegerType(), nullable=False),  # Wrong type
+            ]
+        )
 
         data = [("u001", 5000), ("u002", 3000)]
         df = spark.createDataFrame(data, schema=actual_schema)
@@ -108,16 +127,18 @@ class TestDetectNulls:
         THEN: Returns empty DataFrame
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=True),
-            StructField("timestamp", TimestampType(), nullable=True),
-            StructField("count", IntegerType(), nullable=True)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=True),
+                StructField("timestamp", TimestampType(), nullable=True),
+                StructField("count", IntegerType(), nullable=True),
+            ]
+        )
 
         data = [
             ("u001", datetime(2023, 1, 1, 10, 0, 0), 100),
             ("u002", datetime(2023, 1, 2, 11, 0, 0), 200),
-            ("u003", datetime(2023, 1, 3, 12, 0, 0), 300)
+            ("u003", datetime(2023, 1, 3, 12, 0, 0), 300),
         ]
         df = spark.createDataFrame(data, schema=schema)
 
@@ -142,16 +163,18 @@ class TestDetectNulls:
             - Row 2: null_columns = ["timestamp"]
         """
         # Arrange
-        schema = StructType([
-            StructField("user_id", StringType(), nullable=True),
-            StructField("timestamp", TimestampType(), nullable=True),
-            StructField("count", IntegerType(), nullable=True)
-        ])
+        schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=True),
+                StructField("timestamp", TimestampType(), nullable=True),
+                StructField("count", IntegerType(), nullable=True),
+            ]
+        )
 
         data = [
-            (None, datetime(2023, 1, 1, 10, 0, 0), 100),          # NULL user_id
-            ("u001", None, 200),                                   # NULL timestamp
-            ("u002", datetime(2023, 1, 2, 11, 0, 0), 300)         # No NULLs
+            (None, datetime(2023, 1, 1, 10, 0, 0), 100),  # NULL user_id
+            ("u001", None, 200),  # NULL timestamp
+            ("u002", datetime(2023, 1, 2, 11, 0, 0), 300),  # No NULLs
         ]
         df = spark.createDataFrame(data, schema=schema)
 
@@ -173,7 +196,9 @@ class TestDetectNulls:
 
         timestamp_null_rows = result_df.filter(F.col("timestamp").isNull()).collect()
         assert len(timestamp_null_rows) == 1, "Expected 1 row with NULL timestamp"
-        assert "timestamp" in timestamp_null_rows[0]["null_columns"], "Expected 'timestamp' in null_columns"
+        assert "timestamp" in timestamp_null_rows[0]["null_columns"], (
+            "Expected 'timestamp' in null_columns"
+        )
 
 
 class TestDetectOutliers:
@@ -194,10 +219,12 @@ class TestDetectOutliers:
             - outlier_value: [-100, 200]
         """
         # Arrange
-        schema = StructType([
-            StructField("id", IntegerType(), nullable=False),
-            StructField("value", IntegerType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("id", IntegerType(), nullable=False),
+                StructField("value", IntegerType(), nullable=False),
+            ]
+        )
 
         # Create 100 normal values (1-100) plus 2 outliers (-100, 200)
         normal_data = [(i, i) for i in range(1, 101)]
@@ -238,16 +265,18 @@ class TestDetectOutliers:
             - outlier_reason = "above_max"
         """
         # Arrange
-        schema = StructType([
-            StructField("id", IntegerType(), nullable=False),
-            StructField("duration_ms", LongType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("id", IntegerType(), nullable=False),
+                StructField("duration_ms", LongType(), nullable=False),
+            ]
+        )
 
         data = [
             (1, 100),
             (2, 200),
             (3, 1000),
-            (4, 29000000)  # > 8 hours (outlier)
+            (4, 29000000),  # > 8 hours (outlier)
         ]
         df = spark.createDataFrame(data, schema=schema)
 
@@ -255,10 +284,7 @@ class TestDetectOutliers:
 
         # Act
         result_df = detect_outliers(
-            df,
-            column="duration_ms",
-            method="threshold",
-            threshold_max=threshold_max
+            df, column="duration_ms", method="threshold", threshold_max=threshold_max
         )
 
         # Assert

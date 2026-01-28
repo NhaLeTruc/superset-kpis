@@ -3,13 +3,12 @@ Unit tests for anomaly detection transforms.
 
 Tests detect_anomalies_statistical() function from performance transforms.
 """
-import pytest
+
+from datetime import date
+
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType, LongType,
-    TimestampType, DateType, DoubleType
-)
-from datetime import datetime, date
+from pyspark.sql.types import DateType, DoubleType, StringType, StructField, StructType
+
 from src.transforms.performance import detect_anomalies_statistical
 
 
@@ -28,32 +27,29 @@ class TestDetectAnomaliesStatistical:
             - anomaly_type = "high"
         """
         # Arrange
-        schema = StructType([
-            StructField("date", DateType(), nullable=False),
-            StructField("avg_duration_ms", DoubleType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("date", DateType(), nullable=False),
+                StructField("avg_duration_ms", DoubleType(), nullable=False),
+            ]
+        )
 
         # 28 normal days: values between 900-1100
         import random
+
         random.seed(42)
         normal_data = [
-            (date(2023, 1, day), 1000.0 + random.randint(-100, 100))
-            for day in range(1, 29)
+            (date(2023, 1, day), 1000.0 + random.randint(-100, 100)) for day in range(1, 29)
         ]
 
         # 2 anomaly days
-        outlier_data = [
-            (date(2023, 1, 29), 5000.0),
-            (date(2023, 1, 30), 6000.0)
-        ]
+        outlier_data = [(date(2023, 1, 29), 5000.0), (date(2023, 1, 30), 6000.0)]
 
         df = spark.createDataFrame(normal_data + outlier_data, schema=schema)
 
         # Act
         result_df = detect_anomalies_statistical(
-            df,
-            value_column="avg_duration_ms",
-            z_threshold=3.0
+            df, value_column="avg_duration_ms", z_threshold=3.0
         )
 
         # Assert - function returns only anomalies
@@ -85,13 +81,16 @@ class TestDetectAnomaliesStatistical:
             - No anomalies for v2.0.0
         """
         # Arrange
-        schema = StructType([
-            StructField("app_version", StringType(), nullable=False),
-            StructField("date", DateType(), nullable=False),
-            StructField("avg_duration_ms", DoubleType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("app_version", StringType(), nullable=False),
+                StructField("date", DateType(), nullable=False),
+                StructField("avg_duration_ms", DoubleType(), nullable=False),
+            ]
+        )
 
         import random
+
         random.seed(42)
 
         # v1.0.0 - 28 normal + 2 outliers
@@ -99,10 +98,7 @@ class TestDetectAnomaliesStatistical:
             ("1.0.0", date(2023, 1, day), 1000.0 + random.randint(-100, 100))
             for day in range(1, 29)
         ]
-        v1_outliers = [
-            ("1.0.0", date(2023, 1, 29), 5000.0),
-            ("1.0.0", date(2023, 1, 30), 6000.0)
-        ]
+        v1_outliers = [("1.0.0", date(2023, 1, 29), 5000.0), ("1.0.0", date(2023, 1, 30), 6000.0)]
 
         # v2.0.0 - 30 normal values, no outliers
         v2_normal = [
@@ -114,10 +110,7 @@ class TestDetectAnomaliesStatistical:
 
         # Act
         result_df = detect_anomalies_statistical(
-            df,
-            value_column="avg_duration_ms",
-            group_by_columns=["app_version"],
-            z_threshold=3.0
+            df, value_column="avg_duration_ms", group_by_columns=["app_version"], z_threshold=3.0
         )
 
         # Assert - function returns only anomalies
@@ -145,10 +138,12 @@ class TestDetectAnomaliesStatistical:
         THEN: Returns 0 anomalies
         """
         # Arrange
-        schema = StructType([
-            StructField("date", DateType(), nullable=False),
-            StructField("avg_duration_ms", DoubleType(), nullable=False)
-        ])
+        schema = StructType(
+            [
+                StructField("date", DateType(), nullable=False),
+                StructField("avg_duration_ms", DoubleType(), nullable=False),
+            ]
+        )
 
         # Create data with small variance (no anomalies)
         data = [
@@ -159,9 +154,7 @@ class TestDetectAnomaliesStatistical:
 
         # Act
         result_df = detect_anomalies_statistical(
-            df,
-            value_column="avg_duration_ms",
-            z_threshold=3.0
+            df, value_column="avg_duration_ms", z_threshold=3.0
         )
 
         # Assert - function returns only anomalies, so empty = no anomalies

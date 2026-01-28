@@ -3,11 +3,11 @@ PostgreSQL Connection Management
 
 Handles connection configuration, connection string creation, and validation.
 """
+
 import os
-from typing import Tuple, Dict
 
 
-def get_postgres_connection_props() -> Tuple[str, Dict[str, str]]:
+def get_postgres_connection_props() -> tuple[str, dict[str, str]]:
     """
     Get PostgreSQL JDBC connection properties from environment variables.
 
@@ -46,7 +46,7 @@ def get_postgres_connection_props() -> Tuple[str, Dict[str, str]]:
         "user": user,
         "password": password,
         "driver": "org.postgresql.Driver",
-        "stringtype": "unspecified"  # Helps with VARCHAR compatibility
+        "stringtype": "unspecified",  # Helps with VARCHAR compatibility
     }
 
     return jdbc_url, properties
@@ -103,5 +103,5 @@ def validate_database_config() -> bool:
         print(f"   User: {properties['user']}")
         return True
     except Exception as e:
-        print(f"❌ Database configuration is invalid: {str(e)}")
+        print(f"❌ Database configuration is invalid: {e!s}")
         raise

@@ -12,8 +12,8 @@ For a note-taking app, active user metrics are critical KPIs. Here are the most 
 
 **Formula:**
 ```
-DAU = COUNT(DISTINCT user_id) 
-WHERE DATE(event_timestamp) = target_date 
+DAU = COUNT(DISTINCT user_id)
+WHERE DATE(event_timestamp) = target_date
 AND event_type IN ('app_open', 'web_session_start', 'api_access')
 ```
 
@@ -34,8 +34,8 @@ AND event_type IN ('app_open', 'web_session_start', 'api_access')
 
 **Formula:**
 ```
-DAU = COUNT(DISTINCT user_id) 
-WHERE DATE(event_timestamp) = target_date 
+DAU = COUNT(DISTINCT user_id)
+WHERE DATE(event_timestamp) = target_date
 AND event_type IN ('note_created', 'note_edited', 'note_viewed', 'note_shared')
 AND duration_seconds > 0  -- exclude zero interactions
 ```
@@ -57,8 +57,8 @@ AND duration_seconds > 0  -- exclude zero interactions
 
 **Formula:**
 ```
-DAU = COUNT(DISTINCT user_id) 
-WHERE DATE(session_start_date) = target_date 
+DAU = COUNT(DISTINCT user_id)
+WHERE DATE(session_start_date) = target_date
 AND session_duration_seconds >= 30
 AND NOT is_bot
 ```
@@ -82,8 +82,8 @@ AND NOT is_bot
 
 **Formula:**
 ```
-MAU = COUNT(DISTINCT user_id) 
-WHERE YEAR(event_timestamp) = target_year 
+MAU = COUNT(DISTINCT user_id)
+WHERE YEAR(event_timestamp) = target_year
 AND MONTH(event_timestamp) = target_month
 AND event_type IN ('app_open', 'api_access', 'web_session_start')
 ```
@@ -105,7 +105,7 @@ AND event_type IN ('app_open', 'api_access', 'web_session_start')
 
 **Formula:**
 ```
-MAU = COUNT(DISTINCT user_id) 
+MAU = COUNT(DISTINCT user_id)
 WHERE event_timestamp >= (report_date - INTERVAL '30 days')
 AND event_timestamp < report_date
 AND event_type IN ('note_created', 'note_edited', 'note_viewed', 'api_access')
@@ -129,18 +129,18 @@ AND event_type IN ('note_created', 'note_edited', 'note_viewed', 'api_access')
 
 **Formula:**
 ```
-MAU = COUNT(DISTINCT user_id) 
+MAU = COUNT(DISTINCT user_id)
 WHERE (
-  SELECT COUNT(DISTINCT event_id) 
-  FROM events 
-  WHERE user_id = u.id 
+  SELECT COUNT(DISTINCT event_id)
+  FROM events
+  WHERE user_id = u.id
   AND event_type IN ('note_created', 'note_edited', 'note_shared')
   AND timestamp >= (report_date - INTERVAL '30 days')
 ) >= 3
 AND (
   SELECT COUNT(DISTINCT DATE(timestamp))
-  FROM events 
-  WHERE user_id = u.id 
+  FROM events
+  WHERE user_id = u.id
   AND timestamp >= (report_date - INTERVAL '30 days')
 ) >= 2
 ```

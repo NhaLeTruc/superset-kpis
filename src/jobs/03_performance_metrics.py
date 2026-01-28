@@ -21,28 +21,35 @@ Usage (direct spark-submit):
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'
 """
+
 import argparse
 import sys
 from datetime import datetime
-from typing import Dict
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.config.constants import (
+    DEFAULT_PERCENTILES,
+    TABLE_DEVICE_CORRELATION,
+    TABLE_DEVICE_PERFORMANCE,
+    TABLE_PERFORMANCE_ANOMALIES,
+    TABLE_PERFORMANCE_BY_VERSION,
+    Z_SCORE_ANOMALY_THRESHOLD,
+)
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
-    COL_TIMESTAMP, COL_DURATION_MS, COL_APP_VERSION,
-    COL_DEVICE_TYPE, COL_USER_ID, COL_METRIC_DATE,
-)
-from src.config.constants import (
-    DEFAULT_PERCENTILES, Z_SCORE_ANOMALY_THRESHOLD,
-    TABLE_PERFORMANCE_BY_VERSION, TABLE_DEVICE_PERFORMANCE,
-    TABLE_DEVICE_CORRELATION, TABLE_PERFORMANCE_ANOMALIES,
+    COL_APP_VERSION,
+    COL_DEVICE_TYPE,
+    COL_DURATION_MS,
+    COL_METRIC_DATE,
+    COL_TIMESTAMP,
+    COL_USER_ID,
 )
 from src.transforms.performance import (
-    calculate_percentiles,
     calculate_device_correlation,
-    detect_anomalies_statistical
+    calculate_percentiles,
+    detect_anomalies_statistical,
 )
 
 
@@ -50,23 +57,21 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
     """Performance Metrics Analytics Job."""
 
     def __init__(self):
-        super().__init__(
-            job_name="Performance Metrics",
-            job_type="analytics"
-        )
+        super().__init__(job_name="Performance Metrics", job_type="analytics")
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
         parser = argparse.ArgumentParser(description="GoodNote Performance Metrics")
-        parser.add_argument("--enriched-path", required=True,
-                          help="Path to enriched interactions Parquet")
-        parser.add_argument("--write-to-db", action="store_true",
-                          help="Write results to PostgreSQL")
-        parser.add_argument("--output-path",
-                          help="Optional: Write results to Parquet")
+        parser.add_argument(
+            "--enriched-path", required=True, help="Path to enriched interactions Parquet"
+        )
+        parser.add_argument(
+            "--write-to-db", action="store_true", help="Write results to PostgreSQL"
+        )
+        parser.add_argument("--output-path", help="Optional: Write results to Parquet")
         return parser
 
-    def compute_metrics(self) -> Dict[str, DataFrame]:
+    def compute_metrics(self) -> dict[str, DataFrame]:
         """
         Compute all performance metrics.
 
@@ -87,15 +92,16 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             df=enriched_df,
             value_column=COL_DURATION_MS,
             group_by_columns=[COL_APP_VERSION, COL_METRIC_DATE],
-            percentiles=DEFAULT_PERCENTILES
+            percentiles=DEFAULT_PERCENTILES,
         )
 
         # Rename percentile columns to match database schema
-        version_perf_df = version_perf_df \
-            .withColumnRenamed("p50", "p50_duration_ms") \
-            .withColumnRenamed("p95", "p95_duration_ms") \
-            .withColumnRenamed("p99", "p99_duration_ms") \
+        version_perf_df = (
+            version_perf_df.withColumnRenamed("p50", "p50_duration_ms")
+            .withColumnRenamed("p95", "p95_duration_ms")
+            .withColumnRenamed("p99", "p99_duration_ms")
             .persist()
+        )
 
         version_count = version_perf_df.count()
         print(f"   ✅ Computed percentiles for {version_count} app version-date combinations")
@@ -107,13 +113,14 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             df=enriched_df,
             value_column=COL_DURATION_MS,
             group_by_columns=[COL_DEVICE_TYPE, COL_METRIC_DATE],
-            percentiles=DEFAULT_PERCENTILES
+            percentiles=DEFAULT_PERCENTILES,
         )
 
-        device_percentiles = device_percentiles \
-            .withColumnRenamed("p50", "p50_duration_ms") \
-            .withColumnRenamed("p95", "p95_duration_ms") \
+        device_percentiles = (
+            device_percentiles.withColumnRenamed("p50", "p50_duration_ms")
+            .withColumnRenamed("p95", "p95_duration_ms")
             .withColumnRenamed("p99", "p99_duration_ms")
+        )
 
         # Add user count
         device_perf_with_users = enriched_df.groupBy(COL_DEVICE_TYPE, COL_METRIC_DATE).agg(
@@ -121,9 +128,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         )
 
         device_perf_final = device_percentiles.join(
-            device_perf_with_users,
-            [COL_DEVICE_TYPE, COL_METRIC_DATE],
-            "left"
+            device_perf_with_users, [COL_DEVICE_TYPE, COL_METRIC_DATE], "left"
         ).persist()
 
         device_count = device_perf_final.count()
@@ -134,7 +139,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print("\n📊 Calculating Device-Performance Correlation (ANOVA)...")
         device_correlation_df = calculate_device_correlation(
             interactions_df=enriched_df,
-            metadata_df=enriched_df.select(COL_USER_ID, COL_DEVICE_TYPE).distinct()
+            metadata_df=enriched_df.select(COL_USER_ID, COL_DEVICE_TYPE).distinct(),
         ).persist()
         correlation_count = device_correlation_df.count()
         print(f"   ✅ Computed correlation for {correlation_count} device types")
@@ -152,7 +157,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             df=enriched_df,
             value_column=COL_DURATION_MS,
             z_threshold=Z_SCORE_ANOMALY_THRESHOLD,
-            group_by_columns=[COL_APP_VERSION, COL_METRIC_DATE]
+            group_by_columns=[COL_APP_VERSION, COL_METRIC_DATE],
         )
 
         # Rename duration_ms to metric_value for database schema
@@ -162,15 +167,15 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         anomalies_df = anomalies_df.withColumn(
             "severity",
             F.when(F.abs(F.col("z_score")) >= 4.0, "critical")
-             .when(F.abs(F.col("z_score")) >= 3.5, "high")
-             .when(F.abs(F.col("z_score")) >= 3.0, "medium")
-             .otherwise("low")
+            .when(F.abs(F.col("z_score")) >= 3.5, "high")
+            .when(F.abs(F.col("z_score")) >= 3.0, "medium")
+            .otherwise("low"),
         )
 
         # Add detection timestamp and description
-        anomalies_df = anomalies_df \
-            .withColumn("detected_at", F.lit(datetime.now())) \
-            .withColumn("metric_name", F.lit("duration_ms")) \
+        anomalies_df = (
+            anomalies_df.withColumn("detected_at", F.lit(datetime.now()))
+            .withColumn("metric_name", F.lit("duration_ms"))
             .withColumn(
                 "description",
                 F.concat(
@@ -184,9 +189,10 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
                     F.round(F.abs("z_score"), 2).cast("string"),
                     F.lit(" std deviations, "),
                     F.col("anomaly_type"),
-                    F.lit(")")
-                )
+                    F.lit(")"),
+                ),
             )
+        )
 
         # Cache and count once
         anomalies_df = anomalies_df.persist()
@@ -206,7 +212,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         return metrics
 
-    def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
         """Print summary of computed metrics."""
         print("\n" + "=" * 60)
         print("📊 Performance Metrics Summary")
@@ -214,13 +220,13 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Version Performance Summary
         version_df = metrics["performance_by_version"]
-        print(f"\nPerformance by Version:")
+        print("\nPerformance by Version:")
         print(f"  Total Combinations: {version_df.count():,}")
 
         version_summary = version_df.agg(
             F.avg("p50_duration_ms").alias("avg_p50"),
             F.avg("p95_duration_ms").alias("avg_p95"),
-            F.avg("p99_duration_ms").alias("avg_p99")
+            F.avg("p99_duration_ms").alias("avg_p99"),
         ).collect()[0]
 
         print(f"  Average P50: {version_summary['avg_p50']:,.0f}ms")
@@ -229,12 +235,14 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Device Performance Summary
         device_df = metrics["device_performance"]
-        print(f"\nDevice Performance:")
+        print("\nDevice Performance:")
         print(f"  Total Combinations: {device_df.count():,}")
 
-        device_summary = device_df.groupBy("device_type").agg(
-            F.avg("avg_duration_ms").alias("avg_duration")
-        ).orderBy(F.desc("avg_duration"))
+        device_summary = (
+            device_df.groupBy("device_type")
+            .agg(F.avg("avg_duration_ms").alias("avg_duration"))
+            .orderBy(F.desc("avg_duration"))
+        )
 
         print("  Average Duration by Device:")
         for row in device_summary.collect():
@@ -242,7 +250,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Device Correlation Summary (ANOVA)
         correlation_df = metrics["device_correlation"]
-        print(f"\nDevice-Performance Correlation (ANOVA):")
+        print("\nDevice-Performance Correlation (ANOVA):")
         anova_row = correlation_df.select("f_statistic", "eta_squared").first()
         if anova_row and anova_row["f_statistic"] is not None:
             f_stat = anova_row["f_statistic"]
@@ -263,7 +271,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         # Anomalies Summary
         anomalies_df = metrics["performance_anomalies"]
         anomaly_count = anomalies_df.count()
-        print(f"\nPerformance Anomalies:")
+        print("\nPerformance Anomalies:")
         print(f"  Total Detected: {anomaly_count}")
 
         if anomaly_count > 0:
@@ -274,7 +282,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         print("=" * 60)
 
-    def get_table_mapping(self) -> Dict[str, str]:
+    def get_table_mapping(self) -> dict[str, str]:
         """Get database table mapping with special mode for anomalies."""
         return {
             "performance_by_version": TABLE_PERFORMANCE_BY_VERSION,
