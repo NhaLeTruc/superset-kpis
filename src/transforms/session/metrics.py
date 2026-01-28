@@ -18,8 +18,11 @@ from pyspark.sql.types import BooleanType, DoubleType, LongType
 from src.schemas.columns import (
     COL_ACTION_COUNT,
     COL_BOUNCE_RATE,
+    COL_COUNTRY,
+    COL_DEVICE_TYPE,
     COL_DURATION_MS,
     COL_IS_BOUNCE,
+    COL_METRIC_DATE,
     COL_SESSION_DURATION_MS,
     COL_SESSION_ID,
     COL_TIMESTAMP,
@@ -145,6 +148,80 @@ def calculate_session_metrics(
 
     # Return all columns (preserves extra columns from input DataFrame)
     return result_df
+
+
+def calculate_session_frequency(
+    session_metrics_df: DataFrame,
+    group_by_columns: list[str] | None = None,
+) -> DataFrame:
+    """
+    Calculate user-level session frequency metrics.
+
+    Measures how often users create sessions, which is a key engagement indicator.
+
+    Args:
+        session_metrics_df: DataFrame with session metrics (must include user_id, metric_date)
+        group_by_columns: Optional list of columns to preserve (e.g., device_type, country)
+
+    Returns:
+        DataFrame with session frequency metrics per user
+
+    Schema:
+        - user_id: String
+        - total_sessions: Long (total number of sessions for user)
+        - active_days: Long (number of unique days with sessions)
+        - avg_sessions_per_day: Double (total_sessions / active_days)
+        - first_session_date: Date (date of first session)
+        - last_session_date: Date (date of most recent session)
+        - <group_by_columns>: Original types (if specified)
+
+    Example:
+        >>> freq_df = calculate_session_frequency(session_metrics_df)
+        >>> freq_df.show()
+        +--------+--------------+-----------+--------------------+
+        | user_id|total_sessions|active_days|avg_sessions_per_day|
+        +--------+--------------+-----------+--------------------+
+        |user_001|            15|          7|                2.14|
+        |user_002|             3|          3|                1.00|
+        +--------+--------------+-----------+--------------------+
+    """
+    # Validate required columns
+    required_cols = [COL_USER_ID, COL_METRIC_DATE]
+    missing_cols = [col for col in required_cols if col not in session_metrics_df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+
+    # Build aggregation expressions
+    agg_exprs = [
+        F.count("*").alias("total_sessions"),
+        F.countDistinct(COL_METRIC_DATE).alias("active_days"),
+        F.min(COL_METRIC_DATE).alias("first_session_date"),
+        F.max(COL_METRIC_DATE).alias("last_session_date"),
+    ]
+
+    # Determine group columns
+    group_cols = [COL_USER_ID]
+    if group_by_columns:
+        # Validate group columns exist
+        missing_group = [col for col in group_by_columns if col not in session_metrics_df.columns]
+        if missing_group:
+            raise ValueError(f"Missing group_by columns: {missing_group}")
+        # Add first() for preserved columns
+        for col_name in group_by_columns:
+            agg_exprs.append(F.first(col_name).alias(col_name))
+
+    # Calculate frequency metrics per user
+    freq_df = session_metrics_df.groupBy(*group_cols).agg(*agg_exprs)
+
+    # Calculate avg_sessions_per_day
+    freq_df = freq_df.withColumn(
+        "avg_sessions_per_day",
+        F.when(F.col("active_days") > 0, F.col("total_sessions") / F.col("active_days")).otherwise(
+            0.0
+        ),
+    )
+
+    return freq_df
 
 
 def calculate_bounce_rate(
