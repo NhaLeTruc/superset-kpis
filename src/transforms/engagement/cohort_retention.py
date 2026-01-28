@@ -27,8 +27,8 @@ def calculate_cohort_retention(
     Returns:
         DataFrame with [cohort_week, week_number, cohort_size, active_users, retention_rate]
     """
-    # Handle empty interactions dataframe
-    if interactions_df.count() == 0:
+    # Handle empty interactions dataframe (use head(1) to avoid full scan)
+    if interactions_df.head(1) == []:
         # Return empty dataframe with correct schema
         from pyspark.sql.types import StructType, StructField, DateType, IntegerType, LongType, DoubleType
         empty_schema = StructType([
@@ -71,9 +71,9 @@ def calculate_cohort_retention(
         (F.col("weeks_since_join") < retention_weeks)
     )
 
-    # Get cohort sizes
+    # Get cohort sizes (use countDistinct to handle potential duplicates in metadata)
     cohort_sizes = metadata_with_cohort.groupBy("cohort_week").agg(
-        F.count(COL_USER_ID).alias("cohort_size")
+        F.countDistinct(COL_USER_ID).alias("cohort_size")
     )
 
     # Count active users per cohort per week
@@ -91,40 +91,22 @@ def calculate_cohort_retention(
     )
 
     # Create complete weeks range for each cohort (including weeks with 0 active users)
-    cohorts = cohort_sizes.select("cohort_week", "cohort_size").collect()
+    # Use pure Spark approach with crossJoin for scalability (avoids driver-side collect)
+    spark = interactions_df.sparkSession
+    weeks_df = spark.range(retention_weeks).withColumnRenamed("id", "weeks_since_join")
 
-    # Generate all week combinations
-    from itertools import product
-    all_combinations = []
-    for cohort_row in cohorts:
-        for week in range(retention_weeks):
-            all_combinations.append((
-                cohort_row["cohort_week"],
-                week,
-                cohort_row["cohort_size"]
-            ))
+    # Cross join cohorts with weeks to create complete grid
+    complete_grid = cohort_sizes.crossJoin(weeks_df)
 
-    # Create complete grid DataFrame
-    if all_combinations:
-        from pyspark.sql.types import StructType, StructField, DateType, IntegerType, LongType
-        grid_schema = StructType([
-            StructField("cohort_week", DateType(), nullable=False),
-            StructField("weeks_since_join", IntegerType(), nullable=False),
-            StructField("cohort_size", LongType(), nullable=False)
-        ])
-        complete_grid = interactions_df.sql_ctx.createDataFrame(all_combinations, schema=grid_schema)
+    # Left join retention data with complete grid
+    result_df = complete_grid.join(
+        retention_df.select("cohort_week", "weeks_since_join", "active_users", "retention_rate"),
+        on=["cohort_week", "weeks_since_join"],
+        how="left"
+    )
 
-        # Left join retention data with complete grid
-        result_df = complete_grid.join(
-            retention_df.select("cohort_week", "weeks_since_join", "active_users", "retention_rate"),
-            on=["cohort_week", "weeks_since_join"],
-            how="left"
-        )
-
-        # Fill nulls with 0
-        result_df = result_df.fillna({"active_users": 0, "retention_rate": 0.0})
-    else:
-        result_df = retention_df
+    # Fill nulls with 0
+    result_df = result_df.fillna({"active_users": 0, "retention_rate": 0.0})
 
     # Rename weeks_since_join to week_number for test compatibility
     result_df = result_df.withColumnRenamed("weeks_since_join", "week_number")

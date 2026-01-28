@@ -13,6 +13,10 @@ def calculate_dau(interactions_df: DataFrame) -> DataFrame:
     """
     Calculate Daily Active Users (DAU).
 
+    Definition: An "active user" is any user with at least one interaction
+    (any action_type) recorded on a given day. No minimum duration or
+    interaction count is required.
+
     Args:
         interactions_df: DataFrame with [user_id, timestamp, duration_ms, ...]
 
@@ -47,6 +51,10 @@ def calculate_dau(interactions_df: DataFrame) -> DataFrame:
 def calculate_mau(interactions_df: DataFrame) -> DataFrame:
     """
     Calculate Monthly Active Users (MAU).
+
+    Definition: An "active user" is any user with at least one interaction
+    (any action_type) recorded during the calendar month. No minimum duration
+    or interaction count is required.
 
     Args:
         interactions_df: DataFrame with [user_id, timestamp, ...]

@@ -9,6 +9,10 @@ from pyspark.sql import functions as F
 from src.schemas.columns import COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS, COL_PAGE_ID
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 
+# Safety limit for collecting power users to driver memory
+# At 10M users with 1% = 100K rows, 50K is a reasonable limit
+MAX_POWER_USERS_COLLECT = 50000
+
 
 def calculate_stickiness(dau_df: DataFrame, mau_df: DataFrame) -> DataFrame:
     """
@@ -123,12 +127,16 @@ def identify_power_users(
         power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(users_to_include)
 
     # Calculate percentile rank without window function (avoids single-partition warning)
-    # Power users is a small dataset (top 1%), so collect is safe
+    # Power users is a small dataset (top 1%), so collect is usually safe
     power_users_count = power_users.count()
 
     if power_users_count <= 1:
         # Single user or empty: assign max percentile
         power_users = power_users.withColumn("percentile_rank", F.lit(100.0))
+    elif power_users_count > MAX_POWER_USERS_COLLECT:
+        # Safety limit: skip percentile_rank calculation for very large result sets
+        # to avoid overwhelming driver memory
+        power_users = power_users.withColumn("percentile_rank", F.lit(None).cast("double"))
     else:
         # Collect, sort, compute rank mathematically, then recreate DataFrame
         spark = power_users.sparkSession

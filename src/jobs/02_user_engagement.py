@@ -79,41 +79,37 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         metrics = {}
 
+        # Extract metadata_df once and cache it (used by power_users and cohort_retention)
+        metadata_df = enriched_df.select(
+            COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE
+        ).distinct().persist()
+
         # 1. Daily Active Users (DAU)
         print("\n📊 Calculating Daily Active Users (DAU)...")
         dau_df = calculate_dau(enriched_df)
-        dau_count = dau_df.count()
-        print(f"   ✅ Computed DAU for {dau_count} days")
+        print("   ✅ DAU calculation complete")
         metrics["dau"] = dau_df
 
         # 2. Monthly Active Users (MAU)
         print("\n📊 Calculating Monthly Active Users (MAU)...")
         mau_df = calculate_mau(enriched_df)
-        mau_count = mau_df.count()
-        print(f"   ✅ Computed MAU for {mau_count} months")
+        print("   ✅ MAU calculation complete")
         metrics["mau"] = mau_df
 
         # 3. Stickiness Ratio (DAU/MAU)
         print("\n📊 Calculating Stickiness Ratio...")
         stickiness_df = calculate_stickiness(dau_df, mau_df)
-        stickiness_count = stickiness_df.count()
-        avg_stickiness = stickiness_df.agg({"stickiness_ratio": "avg"}).collect()[0][0]
-        print(f"   ✅ Computed stickiness for {stickiness_count} months")
-        print(f"   📈 Average stickiness: {avg_stickiness:.2%}")
+        print("   ✅ Stickiness calculation complete")
         metrics["stickiness"] = stickiness_df
 
         # 4. Power Users (Top 1%)
         print("\n📊 Identifying Power Users...")
-        metadata_df = enriched_df.select(
-            COL_USER_ID, COL_REGISTRATION_DATE, COL_COUNTRY, COL_DEVICE_TYPE, COL_SUBSCRIPTION_TYPE
-        ).distinct()
         power_users_df = identify_power_users(
             enriched_df,
             metadata_df,
             percentile=HOT_KEY_THRESHOLD_PERCENTILE
         )
-        power_user_count = power_users_df.count()
-        print(f"   ✅ Identified {power_user_count} power users (top 1%)")
+        print("   ✅ Power users identification complete")
         metrics["power_users"] = power_users_df
 
         # 5. Cohort Retention (Weekly cohorts, 6 months)
@@ -124,11 +120,11 @@ class UserEngagementJob(BaseAnalyticsJob):
             cohort_period="week",
             retention_weeks=26
         )
-        cohort_count = cohort_df.count()
-        print(f"   ✅ Computed retention for {cohort_count} cohort-week combinations")
+        print("   ✅ Cohort retention calculation complete")
         metrics["cohort_retention"] = cohort_df
 
-        # Unpersist enriched data
+        # Unpersist cached DataFrames
+        metadata_df.unpersist()
         enriched_df.unpersist()
 
         return metrics

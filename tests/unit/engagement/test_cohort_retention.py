@@ -26,7 +26,7 @@ class TestCalculateCohortRetention:
         metadata_data = [(f"u{i:03d}", date(2023, 1, 1)) for i in range(1, 11)]
         metadata_schema = StructType([
             StructField("user_id", StringType(), nullable=False),
-            StructField("join_date", DateType(), nullable=False)
+            StructField("registration_date", DateType(), nullable=False)
         ])
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
@@ -69,7 +69,7 @@ class TestCalculateCohortRetention:
         metadata_data = [(f"u{i:03d}", date(2023, 1, 1)) for i in range(1, 101)]
         metadata_schema = StructType([
             StructField("user_id", StringType(), nullable=False),
-            StructField("join_date", DateType(), nullable=False)
+            StructField("registration_date", DateType(), nullable=False)
         ])
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
@@ -128,7 +128,7 @@ class TestCalculateCohortRetention:
 
         metadata_schema = StructType([
             StructField("user_id", StringType(), nullable=False),
-            StructField("join_date", DateType(), nullable=False)
+            StructField("registration_date", DateType(), nullable=False)
         ])
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
@@ -178,7 +178,7 @@ class TestCalculateCohortRetention:
         metadata_data = [("u001", date(2023, 1, 1))]
         metadata_schema = StructType([
             StructField("user_id", StringType(), nullable=False),
-            StructField("join_date", DateType(), nullable=False)
+            StructField("registration_date", DateType(), nullable=False)
         ])
         metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
 
