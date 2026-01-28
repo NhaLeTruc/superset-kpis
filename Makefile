@@ -1,7 +1,12 @@
 # GoodNote Analytics Platform - Makefile
-# Simplified commands for development and testing
+# All commands run via Docker containers (no virtual environment required)
 
 .PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
+
+# Docker container names
+SPARK_DEV := goodnote-spark-dev
+SPARK_MASTER := goodnote-spark-master
+POSTGRES := goodnote-postgres
 
 # Default target - show help
 help:
@@ -12,13 +17,14 @@ help:
 	@echo "  make quickstart     - Start everything (Docker + generate data + run jobs)"
 	@echo "  make setup          - Initial setup (start Docker services only)"
 	@echo ""
-	@echo "Testing:"
-	@echo "  make test           - Run all unit tests (59+ tests)"
+	@echo "Testing (via Docker):"
+	@echo "  make test           - Run all tests"
 	@echo "  make test-unit      - Run unit tests only"
 	@echo "  make test-integration - Run integration tests"
 	@echo "  make test-coverage  - Run tests with coverage report"
+	@echo "  make test-file F=<file> - Run specific test file"
 	@echo ""
-	@echo "Code Quality:"
+	@echo "Code Quality (via Docker):"
 	@echo "  make lint           - Run Ruff linter"
 	@echo "  make format         - Format code with Ruff"
 	@echo "  make fix            - Auto-fix all code issues"
@@ -26,7 +32,7 @@ help:
 	@echo "  make typecheck      - Run mypy type checker"
 	@echo "  make security       - Run Bandit security scan"
 	@echo "  make quality        - Run all quality checks"
-	@echo "  make install-hooks  - Install pre-commit hooks"
+	@echo "  make pre-commit     - Run pre-commit checks (via Docker)"
 	@echo ""
 	@echo "Data & Jobs:"
 	@echo "  make generate-data  - Generate sample data (medium size)"
@@ -49,8 +55,8 @@ help:
 	@echo "  make db-tables      - List all database tables"
 	@echo ""
 	@echo "Development:"
-	@echo "  make shell          - Open Spark master shell"
-	@echo "  make jupyter        - Show Jupyter notebook URL"
+	@echo "  make shell          - Open Spark dev container shell"
+	@echo "  make shell-master   - Open Spark master shell"
 	@echo "  make superset       - Show Superset URL"
 	@echo "  make spark-ui       - Show Spark UI URLs"
 	@echo ""
@@ -65,13 +71,12 @@ help:
 
 quickstart: setup generate-data run-jobs
 	@echo ""
-	@echo "✅ Quickstart Complete!"
+	@echo "Quickstart Complete!"
 	@echo ""
 	@echo "Access Points:"
 	@echo "  - Spark Master UI:  http://localhost:8080"
 	@echo "  - Spark App UI:     http://localhost:4040"
 	@echo "  - Apache Superset:  http://localhost:8088 (admin/admin)"
-	@echo "  - Jupyter Notebook: http://localhost:8888"
 	@echo ""
 	@echo "Next Steps:"
 	@echo "  1. Run 'make test' to verify all tests pass"
@@ -80,9 +85,9 @@ quickstart: setup generate-data run-jobs
 	@echo ""
 
 setup: up
-	@echo "⏳ Waiting for services to be ready (30 seconds)..."
+	@echo "Waiting for services to be ready (30 seconds)..."
 	@sleep 30
-	@echo "✅ Setup complete! All services are running."
+	@echo "Setup complete! All services are running."
 	@make status
 
 # ============================================================================
@@ -90,136 +95,188 @@ setup: up
 # ============================================================================
 
 up:
-	@echo "🚀 Starting Docker services..."
+	@echo "Starting Docker services..."
 	docker compose up -d
-	@echo "✅ Docker services started"
+	@echo "Docker services started"
 
 down:
-	@echo "🛑 Stopping Docker services..."
+	@echo "Stopping Docker services..."
 	docker compose down -v --remove-orphans
-	@echo "✅ Docker services stopped"
+	@echo "Docker services stopped"
 
 restart: down up
-	@echo "✅ Services restarted"
+	@echo "Services restarted"
 
 status:
-	@echo "📊 Service Status:"
+	@echo "Service Status:"
 	@docker compose ps
 
 logs:
-	@echo "📋 Service Logs (Ctrl+C to exit):"
+	@echo "Service Logs (Ctrl+C to exit):"
 	docker compose logs -f
 
 logs-spark:
-	@echo "📋 Spark Master Logs:"
-	docker compose logs -f goodnote-spark-master
+	@echo "Spark Master Logs:"
+	docker compose logs -f spark-master
 
 logs-superset:
-	@echo "📋 Superset Logs:"
-	docker compose logs -f goodnote-superset
+	@echo "Superset Logs:"
+	docker compose logs -f superset
+
+logs-dev:
+	@echo "Spark Dev Container Logs:"
+	docker compose logs -f spark-dev
+
+logs-postgres:
+	@echo "PostgreSQL Logs:"
+	docker compose logs -f postgres
+
+# Build/rebuild Docker images
+build:
+	@echo "Building Docker images..."
+	docker compose build
+	@echo "Build complete"
+
+build-no-cache:
+	@echo "Building Docker images (no cache)..."
+	docker compose build --no-cache
+	@echo "Build complete"
 
 # ============================================================================
-# Testing
+# Testing (via Docker)
 # ============================================================================
 
 test: test-unit test-integration
-	@echo "✅ All tests completed"
+	@echo "All tests completed"
 
 test-unit:
-	@echo "🧪 Running unit tests (59+ tests)..."
-	docker exec goodnote-spark-dev pytest tests/unit -v --tb=short
-	@echo "✅ Unit tests completed"
+	@echo "Running unit tests..."
+	docker exec $(SPARK_DEV) pytest tests/unit -v --tb=short
+	@echo "Unit tests completed"
 
 test-integration:
-	@echo "🧪 Running integration tests..."
-	docker exec goodnote-spark-dev pytest tests/integration -v --tb=short
-	@echo "✅ Integration tests completed"
+	@echo "Running integration tests..."
+	docker exec $(SPARK_DEV) pytest tests/integration -v --tb=short
+	@echo "Integration tests completed"
 
 test-coverage:
-	@echo "🧪 Running tests with coverage report..."
-	docker exec goodnote-spark-dev pytest tests/unit \
+	@echo "Running tests with coverage report..."
+	docker exec $(SPARK_DEV) pytest tests/unit \
 		--cov=src \
 		--cov-report=html \
 		--cov-report=term \
 		-v
-	@echo "✅ Coverage report generated at htmlcov/index.html"
+	@echo "Coverage report generated at htmlcov/index.html"
 
-test-specific:
-	@echo "🧪 Usage: make test-specific TEST=tests/unit/test_join_transforms.py::test_identify_hot_keys_basic"
-	@echo "Example: docker exec goodnote-spark-dev pytest $(TEST) -v"
+test-file:
+	@if [ -z "$(F)" ]; then \
+		echo "Usage: make test-file F=tests/unit/test_file.py"; \
+		echo "Example: make test-file F=tests/unit/test_join_transforms.py"; \
+		exit 1; \
+	fi
+	@echo "Running tests in $(F)..."
+	docker exec $(SPARK_DEV) pytest $(F) -v --tb=short
+
+test-function:
+	@if [ -z "$(T)" ]; then \
+		echo "Usage: make test-function T=tests/unit/test_file.py::test_function_name"; \
+		exit 1; \
+	fi
+	@echo "Running test $(T)..."
+	docker exec $(SPARK_DEV) pytest $(T) -v --tb=long
 
 # ============================================================================
 # Data Generation & Jobs
 # ============================================================================
 
 generate-data:
-	@echo "📊 Generating sample data (medium size)..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
+	@echo "Generating sample data (medium size)..."
+	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--medium \
 		--seed 42
-	@echo "✅ Sample data generated"
+	@echo "Sample data generated"
 
 generate-data-small:
-	@echo "📊 Generating small sample data (for quick testing)..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
+	@echo "Generating small sample data (for quick testing)..."
+	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--small \
 		--seed 42
-	@echo "✅ Small sample data generated"
+	@echo "Small sample data generated"
 
 generate-data-large:
-	@echo "📊 Generating large sample data (WARNING: may take several minutes)..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/scripts/generate_sample_data.py \
+	@echo "Generating large sample data (WARNING: may take several minutes)..."
+	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
 		--large \
 		--seed 42
-	@echo "✅ Large sample data generated"
+	@echo "Large sample data generated"
 
 run-jobs:
-	@echo "⚡ Running all Spark ETL jobs..."
-	docker exec goodnote-spark-master bash /opt/spark-apps/src/jobs/run_all_jobs.sh
-	@echo "✅ All jobs completed"
+	@echo "Running all Spark ETL jobs..."
+	docker exec $(SPARK_MASTER) bash /opt/spark-apps/src/jobs/run_all_jobs.sh
+	@echo "All jobs completed"
 
 run-job-1:
-	@echo "⚡ Running Job 1: Data Processing..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/01_data_processing.py
-	@echo "✅ Data Processing job completed"
+	@echo "Running Job 1: Data Processing..."
+	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
+        /opt/spark-apps/src/jobs/01_data_processing.py \
+        --interactions-path /app/data/raw/user_interactions.csv \
+        --metadata-path /app/data/raw/user_metadata.csv \
+        --output-path /app/data/processed/enriched_interactions.parquet'
+	@echo "Data Processing job completed"
 
 run-job-2:
-	@echo "⚡ Running Job 2: User Engagement..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/02_user_engagement.py
-	@echo "✅ User Engagement job completed"
+	@echo "Running Job 2: User Engagement..."
+	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
+        /opt/spark-apps/src/jobs/02_user_engagement.py \
+        --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --write-to-db'
+	@echo "User Engagement job completed"
 
 run-job-3:
-	@echo "⚡ Running Job 3: Performance Metrics..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/03_performance_metrics.py
-	@echo "✅ Performance Metrics job completed"
+	@echo "Running Job 3: Performance Metrics..."
+	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
+        /opt/spark-apps/src/jobs/03_performance_metrics.py \
+        --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --write-to-db'
+	@echo "Performance Metrics job completed"
 
 run-job-4:
-	@echo "⚡ Running Job 4: Session Analysis..."
-	docker exec goodnote-spark-master python3 /opt/spark-apps/src/jobs/04_session_analysis.py
-	@echo "✅ Session Analysis job completed"
+	@echo "Running Job 4: Session Analysis..."
+	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
+        --master "local[*]" \
+        /opt/spark-apps/src/jobs/04_session_analysis.py \
+        --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --write-to-db'
+	@echo "Session Analysis job completed"
 
 # ============================================================================
 # Database Management
 # ============================================================================
 
+# Database credentials (from docker-compose environment)
+DB_USER := analytics_user
+DB_NAME := analytics
+
 db-init:
-	@echo "🗄️  Initializing PostgreSQL database..."
-	docker exec goodnote-postgres psql -U analytics_user -d analytics -f /docker-entrypoint-initdb.d/01_schema.sql
-	docker exec goodnote-postgres psql -U analytics_user -d analytics -f /docker-entrypoint-initdb.d/02_indexes.sql
-	@echo "✅ Database initialized"
+	@echo "Initializing PostgreSQL database..."
+	docker exec $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/01_schema.sql
+	docker exec $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/02_indexes.sql
+	@echo "Database initialized"
 
 db-connect:
-	@echo "🗄️  Connecting to PostgreSQL database..."
-	@echo "Password: postgres"
-	docker exec -it goodnote-postgres psql -U postgres -d goodnote_analytics
+	@echo "Connecting to PostgreSQL database..."
+	docker exec -it $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME)
 
 db-tables:
-	@echo "🗄️  Listing all database tables..."
-	docker exec goodnote-postgres psql -U postgres -d goodnote_analytics -c "\dt"
+	@echo "Listing all database tables..."
+	docker exec $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) -c "\dt"
 
 db-table-counts:
-	@echo "🗄️  Showing row counts for all tables..."
-	docker exec goodnote-postgres psql -U postgres -d goodnote_analytics -c "\
+	@echo "Showing row counts for all tables..."
+	docker exec $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) -c "\
 		SELECT \
 			schemaname, \
 			tablename, \
@@ -227,43 +284,55 @@ db-table-counts:
 		FROM pg_stat_user_tables \
 		ORDER BY n_live_tup DESC;"
 
+db-query:
+	@if [ -z "$(Q)" ]; then \
+		echo "Usage: make db-query Q=\"SELECT * FROM table_name LIMIT 10\""; \
+		exit 1; \
+	fi
+	docker exec $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) -c "$(Q)"
+
 # ============================================================================
 # Development Tools
 # ============================================================================
 
+# Open dev container shell (recommended for development)
 shell:
-	@echo "🐚 Opening Spark master shell..."
-	docker exec -it goodnote-spark-master bash
+	@echo "Opening Spark dev container shell..."
+	docker exec -it $(SPARK_DEV) bash
 
-jupyter:
-	@echo "📓 Jupyter Notebook URL:"
-	@echo "  http://localhost:8888"
-	@echo ""
-	@echo "Opening browser..."
-	@command -v open >/dev/null 2>&1 && open http://localhost:8888 || \
-	command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8888 || \
-	echo "Please open http://localhost:8888 in your browser"
+# Open Spark master shell
+shell-master:
+	@echo "Opening Spark master shell..."
+	docker exec -it $(SPARK_MASTER) bash
+
+# Open Python REPL in dev container
+python:
+	@echo "Opening Python REPL in dev container..."
+	docker exec -it $(SPARK_DEV) python3
+
+# Open PySpark shell
+pyspark:
+	@echo "Opening PySpark shell..."
+	docker exec -it $(SPARK_MASTER) /opt/spark/bin/pyspark
 
 superset:
-	@echo "📊 Apache Superset URL:"
+	@echo "Apache Superset URL:"
 	@echo "  http://localhost:8088"
 	@echo "  Username: admin"
 	@echo "  Password: admin"
 	@echo ""
-	@echo "Opening browser..."
-	@command -v open >/dev/null 2>&1 && open http://localhost:8088 || \
-	command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8088 || \
+	@command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8088 || \
+	command -v open >/dev/null 2>&1 && open http://localhost:8088 || \
 	echo "Please open http://localhost:8088 in your browser"
 
 spark-ui:
-	@echo "⚡ Spark UI URLs:"
+	@echo "Spark UI URLs:"
 	@echo "  - Spark Master:     http://localhost:8080"
 	@echo "  - Spark App:        http://localhost:4040"
 	@echo "  - Spark History:    http://localhost:18080"
 	@echo ""
-	@echo "Opening Spark Master UI..."
-	@command -v open >/dev/null 2>&1 && open http://localhost:8080 || \
-	command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8080 || \
+	@command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8080 || \
+	command -v open >/dev/null 2>&1 && open http://localhost:8080 || \
 	echo "Please open http://localhost:8080 in your browser"
 
 # ============================================================================
@@ -271,80 +340,75 @@ spark-ui:
 # ============================================================================
 
 run-optimization-analysis:
-	@echo "🔍 Running Spark UI optimization analysis..."
-	@echo "⚠️  This will take 10-15 minutes to complete"
-	docker exec goodnote-spark-master bash /opt/spark-apps/scripts/run_optimization_analysis.sh \
+	@echo "Running Spark UI optimization analysis..."
+	@echo "Note: This will take 10-15 minutes to complete"
+	docker exec $(SPARK_MASTER) bash /opt/spark-apps/scripts/run_optimization_analysis.sh \
 		--size medium \
 		--iterations 2
-	@echo "✅ Optimization analysis complete"
-	@echo "📊 Review results in logs and Spark UI at http://localhost:4040"
+	@echo "Optimization analysis complete"
+	@echo "Review results in Spark UI at http://localhost:4040"
 
 # ============================================================================
 # Cleanup
 # ============================================================================
 
-clean: down
-	@echo "🧹 Cleaning up Docker volumes..."
-	docker compose down -v
-	@echo "✅ Cleanup complete"
-
 clean-all:
-	@echo "⚠️  WARNING: This will delete ALL data including Docker images!"
+	@echo "WARNING: This will delete ALL data including Docker images!"
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
-	@echo "🧹 Performing full cleanup..."
+	@echo "Performing full cleanup..."
 	docker compose down -v --remove-orphans
 	docker system prune -af --volumes
-	@echo "✅ Full cleanup complete"
+	@echo "Full cleanup complete"
 
 clean-data:
-	@echo "🧹 Cleaning generated data..."
-	docker exec goodnote-spark-master rm -rf /opt/spark-apps/data/raw/*
-	docker exec goodnote-spark-master rm -rf /opt/spark-apps/data/processed/*
-	@echo "✅ Data cleaned"
+	@echo "Cleaning generated data..."
+	docker exec $(SPARK_MASTER) rm -rf /opt/spark-apps/data/raw/*
+	docker exec $(SPARK_MASTER) rm -rf /opt/spark-apps/data/processed/*
+	@echo "Data cleaned"
 
 # ============================================================================
-# Code Quality
+# Code Quality (via Docker)
 # ============================================================================
 
-.PHONY: lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
+.PHONY: lint format check fix typecheck security quality pre-commit
 
 # Run Ruff linter (no fixes)
 lint:
 	@echo "Running Ruff linter..."
-	ruff check src tests scripts
+	docker exec $(SPARK_DEV) ruff check src tests scripts
 	@echo "Linting complete"
 
 # Format code with Ruff
 format:
 	@echo "Formatting code with Ruff..."
-	ruff format src tests scripts
+	docker exec $(SPARK_DEV) ruff format src tests scripts
 	@echo "Formatting complete"
 
 # Check formatting and linting without changes
 check:
 	@echo "Checking code formatting and linting..."
-	ruff format --check src tests scripts
-	ruff check src tests scripts
+	docker exec $(SPARK_DEV) ruff format --check src tests scripts
+	docker exec $(SPARK_DEV) ruff check src tests scripts
 	@echo "All checks passed"
 
 # Auto-fix all issues
 fix:
 	@echo "Auto-fixing code issues..."
-	ruff check --fix src tests scripts
-	ruff format src tests scripts
+	docker exec $(SPARK_DEV) ruff check --fix src tests scripts
+	docker exec $(SPARK_DEV) ruff format src tests scripts
 	@echo "Auto-fix complete"
 
 # Run type checking with mypy
 typecheck:
 	@echo "Running mypy type checker..."
-	mypy src --ignore-missing-imports
+	docker exec $(SPARK_DEV) mypy src --ignore-missing-imports
 	@echo "Type checking complete"
 
 # Security scan with Bandit
 security:
 	@echo "Running security scan with Bandit..."
-	bandit -r src -c pyproject.toml
+	docker exec $(SPARK_DEV) bandit -r src -c pyproject.toml
 	@echo "Security scan complete"
 
 # Full quality check (all tools)
@@ -352,122 +416,55 @@ quality: lint typecheck security
 	@echo ""
 	@echo "All quality checks passed!"
 
-# Install pre-commit hooks
+# Run pre-commit checks via Docker
+pre-commit:
+	@echo "Running pre-commit checks via Docker..."
+	docker exec $(SPARK_DEV) pre-commit run --all-files
+	@echo "Pre-commit complete"
+
+# Install pre-commit hooks (local - required for git hooks)
 install-hooks:
-	@echo "Installing pre-commit hooks..."
+	@echo "Installing pre-commit hooks locally..."
+	@echo "Note: This requires pre-commit installed locally for git hooks"
 	pip install pre-commit
 	pre-commit install
 	@echo "Pre-commit hooks installed"
-
-# Run pre-commit on all files
-pre-commit-all:
-	@echo "Running pre-commit on all files..."
-	pre-commit run --all-files
-	@echo "Pre-commit complete"
-
-# Update pre-commit hooks
-update-hooks:
-	@echo "Updating pre-commit hooks..."
-	pre-commit autoupdate
-	@echo "Hooks updated"
 
 # ============================================================================
 # TDD Compliance
 # ============================================================================
 
 check-tdd:
-	@echo "🔍 Checking TDD compliance..."
+	@echo "Checking TDD compliance..."
 	@if [ -f "./check-tdd.sh" ]; then \
 		bash ./check-tdd.sh; \
 	else \
-		echo "⚠️  check-tdd.sh not found"; \
+		echo "check-tdd.sh not found"; \
 	fi
-
-# ============================================================================
-# Documentation
-# ============================================================================
-
-docs:
-	@echo "📚 Available Documentation:"
-	@echo ""
-	@echo "Setup & Configuration:"
-	@echo "  - docs/SETUP_INSTRUCTIONS.md      - Step-by-step setup guide"
-	@echo "  - docs/ENVIRONMENT_VARIABLES.md   - Environment configuration"
-	@echo "  - docs/DOCKER_QUICKSTART.md       - Docker quick reference"
-	@echo ""
-	@echo "Implementation:"
-	@echo "  - docs/IMPLEMENTATION_TASKS.md    - Task checklist (95% complete)"
-	@echo "  - docs/TDD_SPEC.md                - Test specifications"
-	@echo "  - docs/ARCHITECTURE.md            - System architecture"
-	@echo ""
-	@echo "Dashboards & Analysis:"
-	@echo "  - superset/DASHBOARD_SETUP_GUIDE.md      - Dashboard setup"
-	@echo "  - docs/SPARK_UI_SCREENSHOT_GUIDE.md      - Optimization guide"
-	@echo "  - docs/REPORT.md                         - Technical report (1,300+ lines)"
-	@echo ""
-
-# ============================================================================
-# Validation
-# ============================================================================
-
-validate: test status
-	@echo ""
-	@echo "✅ Validation Complete"
-	@echo ""
-	@echo "System Status:"
-	@make status
-	@echo ""
-	@echo "Next Steps:"
-	@echo "  1. Review test results above"
-	@echo "  2. Check Spark UI for job metrics"
-	@echo "  3. Verify database tables: make db-table-counts"
-	@echo ""
-
-# ============================================================================
-# CI/CD Helpers
-# ============================================================================
-
-ci-test: up
-	@echo "🤖 Running CI tests..."
-	@sleep 30  # Wait for services
-	@make test-unit
-	@make generate-data-small
-	@make run-jobs
-	@echo "✅ CI tests completed"
 
 # ============================================================================
 # Development Shortcuts
 # ============================================================================
 
 dev: setup
-	@echo "🔧 Development environment ready!"
+	@echo "Development environment ready!"
 	@echo ""
 	@echo "Quick commands:"
 	@echo "  make test           - Run tests"
+	@echo "  make lint           - Run linter"
+	@echo "  make fix            - Auto-fix code issues"
 	@echo "  make generate-data  - Generate sample data"
 	@echo "  make run-jobs       - Run Spark jobs"
-	@echo "  make shell          - Open Spark shell"
+	@echo "  make shell          - Open dev container shell"
 	@echo ""
 
 # Show current project status
 project-status:
-	@echo "📊 GoodNote Analytics Platform - Project Status"
+	@echo "GoodNote Analytics Platform - Project Status"
 	@echo "=============================================="
 	@echo ""
-	@echo "Implementation: 95% Complete"
-	@echo "Last Updated: 2025-11-13"
+	@echo "Docker Services:"
+	@docker compose ps --format "table {{.Name}}\t{{.Status}}"
 	@echo ""
-	@echo "✅ Completed:"
-	@echo "  - Phase 1-8: Core implementation (100%)"
-	@echo "  - Unit Tests: 59+ tests passing"
-	@echo "  - Spark Jobs: 4/4 production jobs ready"
-	@echo "  - Database: 13 tables with indexes"
-	@echo "  - Dashboard Specs: 4 dashboards defined"
-	@echo ""
-	@echo "⚠️  Remaining Work (9-13 hours):"
-	@echo "  - Spark UI optimization analysis"
-	@echo "  - Superset dashboard UI implementation"
-	@echo "  - Integration tests"
-	@echo ""
-	@echo "Run 'make help' for all available commands"
+	@echo "Available Commands: make help"
 	@echo ""
