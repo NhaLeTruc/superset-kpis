@@ -2,7 +2,7 @@
 
 **A production-grade Apache Spark analytics platform for processing 1TB+ user interaction data.**
 
-**Status:** 95% Complete | **Stack:** Spark 3.5, PostgreSQL 15, Superset 3.0 | **Tests:** 59+ unit tests | **Optimizations:** 7 techniques implemented
+**Status:** 95% Complete | **Stack:** Spark 3.5, PostgreSQL 15, Superset 3.0 | **Tests:** 167 tests (26 test files) | **Optimizations:** 7 techniques implemented
 
 ---
 
@@ -17,7 +17,7 @@ cp .env.example .env
 make quickstart
 
 # Verify
-make test              # Run 59+ unit tests
+make test              # Run 167 tests
 make status            # Check services
 make db-tables         # View database tables
 
@@ -49,11 +49,13 @@ make help              # Show all 50+ commands
 
 ```txt
 superset-kpis/
-├── src/                    # Source code (23 functions, 1,200+ lines of jobs)
-├── tests/                  # Test suite (59+ unit tests, 5 modules)
+├── src/                    # Source code (43 functions, 4,500+ lines)
+├── tests/                  # Test suite (167 tests, 26 test files)
+├── scripts/                # Utility scripts (data generation, TDD tools)
 ├── database/               # PostgreSQL schemas (13 tables, 40+ indexes)
-├── docs/                   # Documentation (10+ comprehensive guides)
-├── Makefile                # 50+ simplified commands
+├── docker/                 # Dockerfiles and container scripts
+├── docs/                   # Documentation (12 comprehensive guides)
+├── Makefile                # 54 simplified commands
 └── docker-compose.yml      # Multi-container orchestration
 ```
 
@@ -61,11 +63,38 @@ superset-kpis/
 
 ---
 
+## 🛠️ Scripts
+
+Utility scripts in the `scripts/` directory:
+
+| Script | Description |
+|--------|-------------|
+| `generate_sample_data.py` | Generate synthetic user interaction data for testing and development |
+| `run_spark_job.sh` | Execute Spark jobs with proper configuration and classpath |
+| `run_optimization_analysis.sh` | Run performance analysis and capture Spark UI metrics |
+| `setup-tdd.sh` | Install TDD enforcement tools (git hooks, pytest config) |
+| `check-tdd.sh` | Verify TDD compliance (test coverage, file mappings, hooks) |
+
+**Usage:**
+
+```bash
+# Generate sample data
+python scripts/generate_sample_data.py
+
+# Run a specific Spark job
+./scripts/run_spark_job.sh <job_name>
+
+# Check TDD compliance
+./scripts/check-tdd.sh
+```
+
+---
+
 ## 📊 Status Summary
 
 ### Completed (100%)
 
-- ✅ **Core Functions:** 23 transform functions with 59+ unit tests
+- ✅ **Core Functions:** 43 transform functions with 167 tests
 - ✅ **ETL Jobs:** 4 production Spark jobs (data processing, engagement, performance, sessions)
 - ✅ **Database:** 13 PostgreSQL tables with indexes
 - ✅ **Optimizations:** Broadcast joins, salting, AQE, caching, pruning
@@ -77,7 +106,7 @@ superset-kpis/
 - ⚠️ **Superset UI** (2-3 hours) - Implement 4 dashboards (specs ready)
 - ⚠️ **Integration Tests** (3-4 hours) - End-to-end pipeline testing
 
-**See:** [IMPLEMENTATION_TASKS.md](./docs/IMPLEMENTATION_TASKS.md) for detailed breakdown
+**See:** [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) for detailed breakdown
 
 ---
 
@@ -92,15 +121,15 @@ superset-kpis/
 
 **Implementation:**
 
-- **[IMPLEMENTATION_TASKS.md](./docs/IMPLEMENTATION_TASKS.md)** - Complete checklist (95% done)
-- **[TDD_SPEC.md](./docs/TDD_SPEC.md)** - Test specifications
 - **[OPTIMIZATION_GUIDE.md](./docs/OPTIMIZATION_GUIDE.md)** - 7 Spark optimizations
+- **[ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** - Configuration reference
+- **[DAU_MAU.md](./docs/DAU_MAU.md)** - User engagement metrics
 
 **Architecture:**
 
 - **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System diagrams & design
 - **[SUPERSET_DASHBOARDS.md](./docs/SUPERSET_DASHBOARDS.md)** - Dashboard specs
-- **[TheChallenge.md](./challenge/TheChallenge.md)** - Original requirements
+- **[TheChallenge.md](./docs/challenge/TheChallenge.md)** - Original requirements
 
 ---
 
@@ -108,14 +137,14 @@ superset-kpis/
 
 | Task | Status | Details |
 |------|--------|---------|
-| **Task 1: Data Processing** | ✅ 100% | Hot key detection, salting, optimized joins (15 tests) |
-| **Task 2: User Engagement** | ✅ 100% | DAU, MAU, stickiness, power users, cohorts (15 tests) |
-| **Task 3: Performance** | ✅ 100% | Percentiles, correlation, anomalies (9 tests) |
-| **Task 4: Sessions** | ✅ 100% | Sessionization, metrics, bounce rate (11 tests) |
+| **Task 1: Data Processing** | ✅ 100% | Hot key detection, salting, optimized joins |
+| **Task 2: User Engagement** | ✅ 100% | DAU, MAU, stickiness, power users, cohorts |
+| **Task 3: Performance** | ✅ 100% | Percentiles, correlation, anomalies |
+| **Task 4: Sessions** | ✅ 100% | Sessionization, metrics, bounce rate |
 | **Task 5: Spark UI** | ⚠️ 70% | Framework ready, execution pending |
 | **Task 6: Monitoring** | ⚙️ Optional | Not implemented (print logging used) |
 
-**See:** [IMPLEMENTATION_TASKS.md](./docs/IMPLEMENTATION_TASKS.md) for function details
+**See:** [TESTING_GUIDE.md](./docs/TESTING_GUIDE.md) for test details
 
 ---
 
@@ -223,13 +252,13 @@ All aspects of the environment can be controlled via `.env`:
 2. **Superset Dashboards** (2-3 hours) - Import 4 dashboard specs to UI
 3. **Integration Tests** (3-4 hours) - End-to-end pipeline testing
 
-**See:** [IMPLEMENTATION_TASKS.md](./docs/IMPLEMENTATION_TASKS.md) for detailed tasks
+**See:** [DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) for workflow details
 
 ---
 
 ## 👨‍💻 Project Info
 
-**Status:** 95% Complete | **Updated:** 2025-11-14 | **Branch:** claude/read-implementation-tasks-011CV6AtUcqAWDSPHFJrqSUk
+**Status:** 95% Complete | **Updated:** 2026-01-28
 
 ---
 

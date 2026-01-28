@@ -110,7 +110,7 @@ if command -v pytest &> /dev/null; then
             WARNINGS=$((WARNINGS + 1))
         fi
     else
-        echo "  ${YELLOW}⚠️  pytest.ini not found (run ./setup-tdd.sh)${NC}"
+        echo "  ${YELLOW}⚠️  pytest.ini not found (run scripts/setup-tdd.sh)${NC}"
         WARNINGS=$((WARNINGS + 1))
     fi
 else
@@ -133,7 +133,7 @@ if [ "$hooks_path" = ".githooks" ]; then
     fi
 else
     echo "  ${RED}❌ Git hooks not configured${NC}"
-    echo "     Fix: ./setup-tdd.sh"
+    echo "     Fix: scripts/setup-tdd.sh"
     FAILED=$((FAILED + 1))
 fi
 
@@ -177,7 +177,7 @@ else
     echo "Action required:"
     echo "  1. Review failures above"
     echo "  2. Write missing tests"
-    echo "  3. Run: ./setup-tdd.sh (if hooks not installed)"
-    echo "  4. Run: ./check-tdd.sh (to verify fixes)"
+    echo "  3. Run: scripts/setup-tdd.sh (if hooks not installed)"
+    echo "  4. Run: scripts/check-tdd.sh (to verify fixes)"
     exit 1
 fi

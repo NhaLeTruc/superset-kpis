@@ -69,6 +69,6 @@ This directory ensures Claude AI assistants follow project conventions.
 ## See Also
 
 - `docs/TDD_SPEC.md` - Complete TDD specifications
-- `setup-tdd.sh` - Install TDD enforcement tools
-- `check-tdd.sh` - Verify TDD compliance
+- `scripts/setup-tdd.sh` - Install TDD enforcement tools
+- `scripts/check-tdd.sh` - Verify TDD compliance
 - `.githooks/pre-commit` - Prevent commits without tests

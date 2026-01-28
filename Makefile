@@ -436,10 +436,10 @@ install-hooks:
 
 check-tdd:
 	@echo "Checking TDD compliance..."
-	@if [ -f "./check-tdd.sh" ]; then \
-		bash ./check-tdd.sh; \
+	@if [ -f "./scripts/check-tdd.sh" ]; then \
+		bash ./scripts/check-tdd.sh; \
 	else \
-		echo "check-tdd.sh not found"; \
+		echo "scripts/check-tdd.sh not found"; \
 	fi
 
 # ============================================================================
