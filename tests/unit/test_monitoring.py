@@ -242,7 +242,7 @@ class TestMonitoringIntegration:
                 context["record_counter"].add(1)
                 return row
 
-        valid_rows = [r for r in df.collect() if validate_row(r) is not None]
+        valid_rows = [r for r in df.collect() if validate_row(r) ]
 
         # Verify monitoring tracked all issues
         assert context["record_counter"].value == 2  # 2 valid records

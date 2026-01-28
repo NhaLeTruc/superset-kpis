@@ -10,9 +10,26 @@ Provides configuration profiles optimized for different workload types:
 from pyspark.sql import SparkSession
 
 
+def calculate_optimal_partitions(data_size_gb: float, partition_size_mb: int = 128) -> int:
+    """
+    Calculate optimal partition count based on data size.
+
+    Uses the rule of thumb: ~128MB per partition for balanced parallelism.
+
+    Args:
+        data_size_gb: Estimated data size in GB
+        partition_size_mb: Target partition size in MB (default: 128)
+
+    Returns:
+        Optimal partition count (minimum 200)
+    """
+    return max(200, int((data_size_gb * 1024) / partition_size_mb))
+
+
 def configure_job_specific_settings(
     spark: SparkSession,
-    job_type: str
+    job_type: str,
+    data_size_gb: float = 0.0
 ) -> None:
     """
     Apply job-specific Spark configurations.
@@ -20,6 +37,8 @@ def configure_job_specific_settings(
     Args:
         spark: Active SparkSession
         job_type: Type of job - 'etl', 'analytics', 'ml', 'streaming'
+        data_size_gb: Optional estimated data size in GB for dynamic partition calculation.
+                      If provided, overrides default partition counts using 128MB/partition rule.
 
     Job Types:
         - 'etl': ETL/data processing jobs (more shuffle partitions)
@@ -30,24 +49,40 @@ def configure_job_specific_settings(
     Example:
         >>> spark = create_spark_session()
         >>> configure_job_specific_settings(spark, 'etl')
+        >>> # With dynamic partitioning for 500GB dataset:
+        >>> configure_job_specific_settings(spark, 'etl', data_size_gb=500)
     """
     if job_type == "etl":
         # ETL jobs: more partitions for large data processing
-        spark.conf.set("spark.sql.shuffle.partitions", "400")
+        if data_size_gb :
+            partitions = calculate_optimal_partitions(data_size_gb)
+        else:
+            partitions = 400  # Default fallback
+        spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "50MB")
-        print("📊 Configured for ETL workload (400 partitions)")
+        print(f"📊 Configured for ETL workload ({partitions} partitions)")
 
     elif job_type == "analytics":
         # Analytics: fewer partitions, more broadcasting
-        spark.conf.set("spark.sql.shuffle.partitions", "20")
+        if data_size_gb :
+            # For analytics, use smaller partitions (256MB) for faster queries
+            partitions = max(20, int((data_size_gb * 1024) / 256))
+        else:
+            partitions = 20  # Default fallback
+        spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "200MB")
-        print("📈 Configured for Analytics workload (20 partitions, 200MB broadcast)")
+        print(f"📈 Configured for Analytics workload ({partitions} partitions, 200MB broadcast)")
 
     elif job_type == "ml":
         # ML: more memory for caching, fewer partitions
-        spark.conf.set("spark.sql.shuffle.partitions", "50")
+        if data_size_gb :
+            # For ML, use larger partitions (512MB) to reduce overhead
+            partitions = max(50, int((data_size_gb * 1024) / 512))
+        else:
+            partitions = 50  # Default fallback
+        spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.memory.storageFraction", "0.5")
-        print("🤖 Configured for ML workload (50 partitions, 50% storage)")
+        print(f"🤖 Configured for ML workload ({partitions} partitions, 50% storage)")
 
     elif job_type == "streaming":
         # Streaming: micro-batch optimization

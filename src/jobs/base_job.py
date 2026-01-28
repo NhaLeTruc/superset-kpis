@@ -36,16 +36,25 @@ class BaseAnalyticsJob(ABC):
     Subclasses implement job-specific logic.
     """
 
-    def __init__(self, job_name: str, job_type: str = "analytics"):
+    def __init__(
+        self,
+        job_name: str,
+        job_type: str = "analytics",
+        data_size_gb: float = 0.0
+    ):
         """
         Initialize base job.
 
         Args:
             job_name: Human-readable name (e.g., "User Engagement Analytics")
             job_type: Type for Spark tuning - "etl", "analytics", or "ml"
+            data_size_gb: Estimated data size in GB for dynamic partition calculation.
+                          If > 0, partitions are calculated as max(200, data_size_gb * 1024 / 128).
+                          If 0, uses default partition counts per job_type.
         """
         self.job_name = job_name
         self.job_type = job_type
+        self.data_size_gb = data_size_gb
         self.spark: Optional[SparkSession] = None
         self.monitoring_ctx: Optional[Dict] = None
         self.args = None
@@ -72,7 +81,12 @@ class BaseAnalyticsJob(ABC):
         print(f"   ✅ Loaded {record_count:,} records. Please unpersist when done.")
         return df
 
-    def read_csv(self, path: str, name: str = "data") -> DataFrame:
+    def read_csv(
+            self, 
+            path: str, 
+            name: str = "data",
+            num_partitions: int = 0
+        ) -> DataFrame:
         """
         Generic method to read any CSV file.
 
@@ -85,6 +99,9 @@ class BaseAnalyticsJob(ABC):
         """
         print(f"📖 Reading {name} from: {path}")
         df = self.spark.read.csv(path, header=True, inferSchema=True)
+        if num_partitions:
+            df = df.repartition(num_partitions)
+        df = df.persist()
         record_count = df.count()
 
         # Track in monitoring
@@ -197,7 +214,8 @@ class BaseAnalyticsJob(ABC):
         self,
         metrics: Dict[str, DataFrame],
         output_path: str,
-        partition_by: Optional[List[str]] = None
+        partition_by: Optional[List[str]] = None,
+        coalesce_partitions: Optional[int] = None
     ) -> None:
         """
         Write multiple DataFrames to Parquet files.
@@ -211,6 +229,8 @@ class BaseAnalyticsJob(ABC):
 
         for metric_name, df in metrics.items():
             output_file = f"{output_path}/{metric_name}"
+            if coalesce_partitions:
+                df = df.coalesce(coalesce_partitions)
             writer = df.write.mode("overwrite")
             if partition_by:
                 writer = writer.partitionBy(*partition_by)
@@ -220,7 +240,11 @@ class BaseAnalyticsJob(ABC):
     def setup_spark(self) -> None:
         """Create and configure Spark session."""
         self.spark = create_spark_session(app_name=f"GoodNote - {self.job_name}")
-        configure_job_specific_settings(self.spark, job_type=self.job_type)
+        configure_job_specific_settings(
+            self.spark,
+            job_type=self.job_type,
+            data_size_gb=self.data_size_gb
+        )
 
     def setup_monitoring(self, context_name: str) -> None:
         """

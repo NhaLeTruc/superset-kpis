@@ -41,7 +41,8 @@ class DataProcessingJob(BaseAnalyticsJob):
     def __init__(self):
         super().__init__(
             job_name="Data Processing",
-            job_type="etl"
+            job_type="etl",
+            data_size_gb=0.15  # Estimated data size for dynamic partitioning
         )
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
@@ -74,7 +75,7 @@ class DataProcessingJob(BaseAnalyticsJob):
             interactions_df,
             key_column=COL_USER_ID,
             threshold_percentile=HOT_KEY_THRESHOLD_PERCENTILE
-        )
+        ).persist()
 
         hot_key_count = hot_keys_df.count()
         if hot_key_count > 0:
@@ -98,8 +99,7 @@ class DataProcessingJob(BaseAnalyticsJob):
             F.lit(datetime.now())
         )
 
-        print(f"   ✅ Enriched {enriched_df.count():,} interactions")
-
+        hot_keys_df.unpersist()
         return enriched_df
 
     def compute_metrics(self) -> Dict[str, DataFrame]:
@@ -156,7 +156,7 @@ class DataProcessingJob(BaseAnalyticsJob):
 
     def print_summary(self, metrics: Dict[str, DataFrame]) -> None:
         """Print summary statistics of enriched data."""
-        enriched_df = metrics["enriched_interactions"]
+        enriched_df = metrics["enriched_interactions"].persist()
 
         print("\n📊 Enriched Data Summary:")
         print("=" * 60)
@@ -188,6 +188,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         for row in device_counts.collect():
             print(f"  {row[COL_DEVICE_TYPE]}: {row['count']:,}")
 
+        enriched_df.unpersist()
         print("=" * 60)
 
     def get_table_mapping(self) -> Optional[Dict[str, str]]:

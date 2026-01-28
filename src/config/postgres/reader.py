@@ -68,7 +68,7 @@ def read_from_postgres(
 
     # Apply partitioning if specified
     if partition_column:
-        if not all([num_partitions, lower_bound is not None, upper_bound is not None]):
+        if any(v is None for v in [num_partitions, lower_bound, upper_bound]):
             raise ValueError(
                 "For partitioned reads, must specify: "
                 "partition_column, num_partitions, lower_bound, upper_bound"
