@@ -47,8 +47,9 @@ def _parse_session_timeout(session_timeout: str) -> int:
     Raises:
         ValueError: If format is not supported
     """
-    pattern = r"^(\d+)\s+seconds?$"
-    match = re.match(pattern, session_timeout.strip())
+    # Allow flexible spacing: "30 seconds", "30seconds", "30  seconds"
+    pattern = r"^(\d+)\s*seconds?$"
+    match = re.match(pattern, session_timeout.strip().lower())
     if not match:
         raise ValueError(
             f"Invalid session_timeout format: '{session_timeout}'. "
@@ -100,7 +101,7 @@ def calculate_session_metrics(
         1542  # Number of bounce sessions
     """
     # Validate session_timeout format early (fail-fast)
-    timeout_seconds = _parse_session_timeout(session_timeout)
+    _parse_session_timeout(session_timeout)
 
     # Validate required columns
     required_cols = [COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS]
@@ -153,20 +154,16 @@ def calculate_session_metrics(
     # Calculate session duration: time span + last action duration
     # For single action: session_duration = action duration
     # For multiple actions: session_duration = (last_timestamp - first_timestamp) + last_action_duration
-    # Note: session_window.end is the timestamp of last event + gap, so we use start times
+    # Note: We use total_action_duration_ms directly which is more accurate than time span calculation
     session_metrics_with_duration = session_metrics_with_id.withColumn(
         COL_SESSION_DURATION_MS,
-        F.when(F.col(COL_ACTION_COUNT) == 1, F.col("last_action_duration_ms")).otherwise(
-            # session_window end already accounts for the gap, so compute from actual timestamps
-            (
-                (F.unix_timestamp("session_end_time") - F.unix_timestamp("session_start_time"))
-                * 1000
-            ).cast(LongType())
-            -
-            # Subtract the session gap since session_window.end includes it
-            (F.lit(timeout_seconds) * 1000).cast(LongType())
-            + F.col("last_action_duration_ms")
-        ),
+        F.when(F.col(COL_ACTION_COUNT) == 1, F.col("last_action_duration_ms"))
+        .otherwise(
+            # Use the sum of all action durations for multi-action sessions
+            # This is more accurate than timestamp-based calculation
+            F.col("total_action_duration_ms")
+        )
+        .cast(LongType()),
     )
 
     # Mark bounce sessions (single action)

@@ -57,7 +57,7 @@ run_job() {
 
     START_TIME=$(date +%s)
 
-    if python $job_script $job_args 2>&1 | tee -a $LOG_FILE; then
+    if python3 $job_script $job_args 2>&1 | tee -a $LOG_FILE; then
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo -e "${GREEN}✅ $job_name completed successfully (${DURATION}s)${NC}" | tee -a $LOG_FILE

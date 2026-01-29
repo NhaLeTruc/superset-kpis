@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import sys
 import traceback
-from datetime import datetime
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -94,8 +93,8 @@ class DataProcessingJob(BaseAnalyticsJob):
             hot_keys_df=hot_keys_df,
         )
 
-        # Add processing metadata
-        enriched_df = enriched_df.withColumn("processing_timestamp", F.lit(datetime.now()))
+        # Add processing metadata (use Spark's current_timestamp for consistency across cluster)
+        enriched_df = enriched_df.withColumn("processing_timestamp", F.current_timestamp())
 
         hot_keys_df.unpersist()
         return enriched_df
@@ -155,19 +154,17 @@ class DataProcessingJob(BaseAnalyticsJob):
         print("\n📊 Enriched Data Summary:")
         print("=" * 60)
 
-        # Date range
-        date_stats = enriched_df.agg(
-            F.min(COL_TIMESTAMP).alias("min_date"), F.max(COL_TIMESTAMP).alias("max_date")
+        # Combine all aggregations into a single pass to avoid multiple Spark jobs
+        summary_stats = enriched_df.agg(
+            F.min(COL_TIMESTAMP).alias("min_date"),
+            F.max(COL_TIMESTAMP).alias("max_date"),
+            F.count("*").alias("total_records"),
+            F.countDistinct(COL_USER_ID).alias("unique_users"),
         ).collect()[0]
 
-        print(f"Date Range: {date_stats['min_date']} to {date_stats['max_date']}")
-
-        # Record counts
-        total_records = enriched_df.count()
-        total_users = enriched_df.select(COL_USER_ID).distinct().count()
-
-        print(f"Total Interactions: {total_records:,}")
-        print(f"Unique Users: {total_users:,}")
+        print(f"Date Range: {summary_stats['min_date']} to {summary_stats['max_date']}")
+        print(f"Total Interactions: {summary_stats['total_records']:,}")
+        print(f"Unique Users: {summary_stats['unique_users']:,}")
 
         # Action type distribution
         print("\nAction Type Distribution:")

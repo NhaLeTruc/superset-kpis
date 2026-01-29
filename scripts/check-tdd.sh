@@ -143,7 +143,7 @@ echo ""
 echo "${BLUE}[5] Checking: Required TDD documentation exists?${NC}"
 required_docs=(
     ".claude/SESSION_RULES.md"
-    "docs/TDD_SPEC.md"
+    "docs/TESTING_GUIDE.md"
     "tests/conftest.py"
 )
 

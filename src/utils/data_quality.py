@@ -6,9 +6,13 @@ Provides schema validation, null detection, and outlier detection for Spark Data
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType
+
+if TYPE_CHECKING:
+    from pyspark.sql.types import StructType
 
 
 def validate_schema(
@@ -108,9 +112,14 @@ def detect_nulls(df: DataFrame, non_nullable_columns: list[str]) -> DataFrame:
         *[F.when(F.col(col_name).isNull(), F.lit(col_name)) for col_name in non_nullable_columns]
     )
 
-    # Filter out None values from the array using F.filter() with a lambda
-    # This properly removes nulls, unlike array_except which doesn't handle nulls correctly
-    null_columns_filtered = F.filter(null_columns_expr, lambda x: x.isNotNull())
+    # Filter out None values from the array using native Spark SQL expression
+    # array_compact removes null values (available in Spark 3.4+), fallback to filter with SQL expr
+    try:
+        # Try array_compact first (Spark 3.4+)
+        null_columns_filtered = F.array_compact(null_columns_expr)
+    except AttributeError:
+        # Fallback: use expr-based filter for older Spark versions
+        null_columns_filtered = F.expr(f"filter({null_columns_expr}, x -> x is not null)")
 
     # Add the null_columns column
     result_df = rows_with_nulls.withColumn("null_columns", null_columns_filtered)
@@ -118,7 +127,7 @@ def detect_nulls(df: DataFrame, non_nullable_columns: list[str]) -> DataFrame:
     return result_df
 
 
-def detect_outliers(
+def detect_outliers(  # noqa: PLR0912
     df: DataFrame,
     column: str,
     method: str = "iqr",
@@ -155,7 +164,7 @@ def detect_outliers(
         df_filtered = df.filter(F.col(column).isNotNull())
 
         # Handle empty DataFrame or all-null column
-        if df_filtered.head(1) == []:
+        if df_filtered.limit(1).count() == 0:
             return (
                 df.limit(0)
                 .withColumn("outlier_reason", F.lit(""))

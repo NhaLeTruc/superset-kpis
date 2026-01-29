@@ -107,11 +107,31 @@ def optimized_join(
             large_df, small_df, hot_keys_df, join_key, join_type, salt_factor
         )
 
-    # Strategy 1: Try broadcast join if enabled
+    # Strategy 1: Try broadcast join if enabled and small_df is within size limit
     if enable_broadcast:
-        # Simply use broadcast hint - Spark will use it if small_df is small enough
-        result_df = large_df.join(F.broadcast(small_df), on=join_key, how=join_type)
-        return result_df
+        # Get Spark's autoBroadcastJoinThreshold (default 10MB)
+        spark = small_df.sparkSession
+        broadcast_threshold = int(
+            spark.conf.get("spark.sql.autoBroadcastJoinThreshold", "10485760")
+        )
+
+        # Estimate small_df size using Spark's size estimator
+        # Cache temporarily to get accurate size estimate
+        small_df_cached = small_df.cache()
+        small_df_count = small_df_cached.count()
+
+        # Rough estimate: assume ~100 bytes per row (adjust based on schema)
+        # For more accuracy, could use small_df_cached.rdd.map(lambda r: len(str(r))).sum()
+        estimated_size = small_df_count * 100  # Conservative estimate
+
+        if estimated_size <= broadcast_threshold:
+            # Safe to broadcast
+            result_df = large_df.join(F.broadcast(small_df_cached), on=join_key, how=join_type)
+            small_df_cached.unpersist()
+            return result_df
+        else:
+            # Too large for broadcast - let Spark decide join strategy
+            small_df_cached.unpersist()
 
     # Strategy 2: Check for skew and apply salting if needed
     if enable_salting:

@@ -100,43 +100,45 @@ class UserEngagementJob(BaseAnalyticsJob):
             .persist()
         )
 
-        # 1. Daily Active Users (DAU)
-        print("\n📊 Calculating Daily Active Users (DAU)...")
-        dau_df = calculate_dau(enriched_df)
-        print("   ✅ DAU calculation complete")
-        metrics["dau"] = dau_df
+        try:
+            # 1. Daily Active Users (DAU)
+            print("\n📊 Calculating Daily Active Users (DAU)...")
+            dau_df = calculate_dau(enriched_df)
+            print("   ✅ DAU calculation complete")
+            metrics["dau"] = dau_df
 
-        # 2. Monthly Active Users (MAU)
-        print("\n📊 Calculating Monthly Active Users (MAU)...")
-        mau_df = calculate_mau(enriched_df)
-        print("   ✅ MAU calculation complete")
-        metrics["mau"] = mau_df
+            # 2. Monthly Active Users (MAU)
+            print("\n📊 Calculating Monthly Active Users (MAU)...")
+            mau_df = calculate_mau(enriched_df)
+            print("   ✅ MAU calculation complete")
+            metrics["mau"] = mau_df
 
-        # 3. Stickiness Ratio (DAU/MAU)
-        print("\n📊 Calculating Stickiness Ratio...")
-        stickiness_df = calculate_stickiness(dau_df, mau_df)
-        print("   ✅ Stickiness calculation complete")
-        metrics["stickiness"] = stickiness_df
+            # 3. Stickiness Ratio (DAU/MAU)
+            print("\n📊 Calculating Stickiness Ratio...")
+            stickiness_df = calculate_stickiness(dau_df, mau_df)
+            print("   ✅ Stickiness calculation complete")
+            metrics["stickiness"] = stickiness_df
 
-        # 4. Power Users (Top 1%)
-        print("\n📊 Identifying Power Users...")
-        power_users_df = identify_power_users(
-            enriched_df, metadata_df, percentile=HOT_KEY_THRESHOLD_PERCENTILE
-        )
-        print("   ✅ Power users identification complete")
-        metrics["power_users"] = power_users_df
+            # 4. Power Users (Top 1%)
+            print("\n📊 Identifying Power Users...")
+            power_users_df = identify_power_users(
+                enriched_df, metadata_df, percentile=HOT_KEY_THRESHOLD_PERCENTILE
+            )
+            print("   ✅ Power users identification complete")
+            metrics["power_users"] = power_users_df
 
-        # 5. Cohort Retention (Weekly cohorts, 6 months)
-        print("\n📊 Calculating Cohort Retention...")
-        cohort_df = calculate_cohort_retention(
-            enriched_df, metadata_df, cohort_period="week", retention_weeks=26
-        )
-        print("   ✅ Cohort retention calculation complete")
-        metrics["cohort_retention"] = cohort_df
+            # 5. Cohort Retention (Weekly cohorts, 6 months)
+            print("\n📊 Calculating Cohort Retention...")
+            cohort_df = calculate_cohort_retention(
+                enriched_df, metadata_df, cohort_period="week", retention_weeks=26
+            )
+            print("   ✅ Cohort retention calculation complete")
+            metrics["cohort_retention"] = cohort_df
 
-        # Unpersist cached DataFrames
-        metadata_df.unpersist()
-        enriched_df.unpersist()
+        finally:
+            # Ensure unpersist is called even if an exception occurs
+            metadata_df.unpersist()
+            enriched_df.unpersist()
 
         return metrics
 
@@ -146,51 +148,60 @@ class UserEngagementJob(BaseAnalyticsJob):
         print("📊 Engagement Metrics Summary")
         print("=" * 60)
 
-        # DAU Summary
+        # DAU Summary - single aggregation
         dau_df = metrics["dau"]
-        dau_stats = dau_df.select(
-            F.avg("daily_active_users"), F.max("daily_active_users"), F.min("daily_active_users")
+        dau_stats = dau_df.agg(
+            F.avg("daily_active_users").alias("avg_dau"),
+            F.max("daily_active_users").alias("max_dau"),
+            F.min("daily_active_users").alias("min_dau"),
         ).collect()[0]
         print("\nDaily Active Users:")
-        print(f"  Average DAU: {dau_stats[0]:,.0f}")
-        print(f"  Max DAU: {dau_stats[1]:,}")
-        print(f"  Min DAU: {dau_stats[2]:,}")
+        print(f"  Average DAU: {dau_stats['avg_dau']:,.0f}")
+        print(f"  Max DAU: {dau_stats['max_dau']:,}")
+        print(f"  Min DAU: {dau_stats['min_dau']:,}")
 
         # MAU Summary
         mau_df = metrics["mau"]
-        mau_stats = mau_df.agg({"monthly_active_users": "avg"}).collect()[0]
+        mau_stats = mau_df.agg(F.avg("monthly_active_users").alias("avg_mau")).collect()[0]
         print("\nMonthly Active Users:")
-        print(f"  Average MAU: {mau_stats[0]:,.0f}")
+        print(f"  Average MAU: {mau_stats['avg_mau']:,.0f}")
 
-        # Stickiness Summary
+        # Stickiness Summary - single aggregation
         stickiness_df = metrics["stickiness"]
-        stickiness_stats = stickiness_df.select(
-            F.avg("stickiness_ratio"), F.max("stickiness_ratio"), F.min("stickiness_ratio")
+        stickiness_stats = stickiness_df.agg(
+            F.avg("stickiness_ratio").alias("avg_stick"),
+            F.max("stickiness_ratio").alias("max_stick"),
+            F.min("stickiness_ratio").alias("min_stick"),
         ).collect()[0]
         print("\nStickiness Ratio:")
-        print(f"  Average: {stickiness_stats[0]:.2%}")
-        print(f"  Max: {stickiness_stats[1]:.2%}")
-        print(f"  Min: {stickiness_stats[2]:.2%}")
+        print(f"  Average: {stickiness_stats['avg_stick']:.2%}")
+        print(f"  Max: {stickiness_stats['max_stick']:.2%}")
+        print(f"  Min: {stickiness_stats['min_stick']:.2%}")
 
-        # Power Users Summary
+        # Power Users Summary - single aggregation combining count and sum
         power_users_df = metrics["power_users"]
-        power_user_count = power_users_df.count()
-        total_hours_result = power_users_df.agg({"hours_spent": "sum"}).collect()[0][0]
-        total_hours = total_hours_result if total_hours_result is not None else 0.0
+        power_stats = power_users_df.agg(
+            F.count("*").alias("count"),
+            F.sum("hours_spent").alias("total_hours"),
+        ).collect()[0]
+        power_user_count = power_stats["count"]
+        total_hours = power_stats["total_hours"] if power_stats["total_hours"] is not None else 0.0
         print("\nPower Users:")
         print(f"  Count: {power_user_count:,} (top 1%)")
         print(f"  Total Engagement: {total_hours:,.0f} hours")
 
-        # Cohort Retention Summary
+        # Cohort Retention Summary - combined query
         cohort_df = metrics["cohort_retention"]
-        avg_retention_result = (
-            cohort_df.filter("week_number = 0").agg({"retention_rate": "avg"}).collect()[0][0]
+        cohort_stats = (
+            cohort_df.filter("week_number IN (0, 12)")
+            .groupBy("week_number")
+            .agg(F.avg("retention_rate").alias("avg_retention"))
+            .collect()
         )
-        avg_retention = avg_retention_result if avg_retention_result is not None else 0.0
-        week_12_result = (
-            cohort_df.filter("week_number = 12").agg({"retention_rate": "avg"}).collect()[0][0]
-        )
-        week_12_avg = week_12_result if week_12_result is not None else 0.0
+
+        retention_by_week = {row["week_number"]: row["avg_retention"] for row in cohort_stats}
+        avg_retention = retention_by_week.get(0, 0.0) or 0.0
+        week_12_avg = retention_by_week.get(12, 0.0) or 0.0
         print("\nCohort Retention:")
         print(f"  Average Week 0: {avg_retention:.2%}")
         print(f"  Average Week 12: {week_12_avg:.2%}")

@@ -7,7 +7,7 @@ Provides functions for formatting monitoring metrics and logging summaries.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable  # noqa: TC003 - used at runtime
 from functools import wraps
 from typing import Any
 
@@ -70,7 +70,13 @@ def format_monitoring_summary(context: dict[str, Any], job_name: str) -> str:
     if skew_info["partition_count"] > 0:
         max_size = skew_info["max_partition_size"]
         min_size = skew_info["min_partition_size"]
-        skew_ratio = max_size / min_size if min_size != float("inf") and min_size > 0 else 0
+        # Safe division: handle inf, zero, and edge cases
+        if min_size > 0 and min_size != float("inf"):
+            skew_ratio = max_size / min_size
+        elif max_size > 0:
+            skew_ratio = float("inf")
+        else:
+            skew_ratio = 0
 
         lines.append("📦 Partition Distribution:")
         lines.append(f"   - Partitions Processed: {skew_info['partition_count']}")
@@ -97,7 +103,7 @@ def log_monitoring_summary(context: dict[str, Any], job_name: str):
         job_name: Name of the job for the report header
     """
     summary = format_monitoring_summary(context, job_name)
-    print(summary)
+    # Use logger only (removed print() for proper log control)
     logger.info(f"\n{summary}")
 
 

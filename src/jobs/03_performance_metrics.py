@@ -200,9 +200,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
                 "description",
                 F.concat(
                     F.lit("Performance anomaly detected for "),
-                    F.col("app_version"),
+                    F.col(COL_APP_VERSION),
                     F.lit(" on "),
-                    F.col("metric_date").cast("string"),
+                    F.col(COL_METRIC_DATE).cast("string"),
                     F.lit(": "),
                     F.round("metric_value", 2).cast("string"),
                     F.lit("ms ("),

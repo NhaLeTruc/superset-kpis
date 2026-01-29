@@ -108,12 +108,13 @@ def calculate_device_correlation(
     )
 
     # --- One-way ANOVA: device_type (categorical) vs duration_ms (continuous) ---
-    overall_stats_rows = joined_df.agg(
+    overall_stats_df = joined_df.agg(
         F.avg(COL_DURATION_MS).alias("grand_mean"), F.count("*").alias("N")
-    ).collect()
+    )
+    overall_stats_row = overall_stats_df.first()
 
     # Handle empty DataFrame case
-    if not overall_stats_rows or overall_stats_rows[0]["N"] == 0:
+    if overall_stats_row is None or overall_stats_row["N"] == 0:
         # Return empty result with expected schema
         return (
             device_metrics.withColumn("f_statistic", F.lit(None).cast("double"))
@@ -131,10 +132,11 @@ def calculate_device_correlation(
             )
         )
 
-    overall_stats = overall_stats_rows[0]
-    grand_mean = float(overall_stats["grand_mean"])
-    N = int(overall_stats["N"])
+    grand_mean = float(overall_stats_row["grand_mean"])
+    N = int(overall_stats_row["N"])
 
+    # Cache device_metrics before count() to avoid recomputation
+    device_metrics = device_metrics.cache()
     k = int(device_metrics.count())
 
     # Compute SSB and SSW from per-group stats already calculated

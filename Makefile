@@ -191,23 +191,17 @@ test-function:
 
 generate-data:
 	@echo "Generating sample data (medium size)..."
-	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
-		--medium \
-		--seed 42
+	python3 scripts/generate_sample_data.py --medium --realistic-all
 	@echo "Sample data generated"
 
 generate-data-small:
 	@echo "Generating small sample data (for quick testing)..."
-	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
-		--small \
-		--seed 42
+	python3 scripts/generate_sample_data.py --small --realistic-all
 	@echo "Small sample data generated"
 
 generate-data-large:
 	@echo "Generating large sample data (WARNING: may take several minutes)..."
-	docker exec $(SPARK_MASTER) python3 /opt/spark-apps/scripts/generate_sample_data.py \
-		--large \
-		--seed 42
+	python3 scripts/generate_sample_data.py --large --realistic-all
 	@echo "Large sample data generated"
 
 run-jobs:

@@ -4,18 +4,19 @@ User Segmentation
 Calculates stickiness ratio and identifies power users.
 """
 
+from __future__ import annotations
+
 import logging
 import math
 
 from pyspark.sql import DataFrame
-
-
-logger = logging.getLogger(__name__)
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StructField
 
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.schemas.columns import COL_DURATION_MS, COL_PAGE_ID, COL_TIMESTAMP, COL_USER_ID
+
+logger = logging.getLogger(__name__)
 
 
 # Safety limit for collecting power users to driver memory
@@ -109,6 +110,9 @@ def identify_power_users(
     )
     # Add alias for test compatibility
     user_metrics = user_metrics.withColumn("avg_duration_ms", F.col("avg_duration_per_interaction"))
+
+    # Cache user_metrics before count() to avoid recomputation
+    user_metrics = user_metrics.cache()
 
     # Calculate how many users to include based on percentile threshold
     # Original semantics: include users where percent_rank >= percentile

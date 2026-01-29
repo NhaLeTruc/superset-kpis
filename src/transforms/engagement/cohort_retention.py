@@ -36,8 +36,8 @@ def calculate_cohort_retention(
     Returns:
         DataFrame with [cohort_week, week_number, cohort_size, active_users, retention_rate]
     """
-    # Handle empty interactions dataframe (use head(1) to avoid full scan)
-    if not interactions_df.head(1):
+    # Handle empty interactions dataframe (use limit(1).count() for proper empty check)
+    if interactions_df.limit(1).count() == 0:
         # Return empty dataframe with correct schema
         empty_schema = StructType(
             [
@@ -48,7 +48,9 @@ def calculate_cohort_retention(
                 StructField("retention_rate", DoubleType(), nullable=False),
             ]
         )
-        return interactions_df.sql_ctx.createDataFrame([], schema=empty_schema)
+        # Use sparkSession instead of deprecated sql_ctx
+        spark = interactions_df.sparkSession
+        return spark.createDataFrame([], schema=empty_schema)
 
     # Calculate cohort week (first day of week user registered)
     metadata_with_cohort = metadata_df.withColumn(

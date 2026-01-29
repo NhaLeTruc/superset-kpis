@@ -40,10 +40,13 @@ def calculate_dau(interactions_df: DataFrame) -> DataFrame:
         F.sum(COL_DURATION_MS).alias("total_duration_ms"),
     )
 
-    # Calculate avg_duration_per_user
+    # Calculate avg_duration_per_user with null/zero safety
     dau_df = dau_df.withColumn(
         "avg_duration_per_user",
-        (F.col("total_duration_ms") / F.col("daily_active_users")).cast("double"),
+        F.when(
+            F.col("total_duration_ms").isNull() | (F.col("daily_active_users") == 0),
+            F.lit(0.0),
+        ).otherwise((F.col("total_duration_ms") / F.col("daily_active_users")).cast("double")),
     )
 
     return dau_df
