@@ -69,7 +69,7 @@ help:
 # Quick Start Commands
 # ============================================================================
 
-quickstart: setup generate-data run-jobs
+quickstart: setup generate-data run-job-1 run-job-2 run-job-3 run-job-4
 	@echo ""
 	@echo "Quickstart Complete!"
 	@echo ""
@@ -204,11 +204,6 @@ generate-data-large:
 	python3 scripts/generate_sample_data.py --large --realistic-all
 	@echo "Large sample data generated"
 
-run-jobs:
-	@echo "Running all Spark ETL jobs..."
-	docker exec $(SPARK_MASTER) bash /opt/spark-apps/src/jobs/run_all_jobs.sh
-	@echo "All jobs completed"
-
 run-job-1:
 	@echo "Running Job 1: Data Processing..."
 	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
@@ -328,19 +323,6 @@ spark-ui:
 	@command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8080 || \
 	command -v open >/dev/null 2>&1 && open http://localhost:8080 || \
 	echo "Please open http://localhost:8080 in your browser"
-
-# ============================================================================
-# Optimization & Analysis
-# ============================================================================
-
-run-optimization-analysis:
-	@echo "Running Spark UI optimization analysis..."
-	@echo "Note: This will take 10-15 minutes to complete"
-	docker exec $(SPARK_MASTER) bash /opt/spark-apps/scripts/run_optimization_analysis.sh \
-		--size medium \
-		--iterations 2
-	@echo "Optimization analysis complete"
-	@echo "Review results in Spark UI at http://localhost:4040"
 
 # ============================================================================
 # Cleanup
