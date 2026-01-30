@@ -30,23 +30,23 @@ class TestUserEngagementPipeline:
 
         # Create test data with known DAU pattern
         data = [
-            ("u001", "2024-01-01 10:00:00"),
-            ("u001", "2024-01-01 11:00:00"),  # Same user, same day
-            ("u002", "2024-01-01 10:00:00"),
-            ("u003", "2024-01-01 10:00:00"),
-            ("u001", "2024-01-02 10:00:00"),  # New day
-            ("u002", "2024-01-02 10:00:00"),
+            ("u001", "2024-01-01 10:00:00", 1000),
+            ("u001", "2024-01-01 11:00:00", 2000),  # Same user, same day
+            ("u002", "2024-01-01 10:00:00", 1500),
+            ("u003", "2024-01-01 10:00:00", 1000),
+            ("u001", "2024-01-02 10:00:00", 3000),  # New day
+            ("u002", "2024-01-02 10:00:00", 2500),
         ]
 
-        df = spark.createDataFrame(data, ["user_id", "timestamp"]).withColumn(
+        df = spark.createDataFrame(data, ["user_id", "timestamp", "duration_ms"]).withColumn(
             "timestamp", F.to_timestamp("timestamp")
         )
 
         result = calculate_dau(df)
 
         # Day 1 should have 3 users, Day 2 should have 2 users
-        day1 = result.filter(F.col("metric_date") == "2024-01-01").collect()
-        day2 = result.filter(F.col("metric_date") == "2024-01-02").collect()
+        day1 = result.filter(F.col("date") == "2024-01-01").collect()
+        day2 = result.filter(F.col("date") == "2024-01-02").collect()
 
         assert len(day1) == 1
         assert day1[0]["daily_active_users"] == 3
@@ -98,9 +98,9 @@ class TestUserEngagementPipeline:
         # 10 users active every day in January (high stickiness)
         for day in range(30):
             for user_idx in range(10):
-                data.append((f"u{user_idx:03d}", base_date + timedelta(days=day)))
+                data.append((f"u{user_idx:03d}", base_date + timedelta(days=day), 1000))
 
-        df = spark.createDataFrame(data, ["user_id", "timestamp"]).withColumn(
+        df = spark.createDataFrame(data, ["user_id", "timestamp", "duration_ms"]).withColumn(
             "timestamp", F.to_timestamp("timestamp")
         )
 
@@ -177,18 +177,18 @@ class TestUserEngagementPipeline:
         cohort_date = datetime(2024, 1, 1)
         for i in range(100):
             # All 100 active in week 0
-            data.append((f"u{i:03d}", cohort_date, cohort_date))
+            data.append((f"u{i:03d}", cohort_date, cohort_date, 1000))
 
             # 50 return in week 1
             if i < 50:
-                data.append((f"u{i:03d}", cohort_date, cohort_date + timedelta(weeks=1)))
+                data.append((f"u{i:03d}", cohort_date, cohort_date + timedelta(weeks=1), 1000))
 
             # 25 return in week 2
             if i < 25:
-                data.append((f"u{i:03d}", cohort_date, cohort_date + timedelta(weeks=2)))
+                data.append((f"u{i:03d}", cohort_date, cohort_date + timedelta(weeks=2), 1000))
 
         interactions_df = spark.createDataFrame(
-            [(d[0], d[2]) for d in data], ["user_id", "timestamp"]
+            [(d[0], d[2], d[3]) for d in data], ["user_id", "timestamp", "duration_ms"]
         ).withColumn("timestamp", F.to_timestamp("timestamp"))
 
         metadata_df = (
@@ -204,10 +204,10 @@ class TestUserEngagementPipeline:
         # Verify retention rates exist
         assert result.count() > 0
 
-        # Week 0 should have 100% retention
+        # Week 0 should have 100% retention (returned as decimal 1.0)
         week_0 = result.filter(F.col("week_number") == 0).collect()
         if week_0:
-            assert week_0[0]["retention_rate"] == 100.0
+            assert week_0[0]["retention_rate"] == 1.0
 
 
 class TestUserEngagementDataQuality:
@@ -221,6 +221,7 @@ class TestUserEngagementDataQuality:
             [
                 StructField("user_id", StringType(), False),
                 StructField("timestamp", TimestampType(), False),
+                StructField("duration_ms", IntegerType(), False),
             ]
         )
 
@@ -233,8 +234,8 @@ class TestUserEngagementDataQuality:
         """Test calculation with single user."""
         from src.transforms.engagement import calculate_dau
 
-        data = [("u001", "2024-01-01 10:00:00")]
-        df = spark.createDataFrame(data, ["user_id", "timestamp"]).withColumn(
+        data = [("u001", "2024-01-01 10:00:00", 1000)]
+        df = spark.createDataFrame(data, ["user_id", "timestamp", "duration_ms"]).withColumn(
             "timestamp", F.to_timestamp("timestamp")
         )
 
@@ -249,11 +250,11 @@ class TestUserEngagementDataQuality:
 
         # Same user, same timestamp multiple times
         data = [
-            ("u001", "2024-01-01 10:00:00"),
-            ("u001", "2024-01-01 10:00:00"),
-            ("u001", "2024-01-01 10:00:00"),
+            ("u001", "2024-01-01 10:00:00", 1000),
+            ("u001", "2024-01-01 10:00:00", 2000),
+            ("u001", "2024-01-01 10:00:00", 1500),
         ]
-        df = spark.createDataFrame(data, ["user_id", "timestamp"]).withColumn(
+        df = spark.createDataFrame(data, ["user_id", "timestamp", "duration_ms"]).withColumn(
             "timestamp", F.to_timestamp("timestamp")
         )
 

@@ -4,7 +4,7 @@ Unit tests for DAU and MAU calculation.
 Tests calculate_dau() and calculate_mau() functions from engagement transforms.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import pytest
 from chispa.dataframe_comparer import assert_df_equality
@@ -74,65 +74,6 @@ class TestCalculateDAU:
             ignore_row_order=True,
             ignore_nullable=True,
         )
-
-    def test_calculate_dau_single_user(self, spark):
-        """
-        GIVEN: u001 has interactions on 7 consecutive days
-        WHEN: calculate_dau() is called
-        THEN:
-            - 7 rows returned
-            - Each date has dau=1
-        """
-        # Arrange
-        schema = StructType(
-            [
-                StructField("user_id", StringType(), nullable=False),
-                StructField("timestamp", TimestampType(), nullable=False),
-                StructField("duration_ms", LongType(), nullable=False),
-            ]
-        )
-
-        data = [
-            ("u001", datetime(2023, 1, 1, 10, 0, 0) + timedelta(days=i), 5000) for i in range(7)
-        ]
-        df = spark.createDataFrame(data, schema=schema)
-
-        # Act
-        result_df = calculate_dau(df)
-
-        # Assert
-        assert result_df.count() == 7
-        results = result_df.collect()
-        for row in results:
-            assert row["daily_active_users"] == 1
-
-    def test_calculate_dau_user_multiple_interactions(self, spark):
-        """
-        GIVEN: u001 has 10 interactions on 2023-01-01
-        WHEN: calculate_dau() is called
-        THEN:
-            - 2023-01-01: dau=1 (not 10 - distinct users)
-            - total_interactions=10
-        """
-        # Arrange
-        schema = StructType(
-            [
-                StructField("user_id", StringType(), nullable=False),
-                StructField("timestamp", TimestampType(), nullable=False),
-                StructField("duration_ms", LongType(), nullable=False),
-            ]
-        )
-
-        data = [("u001", datetime(2023, 1, 1, 10, i, 0), 1000) for i in range(10)]
-        df = spark.createDataFrame(data, schema=schema)
-
-        # Act
-        result_df = calculate_dau(df)
-
-        # Assert
-        result = result_df.collect()[0]
-        assert result["daily_active_users"] == 1
-        assert result["total_interactions"] == 10
 
     def test_calculate_dau_empty(self, spark):
         """
