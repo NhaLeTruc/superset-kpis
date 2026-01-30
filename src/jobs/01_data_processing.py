@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import traceback
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -34,7 +33,6 @@ from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas import INTERACTIONS_SCHEMA, METADATA_SCHEMA
 from src.schemas.columns import COL_ACTION_TYPE, COL_DEVICE_TYPE, COL_TIMESTAMP, COL_USER_ID
 from src.transforms.join.execution import identify_hot_keys, optimized_join
-from src.utils.monitoring import log_monitoring_summary
 
 
 class DataProcessingJob(BaseAnalyticsJob):
@@ -107,17 +105,15 @@ class DataProcessingJob(BaseAnalyticsJob):
             Dictionary with enriched DataFrame
         """
         # Read input data from generated CSV files
-        interactions_df = self.read_csv(self.args.interactions_path, name="interactions", schema=INTERACTIONS_SCHEMA, num_partitions=1)
-        metadata_df = self.read_csv(self.args.metadata_path, name="user metadata", schema=METADATA_SCHEMA, num_partitions=1)
-
-        # If you're reading huge data (> 10GB) from production parquet files, 
-        # Consider increasing num_partitions using spark_tuning.py's calculate_optimal_partitions().
-        # For example:
-        #   opt_partitions = calculate_optimal_partitions(data_size_gb=50, partition_size_mb=128)
-        #   interactions_df = self.read_parquet(self.args.interactions_path, name="interactions", num_partitions=opt_partitions)
-        # -----------------------------------------------------------------------------------------------------------
-        #   opt_partitions = calculate_optimal_partitions(data_size_gb=5, partition_size_mb=128)
-        #   metadata_df = self.read_parquet(self.args.metadata_path, name="user metadata", num_partitions=opt_partitions)
+        interactions_df = self.read_csv(
+            self.args.interactions_path,
+            name="interactions",
+            schema=INTERACTIONS_SCHEMA,
+            num_partitions=1,
+        )
+        metadata_df = self.read_csv(
+            self.args.metadata_path, name="user metadata", schema=METADATA_SCHEMA, num_partitions=1
+        )
 
         # Track initial record count
         interaction_count = interactions_df.count()
@@ -193,60 +189,6 @@ class DataProcessingJob(BaseAnalyticsJob):
     def get_table_mapping(self) -> dict[str, str] | None:
         """This job writes to Parquet, not database."""
         return None
-
-    def run(self) -> int:
-        """
-        Execute data processing pipeline.
-
-        Overrides base class to handle ETL-specific output writing
-        (date-partitioned Parquet instead of metrics tables).
-        """
-        try:
-            # Parse arguments
-            parser = self.get_argument_parser()
-            self.args = parser.parse_args()
-
-            # Print header
-            self.print_job_header()
-
-            # Setup Spark
-            self.setup_spark()
-
-            # Setup monitoring
-            self.setup_monitoring("data_processing")
-
-            # Execute core computation
-            metrics = self.compute_metrics()
-
-            # Print summary
-            self.print_summary(metrics)
-
-            # Write enriched output with date partitioning
-            self.write_to_parquet(metrics, self.args.output_path, partition_by=["date"])
-
-            # Log monitoring summary
-            if self.monitoring_ctx:
-                print("\n")
-                log_monitoring_summary(self.monitoring_ctx, "Data Processing Job")
-
-            # Print footer
-            self.print_job_footer(success=True)
-
-            return 0
-
-        except Exception as e:
-            print("\n" + "=" * 60)
-            print(f"❌ Job failed with error: {e!s}")
-            print("=" * 60)
-            traceback.print_exc()
-
-            self.print_job_footer(success=False)
-
-            return 1
-
-        finally:
-            if self.spark:
-                self.spark.stop()
 
 
 def main():

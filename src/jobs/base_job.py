@@ -55,6 +55,7 @@ class BaseAnalyticsJob(ABC):
         self.spark: SparkSession | None = None
         self.monitoring_ctx: dict | None = None
         self.args = None
+        self.partition_by: list[str] = ["date"]  # Default partition columns for parquet output
 
     def read_parquet(self, path: str, name: str = "data") -> DataFrame:
         """
@@ -79,11 +80,11 @@ class BaseAnalyticsJob(ABC):
         return df
 
     def read_csv(
-        self, 
-        path: str, 
+        self,
+        path: str,
         name: str = "data",
         schema: StructType | None = None,
-        num_partitions: int = 1
+        num_partitions: int = 1,
     ) -> DataFrame:
         """
         Generic method to read any CSV file.
@@ -390,7 +391,9 @@ class BaseAnalyticsJob(ABC):
 
             # Write to Parquet if requested
             if hasattr(self.args, "output_path") and self.args.output_path:
-                self.write_to_parquet(metrics, self.args.output_path)
+                self.write_to_parquet(
+                    metrics, self.args.output_path, partition_by=self.partition_by
+                )
 
             # Log monitoring summary
             if self.monitoring_ctx:
