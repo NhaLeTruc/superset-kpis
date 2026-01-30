@@ -45,17 +45,64 @@
       "cache_timeout": 1800
     },
     {
+      "slice_name": "Device Performance Correlation Analysis",
+      "viz_type": "dist_bar",
+      "description": "Performance metrics comparison across device types with statistical significance",
+      "params": {
+        "datasource": "device_correlation",
+        "viz_type": "dist_bar",
+        "groupby": ["device_type"],
+        "metrics": ["avg_duration_ms", "p95_duration_ms"],
+        "order_desc": true,
+        "orderby": [["avg_duration_ms", false]],
+        "y_axis_format": ",d",
+        "y_axis_label": "Duration (ms)",
+        "color_scheme": "supersetColors",
+        "show_legend": true
+      },
+      "query_context": {
+        "sql": "SELECT\n  device_type,\n  ROUND(avg_duration_ms, 2) as avg_duration_ms,\n  ROUND(p95_duration_ms, 2) as p95_duration_ms,\n  total_interactions,\n  unique_users,\n  ROUND(interactions_per_user, 2) as interactions_per_user\nFROM device_correlation\nORDER BY avg_duration_ms DESC"
+      },
+      "cache_timeout": 1800
+    },
+    {
+      "slice_name": "Device-Performance ANOVA Results",
+      "viz_type": "table",
+      "description": "ANOVA statistical analysis showing device type impact on performance",
+      "params": {
+        "datasource": "device_correlation",
+        "viz_type": "table",
+        "groupby": ["device_type", "avg_duration_ms", "p95_duration_ms", "total_interactions", "unique_users", "interactions_per_user", "f_statistic", "eta_squared"],
+        "metrics": [],
+        "row_limit": 50,
+        "order_desc": true,
+        "orderby": [["avg_duration_ms", false]],
+        "column_config": {
+          "avg_duration_ms": {"d3NumberFormat": ",.2f", "label": "Avg Duration (ms)"},
+          "p95_duration_ms": {"d3NumberFormat": ",.2f", "label": "P95 Duration (ms)"},
+          "total_interactions": {"d3NumberFormat": ",d", "label": "Total Interactions"},
+          "unique_users": {"d3NumberFormat": ",d", "label": "Unique Users"},
+          "interactions_per_user": {"d3NumberFormat": ",.2f", "label": "Interactions/User"},
+          "f_statistic": {"d3NumberFormat": ",.4f", "label": "F-Statistic"},
+          "eta_squared": {"d3NumberFormat": ".4f", "label": "Effect Size (eta^2)"}
+        }
+      },
+      "query_context": {
+        "sql": "SELECT\n  device_type,\n  ROUND(avg_duration_ms, 2) as avg_duration_ms,\n  ROUND(p95_duration_ms, 2) as p95_duration_ms,\n  total_interactions,\n  unique_users,\n  ROUND(interactions_per_user, 2) as interactions_per_user,\n  ROUND(f_statistic, 4) as f_statistic,\n  ROUND(eta_squared, 4) as eta_squared\nFROM device_correlation\nORDER BY avg_duration_ms DESC"
+      },
+      "cache_timeout": 1800
+    },
+    {
       "slice_name": "Performance Anomalies Alert Table",
       "viz_type": "table",
       "description": "Recent performance anomalies detected",
       "params": {
         "datasource": "performance_anomalies",
         "viz_type": "table",
-        "groupby": ["detected_at", "severity", "app_version", "metric_name", "metric_value", "z_score", "description"],
+        "groupby": ["detected_time", "severity", "app_version", "device_type", "metric_name", "value", "z_score", "description"],
         "metrics": [],
         "row_limit": 50,
-        "order_desc": true,
-        "orderby": [["detected_at", false]]
+        "orderby": [["detected_time", true]]
       },
       "query_context": {
         "sql": "SELECT\n  TO_CHAR(detected_at, 'YYYY-MM-DD HH24:MI') as detected_time,\n  severity,\n  app_version,\n  device_type,\n  metric_name,\n  ROUND(metric_value, 2) as value,\n  ROUND(z_score, 2) as z_score,\n  description\nFROM performance_anomalies\nWHERE detected_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'\nORDER BY detected_at DESC, severity DESC\nLIMIT 50"

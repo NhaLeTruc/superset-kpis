@@ -14,7 +14,7 @@
       "params": {
         "datasource": "session_metrics",
         "viz_type": "treemap",
-        "groupby": ["CASE\n  WHEN session_duration_ms < 60000 THEN '< 1 min'\n  WHEN session_duration_ms < 300000 THEN '1-5 min'\n  WHEN session_duration_ms < 900000 THEN '5-15 min'\n  WHEN session_duration_ms < 1800000 THEN '15-30 min'\n  ELSE '> 30 min'\nEND"],
+        "groupby": ["duration_bucket"],
         "metric": "COUNT(*)",
         "color_scheme": "supersetColors"
       },
@@ -30,7 +30,7 @@
       "params": {
         "datasource": "session_metrics",
         "viz_type": "pie",
-        "groupby": ["CASE\n  WHEN actions_count = 1 THEN '1 action (Bounce)'\n  WHEN actions_count BETWEEN 2 AND 3 THEN '2-3 actions'\n  WHEN actions_count BETWEEN 4 AND 10 THEN '4-10 actions'\n  ELSE '> 10 actions'\nEND"],
+        "groupby": ["action_bucket"],
         "metric": "COUNT(*)",
         "donut": true,
         "show_labels": true,
@@ -172,14 +172,70 @@
         "sql": "SELECT actions_count\nFROM session_metrics\nWHERE actions_count <= 50\nLIMIT 10000"
       },
       "cache_timeout": 86400
+    },
+    {
+      "slice_name": "User Session Frequency Distribution",
+      "viz_type": "histogram",
+      "description": "Distribution of users by total session count",
+      "params": {
+        "datasource": "session_frequency",
+        "viz_type": "histogram",
+        "all_columns_x": "total_sessions",
+        "row_limit": 10000,
+        "bins": 20,
+        "x_axis_label": "Total Sessions per User",
+        "y_axis_label": "User Count",
+        "color_scheme": "supersetColors"
+      },
+      "query_context": {
+        "sql": "SELECT total_sessions\nFROM session_frequency\nWHERE total_sessions <= 100\nLIMIT 10000"
+      },
+      "cache_timeout": 86400
+    },
+    {
+      "slice_name": "User Engagement Metrics by Device & Country",
+      "viz_type": "table",
+      "description": "Summary of return user metrics aggregated by device type and country",
+      "params": {
+        "datasource": "session_frequency",
+        "viz_type": "table",
+        "groupby": ["device_type", "country"],
+        "metrics": [
+          "COUNT(*)",
+          "AVG(total_sessions)",
+          "AVG(active_days)",
+          "AVG(avg_sessions_per_day)"
+        ],
+        "row_limit": 100,
+        "order_desc": true,
+        "orderby": [["COUNT(*)", false]],
+        "column_aliases": {
+          "COUNT(*)": "User Count",
+          "AVG(total_sessions)": "Avg Sessions/User",
+          "AVG(active_days)": "Avg Active Days",
+          "AVG(avg_sessions_per_day)": "Avg Sessions/Day"
+        }
+      },
+      "query_context": {
+        "sql": "SELECT\n  device_type,\n  country,\n  COUNT(*) as user_count,\n  ROUND(AVG(total_sessions), 2) as avg_sessions_per_user,\n  ROUND(AVG(active_days), 2) as avg_active_days,\n  ROUND(AVG(avg_sessions_per_day), 2) as avg_sessions_per_day,\n  SUM(CASE WHEN total_sessions > 1 THEN 1 ELSE 0 END) as return_users,\n  ROUND(SUM(CASE WHEN total_sessions > 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as return_rate_pct\nFROM session_frequency\nGROUP BY device_type, country\nORDER BY user_count DESC\nLIMIT 100"
+      },
+      "cache_timeout": 21600
     }
   ],
   "filters": [
     {
-      "filter_name": "Date Range",
+      "filter_name": "Session Date",
       "filter_type": "filter_time",
       "targets": [
         ["session_metrics", "session_start_time"],
+        ["session_frequency", "first_session_date"]
+      ],
+      "defaultValue": "Last 30 days"
+    },
+    {
+      "filter_name": "Metric Date",
+      "filter_type": "filter_time",
+      "targets": [
         ["bounce_rates", "metric_date"]
       ],
       "defaultValue": "Last 30 days"
@@ -187,13 +243,19 @@
     {
       "filter_name": "Device Type",
       "filter_type": "filter_select",
-      "targets": [["session_metrics", "device_type"]],
+      "targets": [
+        ["session_metrics", "device_type"],
+        ["session_frequency", "device_type"]
+      ],
       "defaultValue": null
     },
     {
       "filter_name": "Country",
       "filter_type": "filter_select",
-      "targets": [["session_metrics", "country"]],
+      "targets": [
+        ["session_metrics", "country"],
+        ["session_frequency", "country"]
+      ],
       "defaultValue": null
     }
   ],

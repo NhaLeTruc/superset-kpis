@@ -48,9 +48,9 @@
       "params": {
         "datasource": "user_stickiness",
         "viz_type": "gauge_chart",
-        "metric": "stickiness",
+        "metric": "AVG(stickiness)",
         "groupby": [],
-        "time_range": "Last 1 day"
+        "time_range": "Last 7 days"
       },
       "query_context": {
         "sql": "SELECT AVG(stickiness) as avg_stickiness FROM user_stickiness WHERE date >= CURRENT_DATE - INTERVAL '7 days'"
@@ -116,11 +116,16 @@
         "datasource": "daily_active_users",
         "viz_type": "table",
         "groupby": [],
-        "metrics": ["AVG(dau)", "AVG(total_interactions)", "AVG(avg_duration_ms)"],
-        "time_range": "Last 30 days"
+        "metrics": ["AVG(dau)", "AVG(total_interactions)", "SUM(total_duration_ms)/1000/60"],
+        "time_range": "Last 30 days",
+        "column_aliases": {
+          "AVG(dau)": "Avg Daily Active Users",
+          "AVG(total_interactions)": "Avg Daily Interactions",
+          "SUM(total_duration_ms)/1000/60": "Total Minutes"
+        }
       },
       "query_context": {
-        "sql": "SELECT\n  AVG(dau) as avg_daily_active_users,\n  AVG(total_interactions) as avg_daily_interactions,\n  AVG(total_duration_ms)/1000/60 as avg_minutes_per_day\nFROM daily_active_users\nWHERE date >= CURRENT_DATE - INTERVAL '30 days'"
+        "sql": "SELECT\n  AVG(dau) as avg_daily_active_users,\n  AVG(total_interactions) as avg_daily_interactions,\n  SUM(total_duration_ms)/1000/60 as total_minutes\nFROM daily_active_users\nWHERE date >= CURRENT_DATE - INTERVAL '30 days'"
       },
       "cache_timeout": 3600
     },
