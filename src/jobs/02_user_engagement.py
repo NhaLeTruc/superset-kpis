@@ -156,15 +156,19 @@ class UserEngagementJob(BaseAnalyticsJob):
             F.min("daily_active_users").alias("min_dau"),
         ).collect()[0]
         print("\nDaily Active Users:")
-        print(f"  Average DAU: {dau_stats['avg_dau']:,.0f}")
-        print(f"  Max DAU: {dau_stats['max_dau']:,}")
-        print(f"  Min DAU: {dau_stats['min_dau']:,}")
+        avg_dau = dau_stats["avg_dau"] if dau_stats["avg_dau"] is not None else 0.0
+        max_dau = dau_stats["max_dau"] if dau_stats["max_dau"] is not None else 0
+        min_dau = dau_stats["min_dau"] if dau_stats["min_dau"] is not None else 0
+        print(f"  Average DAU: {avg_dau:,.0f}")
+        print(f"  Max DAU: {max_dau:,}")
+        print(f"  Min DAU: {min_dau:,}")
 
         # MAU Summary
         mau_df = metrics["mau"]
         mau_stats = mau_df.agg(F.avg("monthly_active_users").alias("avg_mau")).collect()[0]
         print("\nMonthly Active Users:")
-        print(f"  Average MAU: {mau_stats['avg_mau']:,.0f}")
+        avg_mau = mau_stats["avg_mau"] if mau_stats["avg_mau"] is not None else 0.0
+        print(f"  Average MAU: {avg_mau:,.0f}")
 
         # Stickiness Summary - single aggregation
         stickiness_df = metrics["stickiness"]
@@ -174,9 +178,18 @@ class UserEngagementJob(BaseAnalyticsJob):
             F.min("stickiness_ratio").alias("min_stick"),
         ).collect()[0]
         print("\nStickiness Ratio:")
-        print(f"  Average: {stickiness_stats['avg_stick']:.2%}")
-        print(f"  Max: {stickiness_stats['max_stick']:.2%}")
-        print(f"  Min: {stickiness_stats['min_stick']:.2%}")
+        avg_stick = (
+            stickiness_stats["avg_stick"] if stickiness_stats["avg_stick"] is not None else 0.0
+        )
+        max_stick = (
+            stickiness_stats["max_stick"] if stickiness_stats["max_stick"] is not None else 0.0
+        )
+        min_stick = (
+            stickiness_stats["min_stick"] if stickiness_stats["min_stick"] is not None else 0.0
+        )
+        print(f"  Average: {avg_stick:.2%}")
+        print(f"  Max: {max_stick:.2%}")
+        print(f"  Min: {min_stick:.2%}")
 
         # Power Users Summary - single aggregation combining count and sum
         power_users_df = metrics["power_users"]

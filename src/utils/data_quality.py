@@ -11,12 +11,13 @@ from typing import TYPE_CHECKING
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+
 if TYPE_CHECKING:
     from pyspark.sql.types import StructType
 
 
 def validate_schema(
-    df: DataFrame, expected_schema: StructType, strict: bool = True
+    df: DataFrame | None, expected_schema: StructType | None, strict: bool = True
 ) -> tuple[bool, list[str]]:
     """
     Validate DataFrame schema.
@@ -35,7 +36,15 @@ def validate_schema(
         - "Missing column: 'user_id'"
         - "Column 'duration_ms' has type LongType but expected IntegerType"
         - "Extra column: 'unknown_column'"
+
+    Raises:
+        ValueError: If df or expected_schema is None
     """
+    if df is None:
+        raise ValueError("DataFrame cannot be None")
+    if expected_schema is None:
+        raise ValueError("expected_schema cannot be None")
+
     errors = []
     actual_schema = df.schema
 
@@ -144,9 +153,9 @@ def detect_outliers(  # noqa: PLR0912
 
     Args:
         df: DataFrame to check
-        column: Numeric column to analyze
+        column: Numeric column to analyze (must be numeric type)
         method: "iqr" or "threshold"
-        iqr_multiplier: Multiplier for IQR method (default: 1.5)
+        iqr_multiplier: Multiplier for IQR method (default: 1.5, must be positive)
         threshold_min: Minimum threshold (for threshold method)
         threshold_max: Maximum threshold (for threshold method)
 
@@ -154,10 +163,24 @@ def detect_outliers(  # noqa: PLR0912
         DataFrame with only outlier rows, plus columns:
             - outlier_reason (StringType): "below_min", "above_max", or "iqr_outlier"
             - outlier_value (DoubleType): The outlier value
+
+    Raises:
+        ValueError: If column doesn't exist, is not numeric, or iqr_multiplier <= 0
     """
     # Validate column exists
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
+
+    # Validate column is numeric
+    from pyspark.sql.types import NumericType
+
+    column_type = df.schema[column].dataType
+    if not isinstance(column_type, NumericType):
+        raise ValueError(f"Column '{column}' must be numeric, got {column_type.simpleString()}")
+
+    # Validate iqr_multiplier is positive
+    if iqr_multiplier <= 0:
+        raise ValueError(f"iqr_multiplier must be positive, got {iqr_multiplier}")
 
     if method == "iqr":
         # Filter out nulls before calculating quartiles

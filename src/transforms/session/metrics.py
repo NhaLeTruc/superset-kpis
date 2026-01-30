@@ -62,7 +62,8 @@ def _parse_session_timeout(session_timeout: str) -> int:
 
 
 def calculate_session_metrics(
-    interactions_df: DataFrame, session_timeout: str = "1800 seconds"
+    interactions_df: DataFrame,
+    session_timeout: str | int = "1800 seconds",
 ) -> DataFrame:
     """
     Calculate session metrics using Spark's native session_window().
@@ -79,7 +80,9 @@ def calculate_session_metrics(
 
     Args:
         interactions_df: DataFrame with columns [user_id, timestamp, duration_ms]
-        session_timeout: Gap duration that triggers new session (default: "1800 seconds")
+        session_timeout: Gap duration that triggers new session. Can be:
+            - A string (e.g., "1800 seconds", "30 minutes")
+            - An integer (seconds, e.g., 1800)
 
     Returns:
         DataFrame with session-level metrics
@@ -97,11 +100,18 @@ def calculate_session_metrics(
 
     Example:
         >>> metrics_df = calculate_session_metrics(interactions_df, session_timeout="1800 seconds")
+        >>> metrics_df = calculate_session_metrics(interactions_df, session_timeout=1800)  # Also valid
         >>> metrics_df.filter("is_bounce = true").count()
         1542  # Number of bounce sessions
     """
-    # Validate session_timeout format early (fail-fast)
-    _parse_session_timeout(session_timeout)
+    # Convert integer to string format if needed
+    if isinstance(session_timeout, int):
+        if session_timeout <= 0:
+            raise ValueError(f"Session timeout must be positive, got {session_timeout}")
+        session_timeout = f"{session_timeout} seconds"
+    else:
+        # Validate session_timeout format early (fail-fast)
+        _parse_session_timeout(session_timeout)
 
     # Validate required columns
     required_cols = [COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS]

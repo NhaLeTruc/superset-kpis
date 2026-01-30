@@ -88,11 +88,13 @@ def apply_salting(
 
     # For hot keys: random salt 0 to (salt_factor-1)
     # For non-hot keys: salt = 0
+    # Using floor() ensures uniform distribution across all salt buckets
     df_with_salt = df_with_marker.withColumn(
         "salt",
-        F.when(F.col("is_hot_key").isNotNull(), (F.rand() * salt_factor).cast("int")).otherwise(
-            F.lit(0)
-        ),
+        F.when(
+            F.col("is_hot_key").isNotNull(),
+            F.floor(F.rand() * salt_factor).cast("int"),
+        ).otherwise(F.lit(0)),
     )
 
     # Create {key_column}_salted column
@@ -147,10 +149,12 @@ def explode_for_salting(
     # Create salt values array for explosion
     # For hot keys: array(0, 1, 2, ..., salt_factor-1)
     # For non-hot keys: array(0)
+    # Using F.sequence is more efficient than Python list comprehension
     df_with_salt_array = df_with_marker.withColumn(
         "salt_array",
         F.when(
-            F.col("is_hot_key").isNotNull(), F.array(*[F.lit(i) for i in range(salt_factor)])
+            F.col("is_hot_key").isNotNull(),
+            F.sequence(F.lit(0), F.lit(salt_factor - 1)),
         ).otherwise(F.array(F.lit(0))),
     )
 

@@ -6,11 +6,11 @@
 |----------|-------|-------|-------------|
 | Critical | 5 | 5 | Bugs causing incorrect results or runtime failures |
 | High | 11 | 11 | Performance issues and PySpark anti-patterns |
-| Medium | 15 | 5 | Code quality, missing validation, deprecated APIs |
-| Low | 10+ | 1 | Documentation and minor improvements |
+| Medium | 15 | 9 | Code quality, missing validation, deprecated APIs |
+| Low | 10+ | 7 | Documentation and minor improvements |
 
 **Total Issues Identified: ~41**
-**Issues Fixed: 22**
+**Issues Fixed: 32**
 
 ---
 
@@ -37,17 +37,27 @@ The following issues have been addressed:
 - [x] #15 Null/zero division - Proper check in active_users.py
 - [x] #16 Unsafe division in skew ratio - Fixed in reporting.py
 
-### Medium Severity (Partially Fixed)
+### Medium Severity (Mostly Fixed)
 
 - [x] #17 Deprecated API - Uses `sparkSession` instead of `sql_ctx`
 - [x] #18 print() in production - Removed
+- [x] #19 Generic exception catching - Uses `logger.exception()` for full traceback
 - [x] #21 DataFrame persistence lifecycle - Added try-finally
+- [x] #23 Missing parameter validation - Added None checks to validate_schema()
+- [x] #24 Missing input validation - Added numeric type and iqr_multiplier validation to detect_outliers()
 - [x] #25 Regex pattern - Made flexible with `\s*`
+- [x] #26 Inconsistent null safety - Added null checks in print_summary aggregation results
 - [x] #29-30 Percentiles issues - Fixed collect and added cache
 
-### Low Severity (Partially Fixed)
+### Low Severity (Mostly Fixed)
 
 - [x] #25 Session timeout regex - Made flexible
+- [x] #31 Missing type annotation - Added SparkContext type hint to context.py
+- [x] #34 Redundant Z-Score logic - Extracted _calculate_zscore() helper function
+- [x] #35 Suboptimal salt generation - Uses F.floor() for uniform distribution
+- [x] #36 Array expansion inefficiency - Uses F.sequence() instead of list comprehension
+- [x] #38 Float("inf") code smell - Uses sys.maxsize with _MIN_PARTITION_SENTINEL constant
+- [x] #41 Session timeout string format - Accepts integer parameter directly
 
 ---
 
@@ -218,10 +228,11 @@ The following issues have been addressed:
 - **Description**: Using `print()` bypasses logging configuration.
 - **Suggested Fix**: Remove `print()` call; `logger.info()` is sufficient.
 
-#### 19. Generic Exception Catching
+#### 19. Generic Exception Catching ✅ FIXED
 - **File**: `src/utils/monitoring/reporting.py:129-131`
 - **Description**: Catching `Exception` is too broad and masks programming errors.
 - **Suggested Fix**: Catch specific exceptions or use `exc_info=True` for full traceback.
+- **Resolution**: Changed to use `logger.exception()` which automatically includes full traceback.
 
 #### 20. Hardcoded Column Names in String Concatenation
 - **File**: `src/jobs/03_performance_metrics.py:196-214`
@@ -240,15 +251,17 @@ The following issues have been addressed:
 
 ### Missing Validation
 
-#### 23. Missing Parameter Validation in validate_schema()
+#### 23. Missing Parameter Validation in validate_schema() ✅ FIXED
 - **File**: `src/utils/data_quality.py:14-67`
 - **Description**: No check if `expected_schema` or `df` is None.
 - **Suggested Fix**: Add parameter validation at start.
+- **Resolution**: Added None checks with informative ValueError messages.
 
-#### 24. Missing Input Validation in detect_outliers()
+#### 24. Missing Input Validation in detect_outliers() ✅ FIXED
 - **File**: `src/utils/data_quality.py:121-233`
 - **Description**: No validation that `column` contains numeric data or that `iqr_multiplier` is positive.
 - **Suggested Fix**: Add explicit validation with informative error messages.
+- **Resolution**: Added NumericType validation for column and positive check for iqr_multiplier.
 
 #### 25. Overly Restrictive Regex Pattern
 - **File**: `src/transforms/session/metrics.py:51-60`
@@ -257,10 +270,11 @@ The following issues have been addressed:
 
 ### Null Handling Issues
 
-#### 26. Inconsistent Null Safety in Aggregations
+#### 26. Inconsistent Null Safety in Aggregations ✅ FIXED
 - **File**: `src/jobs/02_user_engagement.py:155-193`
 - **Description**: Inconsistent null checking when accessing aggregation results.
 - **Suggested Fix**: Wrap all aggregation results in null-safe accessors.
+- **Resolution**: Added null-safe accessors for all DAU, MAU, and stickiness aggregation results.
 
 #### 27. Missing Null Checks Before collect() Access
 - **File**: `src/jobs/03_performance_metrics.py:263-265, 283, 290-292`
@@ -288,10 +302,11 @@ The following issues have been addressed:
 
 ### Documentation & Code Quality
 
-#### 31. Missing Type Annotation
+#### 31. Missing Type Annotation ✅ FIXED
 - **File**: `src/utils/monitoring/context.py:23`
 - **Description**: `spark_context` parameter missing type annotation.
 - **Suggested Fix**: Add `from pyspark import SparkContext` and annotate.
+- **Resolution**: Added TYPE_CHECKING import with SparkContext type hint.
 
 #### 32. Emoji in Production Logging
 - **Files**: `src/utils/monitoring/context.py:57`, `reporting.py:51,54,56,124,127,130`
@@ -303,30 +318,34 @@ The following issues have been addressed:
 - **Description**: Struct-based approach for last duration is clever but not well documented.
 - **Suggested Fix**: Add comment explaining why struct comparison works.
 
-#### 34. Redundant Z-Score Calculation Logic
+#### 34. Redundant Z-Score Calculation Logic ✅ FIXED
 - **File**: `src/transforms/performance/anomalies.py:67-76, 107-115`
 - **Description**: Duplicate z-score calculation logic.
 - **Suggested Fix**: Extract into helper function.
+- **Resolution**: Extracted `_calculate_zscore()` helper function for reuse.
 
-#### 35. Suboptimal Salt Generation
+#### 35. Suboptimal Salt Generation ✅ FIXED
 - **File**: `src/transforms/join/optimization.py:92-95`
 - **Description**: `F.rand() * salt_factor` produces non-uniform distribution at boundaries.
 - **Suggested Fix**: Use `F.floor(F.rand() * salt_factor).cast("int")`.
+- **Resolution**: Added F.floor() for uniform distribution across salt buckets.
 
-#### 36. Array Expansion Inefficiency
+#### 36. Array Expansion Inefficiency ✅ FIXED
 - **File**: `src/transforms/join/optimization.py:150-155`
 - **Description**: List comprehension creates many Lit expressions.
 - **Suggested Fix**: Use `F.sequence(F.lit(0), F.lit(salt_factor - 1))`.
+- **Resolution**: Replaced Python list comprehension with F.sequence() for efficiency.
 
 #### 37. Unnecessary Sorting of Extra Columns
 - **File**: `src/transforms/session/metrics.py:128-129`
 - **Description**: Sorted extra columns adds small overhead.
 - **Note**: Keep for determinism, but document why.
 
-#### 38. Float("inf") Code Smell
+#### 38. Float("inf") Code Smell ✅ FIXED
 - **File**: `src/utils/monitoring/accumulators.py:86-96`
 - **Description**: Using `float("inf")` in accumulator state could cause serialization issues.
 - **Suggested Fix**: Use `sys.maxsize` or document the approach.
+- **Resolution**: Added `_MIN_PARTITION_SENTINEL = sys.maxsize` constant and updated all usages.
 
 #### 39. Unconditional unpersist()
 - **File**: `src/jobs/01_data_processing.py:142-143`
@@ -338,10 +357,11 @@ The following issues have been addressed:
 - **Description**: DataFrame persisted in print_summary() just before job termination.
 - **Suggested Fix**: Remove `.persist()` or combine aggregations.
 
-#### 41. Session Timeout String Format
+#### 41. Session Timeout String Format ✅ FIXED
 - **File**: `src/jobs/04_session_analysis.py:105-106`
 - **Description**: Fragile string format for timeout parameter.
 - **Suggested Fix**: Pass timeout as integer, let transform function format it.
+- **Resolution**: Updated `calculate_session_metrics()` to accept `int | str` and handle conversion internally.
 
 ---
 

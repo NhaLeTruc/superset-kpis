@@ -10,9 +10,15 @@ Provides specialized accumulators for tracking metrics across Spark partitions:
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from pyspark import AccumulatorParam
+
+
+# Sentinel value for uninitialized min_partition_size
+# Using sys.maxsize instead of float("inf") to avoid serialization issues
+_MIN_PARTITION_SENTINEL = sys.maxsize
 
 
 class RecordCounterAccumulator(AccumulatorParam):
@@ -85,7 +91,11 @@ class PartitionSkewDetector(AccumulatorParam):
 
     def zero(self, initial_value: dict[str, Any]) -> dict[str, Any]:
         """Return the zero value for this accumulator."""
-        return {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0}
+        return {
+            "max_partition_size": 0,
+            "min_partition_size": _MIN_PARTITION_SENTINEL,
+            "partition_count": 0,
+        }
 
     def addInPlace(self, v1: dict[str, Any], v2: dict[str, Any]) -> dict[str, Any]:
         """Merge two partition info dictionaries."""

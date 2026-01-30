@@ -11,6 +11,8 @@ from collections.abc import Callable  # noqa: TC003 - used at runtime
 from functools import wraps
 from typing import Any
 
+from .accumulators import _MIN_PARTITION_SENTINEL
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +72,9 @@ def format_monitoring_summary(context: dict[str, Any], job_name: str) -> str:
     if skew_info["partition_count"] > 0:
         max_size = skew_info["max_partition_size"]
         min_size = skew_info["min_partition_size"]
-        # Safe division: handle inf, zero, and edge cases
-        if min_size > 0 and min_size != float("inf"):
+        # Safe division: handle sentinel value, zero, and edge cases
+        is_sentinel = min_size == _MIN_PARTITION_SENTINEL
+        if min_size > 0 and not is_sentinel:
             skew_ratio = max_size / min_size
         elif max_size > 0:
             skew_ratio = float("inf")
@@ -81,7 +84,7 @@ def format_monitoring_summary(context: dict[str, Any], job_name: str) -> str:
         lines.append("📦 Partition Distribution:")
         lines.append(f"   - Partitions Processed: {skew_info['partition_count']}")
         lines.append(f"   - Max Partition Size: {max_size:,}")
-        lines.append(f"   - Min Partition Size: {min_size if min_size != float('inf') else 0:,}")
+        lines.append(f"   - Min Partition Size: {min_size if not is_sentinel else 0:,}")
 
         if skew_ratio > 0:
             lines.append(f"   - Skew Ratio: {skew_ratio:.2f}x")
@@ -132,8 +135,8 @@ def with_monitoring(operation_name: str) -> Callable:
                 result = func(*args, **kwargs)
                 logger.info(f"✅ Completed operation: {operation_name}")
                 return result
-            except Exception as e:
-                logger.error(f"❌ Failed operation: {operation_name} - {e!s}")
+            except Exception:
+                logger.exception(f"❌ Failed operation: {operation_name}")
                 raise
 
         return wrapper

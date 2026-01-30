@@ -6,10 +6,31 @@ Implements Z-score based anomaly detection with iterative baseline refinement.
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from src.config.constants import Z_SCORE_ANOMALY_THRESHOLD
+
+
+def _calculate_zscore(value_col: Column, mean_col: Column, stddev_col: Column) -> Column:
+    """
+    Calculate Z-score with safe handling for zero/null standard deviation.
+
+    When stddev is 0 or null (all values identical), returns 0 (no anomalies possible).
+
+    Args:
+        value_col: Column with the value to score
+        mean_col: Column with the mean value
+        stddev_col: Column with the standard deviation
+
+    Returns:
+        Column with Z-score values
+    """
+    return (
+        F.when((stddev_col.isNull()) | (stddev_col == 0), F.lit(0.0))
+        .otherwise((value_col - mean_col) / stddev_col)
+        .cast("double")
+    )
 
 
 def detect_anomalies_statistical(
@@ -64,15 +85,9 @@ def detect_anomalies_statistical(
         )
 
     # Step 2: Calculate initial z-scores and identify non-anomalous data
-    # When stddev is 0 or null (all values identical), z-score is 0 (no anomalies possible)
     df_with_initial_zscore = df_with_initial_stats.withColumn(
         "initial_z_score",
-        F.when(
-            (F.col("initial_stddev").isNull()) | (F.col("initial_stddev") == 0),
-            F.lit(0.0),
-        )
-        .otherwise((F.col(value_column) - F.col("initial_mean")) / F.col("initial_stddev"))
-        .cast("double"),
+        _calculate_zscore(F.col(value_column), F.col("initial_mean"), F.col("initial_stddev")),
     )
 
     # Filter to non-anomalous data (|z| <= threshold)
@@ -103,15 +118,9 @@ def detect_anomalies_statistical(
         )
 
     # Step 4: Calculate final z-scores using refined baseline
-    # When stddev is 0 or null (all values identical), z-score is 0 (no anomalies possible)
     df_with_zscore = df_with_refined_stats.withColumn(
         "z_score",
-        F.when(
-            (F.col("baseline_stddev").isNull()) | (F.col("baseline_stddev") == 0),
-            F.lit(0.0),
-        )
-        .otherwise((F.col(value_column) - F.col("baseline_mean")) / F.col("baseline_stddev"))
-        .cast("double"),
+        _calculate_zscore(F.col(value_column), F.col("baseline_mean"), F.col("baseline_stddev")),
     )
 
     # Filter to anomalies (|z_score| > threshold)

@@ -7,9 +7,10 @@ Provides factory function for creating monitoring contexts with all accumulators
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .accumulators import (
+    _MIN_PARTITION_SENTINEL,
     DataQualityErrorsAccumulator,
     PartitionSkewDetector,
     RecordCounterAccumulator,
@@ -17,10 +18,14 @@ from .accumulators import (
 )
 
 
+if TYPE_CHECKING:
+    from pyspark import SparkContext
+
+
 logger = logging.getLogger(__name__)
 
 
-def create_monitoring_context(spark_context, job_name: str) -> dict[str, Any]:
+def create_monitoring_context(spark_context: SparkContext, job_name: str) -> dict[str, Any]:
     """
     Create a monitoring context with all accumulators initialized.
 
@@ -50,7 +55,11 @@ def create_monitoring_context(spark_context, job_name: str) -> dict[str, Any]:
 
     # Partition skew detector
     context["partition_skew"] = spark_context.accumulator(
-        {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0},
+        {
+            "max_partition_size": 0,
+            "min_partition_size": _MIN_PARTITION_SENTINEL,
+            "partition_count": 0,
+        },
         PartitionSkewDetector(),
     )
 

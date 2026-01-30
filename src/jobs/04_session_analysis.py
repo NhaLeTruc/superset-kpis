@@ -102,8 +102,10 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         print("\n📊 Calculating session metrics...")
         print("   ⏱️  Session timeout: 30 minutes")
 
-        session_timeout = f"{SESSION_TIMEOUT_SECONDS} seconds"
-        session_metrics_df = calculate_session_metrics(enriched_df, session_timeout=session_timeout)
+        # Pass timeout as integer - the function handles conversion internally
+        session_metrics_df = calculate_session_metrics(
+            enriched_df, session_timeout=SESSION_TIMEOUT_SECONDS
+        )
 
         # Add metric date for time-series analysis
         session_metrics_df = session_metrics_df.withColumn(
