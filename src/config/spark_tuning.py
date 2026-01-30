@@ -54,7 +54,7 @@ def configure_job_specific_settings(
     if job_type == "etl":
         # ETL jobs: more partitions for large data processing
         if data_size_gb:
-            partitions = calculate_optimal_partitions(data_size_gb)
+            partitions = calculate_optimal_partitions(data_size_gb, partition_size_mb=128)
         else:
             partitions = 400  # Default fallback
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
@@ -65,7 +65,7 @@ def configure_job_specific_settings(
         # Analytics: fewer partitions, more broadcasting
         if data_size_gb:
             # For analytics, use smaller partitions (256MB) for faster queries
-            partitions = max(20, int((data_size_gb * 1024) / 256))
+            partitions = calculate_optimal_partitions(data_size_gb, partition_size_mb=256)
         else:
             partitions = 20  # Default fallback
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
@@ -76,7 +76,7 @@ def configure_job_specific_settings(
         # ML: more memory for caching, fewer partitions
         if data_size_gb:
             # For ML, use larger partitions (512MB) to reduce overhead
-            partitions = max(50, int((data_size_gb * 1024) / 512))
+            partitions = calculate_optimal_partitions(data_size_gb, partition_size_mb=512)
         else:
             partitions = 50  # Default fallback
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
@@ -93,41 +93,3 @@ def configure_job_specific_settings(
 
     else:
         print(f"⚠️  Unknown job type: {job_type}. Using default settings.")
-
-
-def apply_performance_profile(spark: SparkSession, profile_name: str) -> None:
-    """
-    Apply a pre-configured performance profile.
-
-    Args:
-        spark: Active SparkSession
-        profile_name: Profile name - 'high_throughput', 'low_latency', 'memory_intensive'
-
-    Profiles:
-        - 'high_throughput': Maximize data processing throughput
-        - 'low_latency': Optimize for query response time
-        - 'memory_intensive': Optimize for in-memory operations
-
-    Example:
-        >>> apply_performance_profile(spark, 'high_throughput')
-    """
-    if profile_name == "high_throughput":
-        spark.conf.set("spark.sql.shuffle.partitions", "600")
-        spark.conf.set("spark.default.parallelism", "600")
-        spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "30MB")
-        print("🚀 Applied high_throughput profile (600 partitions, 30MB broadcast)")
-
-    elif profile_name == "low_latency":
-        spark.conf.set("spark.sql.shuffle.partitions", "50")
-        spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "500MB")
-        spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        print("⚡ Applied low_latency profile (50 partitions, 500MB broadcast)")
-
-    elif profile_name == "memory_intensive":
-        spark.conf.set("spark.sql.shuffle.partitions", "100")
-        spark.conf.set("spark.memory.storageFraction", "0.6")
-        spark.conf.set("spark.memory.fraction", "0.9")
-        print("💾 Applied memory_intensive profile (60% storage, 90% memory)")
-
-    else:
-        print(f"⚠️  Unknown profile: {profile_name}")

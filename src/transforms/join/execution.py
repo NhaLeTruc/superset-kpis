@@ -61,7 +61,7 @@ def optimized_join(
     large_df: DataFrame,
     small_df: DataFrame,
     join_key: str,
-    join_type: str = "inner",
+    join_type: str = "left",
     hot_keys_df: DataFrame = None,
     enable_broadcast: bool = True,
     enable_salting: bool = True,

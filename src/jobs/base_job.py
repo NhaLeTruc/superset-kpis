@@ -78,22 +78,33 @@ class BaseAnalyticsJob(ABC):
         print(f"   ✅ Loaded {record_count:,} records. Please unpersist when done.")
         return df
 
-    def read_csv(self, path: str, name: str = "data", num_partitions: int = 0) -> DataFrame:
+    def read_csv(
+        self, 
+        path: str, 
+        name: str = "data",
+        schema: StructType | None = None,
+        num_partitions: int = 1
+    ) -> DataFrame:
         """
         Generic method to read any CSV file.
 
         Args:
             path: Path to CSV file
             name: Display name for logging
+            schema: Optional StructType schema for reading
+            num_partitions: Number of partitions to repartition DataFrame into
 
         Returns:
             DataFrame
         """
         print(f"📖 Reading {name} from: {path}")
-        df = self.spark.read.csv(path, header=True, inferSchema=True)
-        if num_partitions:
-            df = df.repartition(num_partitions)
-        df = df.persist()
+
+        if schema:
+            df = self.spark.read.csv(path, header=True, schema=schema)
+        else:
+            df = self.spark.read.csv(path, header=True, inferSchema=True)
+
+        df = df.repartition(num_partitions).persist()
         record_count = df.count()
 
         # Track in monitoring

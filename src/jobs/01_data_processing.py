@@ -106,9 +106,18 @@ class DataProcessingJob(BaseAnalyticsJob):
         Returns:
             Dictionary with enriched DataFrame
         """
-        # Read input data
-        interactions_df = self.read_csv(self.args.interactions_path, name="interactions")
-        metadata_df = self.read_csv(self.args.metadata_path, name="user metadata")
+        # Read input data from generated CSV files
+        interactions_df = self.read_csv(self.args.interactions_path, name="interactions", schema=INTERACTIONS_SCHEMA, num_partitions=1)
+        metadata_df = self.read_csv(self.args.metadata_path, name="user metadata", schema=METADATA_SCHEMA, num_partitions=1)
+
+        # If you're reading huge data (> 10GB) from production parquet files, 
+        # Consider increasing num_partitions using spark_tuning.py's calculate_optimal_partitions().
+        # For example:
+        #   opt_partitions = calculate_optimal_partitions(data_size_gb=50, partition_size_mb=128)
+        #   interactions_df = self.read_parquet(self.args.interactions_path, name="interactions", num_partitions=opt_partitions)
+        # -----------------------------------------------------------------------------------------------------------
+        #   opt_partitions = calculate_optimal_partitions(data_size_gb=5, partition_size_mb=128)
+        #   metadata_df = self.read_parquet(self.args.metadata_path, name="user metadata", num_partitions=opt_partitions)
 
         # Track initial record count
         interaction_count = interactions_df.count()
