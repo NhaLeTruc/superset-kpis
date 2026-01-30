@@ -164,14 +164,18 @@ def calculate_session_metrics(
     # Calculate session duration: time span + last action duration
     # For single action: session_duration = action duration
     # For multiple actions: session_duration = (last_timestamp - first_timestamp) + last_action_duration
-    # Note: We use total_action_duration_ms directly which is more accurate than time span calculation
+    # session_window provides start (first event time) and end (last event time + gap threshold)
+    # So we calculate: (session_end_time - gap_threshold - session_start_time) + last_action_duration
+    # But simpler: use (session_end_time - session_start_time) as base, then subtract gap and add action
+    # Actually, let's use: unix_timestamp difference in ms + last_action_duration
     session_metrics_with_duration = session_metrics_with_id.withColumn(
         COL_SESSION_DURATION_MS,
         F.when(F.col(COL_ACTION_COUNT) == 1, F.col("last_action_duration_ms"))
         .otherwise(
-            # Use the sum of all action durations for multi-action sessions
-            # This is more accurate than timestamp-based calculation
-            F.col("total_action_duration_ms")
+            # Time from first to last interaction + last action duration
+            (F.unix_timestamp("session_end_time") - F.unix_timestamp("session_start_time")) * 1000
+            - _parse_session_timeout(session_timeout) * 1000  # Subtract the gap threshold
+            + F.col("last_action_duration_ms")
         )
         .cast(LongType()),
     )

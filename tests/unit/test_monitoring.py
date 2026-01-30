@@ -132,6 +132,8 @@ class TestMonitoringHelpers:
 
     def test_create_monitoring_context(self, spark):
         """Test creating a monitoring context with all accumulators."""
+        import sys
+
         from src.utils.monitoring import create_monitoring_context
 
         context = create_monitoring_context(spark.sparkContext, "test_job")
@@ -146,9 +148,10 @@ class TestMonitoringHelpers:
         assert context["record_counter"].value == 0
         assert context["skipped_records"].value == 0
         assert context["data_quality_errors"].value == {}
+        # Note: sys.maxsize is used instead of float("inf") to avoid serialization issues
         assert context["partition_skew"].value == {
             "max_partition_size": 0,
-            "min_partition_size": float("inf"),
+            "min_partition_size": sys.maxsize,
             "partition_count": 0,
         }
 
