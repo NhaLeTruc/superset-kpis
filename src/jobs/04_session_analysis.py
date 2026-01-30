@@ -295,40 +295,43 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         # Session Frequency Summary
         if "session_frequency" in metrics:
-            freq_df = metrics["session_frequency"]
-            print("\nSession Frequency:")
-
-            freq_stats = freq_df.agg(
-                F.avg("total_sessions").alias("avg_sessions"),
-                F.max("total_sessions").alias("max_sessions"),
-                F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
-                (
-                    F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
-                ).alias("return_rate"),
-            ).collect()[0]
-
-            avg_sessions = freq_stats["avg_sessions"] or 0
-            max_sessions = freq_stats["max_sessions"] or 0
-            avg_daily = freq_stats["avg_daily_freq"] or 0
-            return_rate = freq_stats["return_rate"] or 0
-
-            print(f"  Avg Sessions per User: {avg_sessions:.2f}")
-            print(f"  Max Sessions per User: {int(max_sessions):,}")
-            print(f"  Avg Daily Session Frequency: {avg_daily:.2f}")
-            print(f"  Return User Rate (2+ sessions): {return_rate:.1f}%")
-
-            # Session frequency by device
-            device_freq = (
-                freq_df.groupBy(COL_DEVICE_TYPE)
-                .agg(F.avg("total_sessions").alias("avg_sessions"))
-                .orderBy(F.desc("avg_sessions"))
-            )
-
-            print("  Avg Sessions by Device Type:")
-            for row in device_freq.collect():
-                print(f"    {row[COL_DEVICE_TYPE]}: {row['avg_sessions']:.2f}")
+            self._print_frequency_summary(metrics["session_frequency"])
 
         print("=" * 60)
+
+    def _print_frequency_summary(self, freq_df: DataFrame) -> None:
+        """Print session frequency summary."""
+        print("\nSession Frequency:")
+
+        freq_stats = freq_df.agg(
+            F.avg("total_sessions").alias("avg_sessions"),
+            F.max("total_sessions").alias("max_sessions"),
+            F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
+            (
+                F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
+            ).alias("return_rate"),
+        ).collect()[0]
+
+        avg_sessions = freq_stats["avg_sessions"] or 0
+        max_sessions = freq_stats["max_sessions"] or 0
+        avg_daily = freq_stats["avg_daily_freq"] or 0
+        return_rate = freq_stats["return_rate"] or 0
+
+        print(f"  Avg Sessions per User: {avg_sessions:.2f}")
+        print(f"  Max Sessions per User: {int(max_sessions):,}")
+        print(f"  Avg Daily Session Frequency: {avg_daily:.2f}")
+        print(f"  Return User Rate (2+ sessions): {return_rate:.1f}%")
+
+        # Session frequency by device
+        device_freq = (
+            freq_df.groupBy(COL_DEVICE_TYPE)
+            .agg(F.avg("total_sessions").alias("avg_sessions"))
+            .orderBy(F.desc("avg_sessions"))
+        )
+
+        print("  Avg Sessions by Device Type:")
+        for row in device_freq.collect():
+            print(f"    {row[COL_DEVICE_TYPE]}: {row['avg_sessions']:.2f}")
 
     def get_table_mapping(self) -> dict[str, str]:
         """Get database table mapping."""

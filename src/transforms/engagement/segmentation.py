@@ -16,6 +16,7 @@ from pyspark.sql.types import DoubleType, StructField
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.schemas.columns import COL_DURATION_MS, COL_PAGE_ID, COL_TIMESTAMP, COL_USER_ID
 
+
 logger = logging.getLogger(__name__)
 
 

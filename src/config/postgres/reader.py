@@ -6,7 +6,11 @@ Handles reading data from PostgreSQL into Spark DataFrames.
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, SparkSession
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame, SparkSession
 
 from .connection import get_postgres_connection_props
 

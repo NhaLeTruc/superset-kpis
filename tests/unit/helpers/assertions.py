@@ -6,7 +6,11 @@ Provides reusable assertion helpers for common test patterns.
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame
 
 
 def assert_dataframe_schema(df: DataFrame, expected_columns: list[str]) -> None:

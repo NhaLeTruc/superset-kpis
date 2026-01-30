@@ -16,13 +16,17 @@ Jobs should inherit from BaseAnalyticsJob and implement:
 
 from __future__ import annotations
 
-import argparse
 import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.types import StructType
+
+if TYPE_CHECKING:
+    import argparse
+
+    from pyspark.sql import DataFrame, SparkSession
+    from pyspark.sql.types import StructType
 
 from src.config.database_config import write_to_postgres
 from src.config.spark_config import configure_job_specific_settings, create_spark_session

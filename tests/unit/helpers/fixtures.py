@@ -8,8 +8,11 @@ Eliminates duplication of data generation logic across tests.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING
 
-from pyspark.sql import DataFrame, SparkSession
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame, SparkSession
 
 from .schemas import interactions_schema, metadata_schema
 
