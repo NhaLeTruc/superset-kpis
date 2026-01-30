@@ -21,16 +21,14 @@
 superset-kpis/
 ├── README.md                      ✅ Root (exception)
 ├── docs/                          ✅ All other .md files here
-│   ├── TDD_SPEC.md
-│   ├── TDD_ENFORCEMENT_GUIDE.md
-│   ├── IMPLEMENTATION_PLAN.md
-│   ├── IMPLEMENTATION_TASKS.md
-│   ├── ARCHITECTURE.md
-│   ├── PROJECT_STRUCTURE.md
-│   ├── SETUP_GUIDE.md                 # Troubleshooting guide
-│   └── SUPERSET_DASHBOARDS.md         # Dashboard specifications
-└── challenge/
-    └── TheChallenge.md            ✅ Subdirectory OK
+   ├── TDD_SPEC.md
+   ├── TDD_ENFORCEMENT_GUIDE.md
+   ├── IMPLEMENTATION_PLAN.md
+   ├── IMPLEMENTATION_TASKS.md
+   ├── ARCHITECTURE.md
+   ├── PROJECT_STRUCTURE.md
+   ├── SETUP_GUIDE.md                 # Troubleshooting guide
+   └── SUPERSET_DASHBOARDS.md         # Dashboard specifications
 ```
 
 ### Enforcement
