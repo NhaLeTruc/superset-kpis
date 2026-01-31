@@ -27,5 +27,5 @@ python-dotenv>=1.0.0  # Environment variable management
 # =============================================================================
 ruff>=0.9.0           # Linting, formatting, import sorting
 mypy>=1.14.0          # Static type checking
-bandit>=1.8.0         # Security analysis
-pre-commit>=4.0.0     # Pre-commit hook framework
+bandit>=1.7.0         # Security analysis (1.7.x for Python 3.8 compatibility)
+pre-commit>=3.5.0     # Pre-commit hook framework (3.x for Python 3.8 compatibility)

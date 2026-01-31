@@ -11,6 +11,11 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.
 RUN curl -fSL https://jdbc.postgresql.org/download/postgresql-42.7.1.jar \
     -o /opt/spark/jars/postgresql-42.7.1.jar
 
+# Configure JDBC driver as default classpath for all Spark jobs
+RUN mkdir -p /opt/spark/conf && \
+    echo "spark.driver.extraClassPath /opt/spark/jars/postgresql-42.7.1.jar" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.executor.extraClassPath /opt/spark/jars/postgresql-42.7.1.jar" >> /opt/spark/conf/spark-defaults.conf
+
 # Create required runtime directories
 RUN mkdir -p /tmp/spark-events /app/data/raw /app/data/processed
 
