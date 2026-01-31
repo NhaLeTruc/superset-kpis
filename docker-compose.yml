@@ -15,13 +15,16 @@ services:
       - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
       - SPARK_MASTER_HOST=${SPARK_MASTER_HOST:-spark-master}
       - SPARK_MASTER_PORT=${SPARK_MASTER_PORT:-7077}
-      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
-      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
-      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
-      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
-      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-4g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-4g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-2}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-4g}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-4}
       - SPARK_SQL_SHUFFLE_PARTITIONS=${SPARK_SQL_SHUFFLE_PARTITIONS:-200}
       - SPARK_SQL_ADAPTIVE_ENABLED=${SPARK_SQL_ADAPTIVE_ENABLED:-true}
+      # Event Logging (for History Server)
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
       # Database Configuration
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
@@ -32,11 +35,13 @@ services:
     ports:
       - "${SPARK_MASTER_PORT:-7077}:7077"
       - "${SPARK_MASTER_WEBUI_PORT:-8080}:8080"
+      - "4040:4040"  # Spark Application UI (active during job execution)
     volumes:
       - ./src:/opt/spark-apps/src/
       - ./data:/app/data
       - ./database:/app/database
       - ./scripts:/opt/spark-apps/scripts/
+      - spark_events:/opt/spark/spark-events
     networks:
       - goodnote-network
     healthcheck:
@@ -55,18 +60,18 @@ services:
       - SPARK_NO_DAEMONIZE=true
       # Spark Configuration
       - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
-      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
-      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
-      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
-      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
-      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-4g}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-4}
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-4g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-4g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-2}
       # Database Configuration
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-analytics}
       - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-2g} --cores ${SPARK_WORKER_CORES:-2} ${SPARK_MASTER_URL:-spark://spark-master:7077}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-4g} --cores ${SPARK_WORKER_CORES:-4} ${SPARK_MASTER_URL:-spark://spark-master:7077}
     volumes:
       - ./src:/app/src
       - ./data:/app/data
@@ -91,18 +96,18 @@ services:
       - SPARK_NO_DAEMONIZE=true
       # Spark Configuration
       - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
-      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
-      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
-      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
-      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
-      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-4g}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-4}
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-4g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-4g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-2}
       # Database Configuration
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-analytics}
       - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-2g} --cores ${SPARK_WORKER_CORES:-2} ${SPARK_MASTER_URL:-spark://spark-master:7077}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-4g} --cores ${SPARK_WORKER_CORES:-4} ${SPARK_MASTER_URL:-spark://spark-master:7077}
     volumes:
       - ./src:/app/src
       - ./data:/app/data
@@ -113,6 +118,30 @@ services:
       - spark-master
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8081' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Spark History Server (view completed job DAGs)
+  spark-history:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.spark
+    container_name: ${CONTAINER_SPARK_HISTORY:-goodnote-spark-history}
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+    ports:
+      - "${SPARK_HISTORY_WEBUI_PORT:-18080}:18080"
+    volumes:
+      - spark_events:/opt/spark/spark-events
+    networks:
+      - goodnote-network
+    depends_on:
+      - spark-master
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/18080' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -291,6 +320,8 @@ volumes:
   spark_work_1:
     driver: local
   spark_work_2:
+    driver: local
+  spark_events:
     driver: local
   superset_home:
     driver: local
