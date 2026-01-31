@@ -13,7 +13,7 @@ from pyspark.sql import SparkSession
 
 def calculate_optimal_partitions(
     spark: SparkSession,
-    data_size_gb: float,
+    data_size_gb: int = 1,
     partition_size_mb: int = 128,
     partitions_per_core: int = 2,
 ) -> int:
@@ -80,7 +80,7 @@ def calculate_optimal_partitions(
 
 
 def configure_job_specific_settings(
-    spark: SparkSession, job_type: str, data_size_gb: float = 0.0
+    spark: SparkSession, job_type: str, data_size_gb: int = 1
 ) -> None:
     """
     Apply job-specific Spark configurations.
@@ -105,35 +105,26 @@ def configure_job_specific_settings(
     """
     if job_type == "etl":
         # ETL jobs: more partitions for large data processing
-        if data_size_gb:
-            partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=128)
-        else:
-            partitions = calculate_optimal_partitions(spark, data_size_gb=0)
+        partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=128)
+
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "50MB")
-        print(f"📊 Configured for ETL workload ({partitions} partitions)")
 
     elif job_type == "analytics":
         # Analytics: fewer partitions, more broadcasting
-        if data_size_gb:
-            # For analytics, use larger partitions (256MB) for faster queries
-            partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=256)
-        else:
-            partitions = calculate_optimal_partitions(spark, data_size_gb=0, partition_size_mb=256)
+        # For analytics, use larger partitions (256MB) for faster queries
+        partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=256)
+
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "200MB")
-        print(f"📈 Configured for Analytics workload ({partitions} partitions, 200MB broadcast)")
 
     elif job_type == "ml":
         # ML: more memory for caching, fewer partitions
-        if data_size_gb:
-            # For ML, use larger partitions (512MB) to reduce overhead
-            partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=512)
-        else:
-            partitions = calculate_optimal_partitions(spark, data_size_gb=0, partition_size_mb=512)
+        # For ML, use larger partitions (512MB) to reduce overhead
+        partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=512)
+
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
         spark.conf.set("spark.memory.storageFraction", "0.5")
-        print(f"🤖 Configured for ML workload ({partitions} partitions, 50% storage)")
 
     elif job_type == "streaming":
         # Streaming: micro-batch optimization
@@ -141,7 +132,3 @@ def configure_job_specific_settings(
             "spark.sql.streaming.stateStore.providerClass",
             "org.apache.spark.sql.execution.streaming.state.HDFSBackedStateStoreProvider",
         )
-        print("🌊 Configured for Streaming workload")
-
-    else:
-        print(f"⚠️  Unknown job type: {job_type}. Using default settings.")

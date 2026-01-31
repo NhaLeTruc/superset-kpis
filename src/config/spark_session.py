@@ -39,9 +39,9 @@ def create_spark_session(
 
     Environment Variables:
         - SPARK_MASTER: Spark master URL (e.g., spark://host:7077, local[4])
-        - SPARK_DRIVER_MEMORY: Driver memory (default: 4g)
-        - SPARK_EXECUTOR_MEMORY: Executor memory (default: 4g)
-        - SPARK_EXECUTOR_CORES: Cores per executor (default: 4)
+        - SPARK_DRIVER_MEMORY: Driver memory (default: 1g)
+        - SPARK_EXECUTOR_MEMORY: Executor memory (default: 1g)
+        - SPARK_EXECUTOR_CORES: Cores per executor (default: 1)
 
     Example:
         >>> spark = create_spark_session(app_name="Data Processing")
@@ -49,11 +49,12 @@ def create_spark_session(
     """
     # Get configuration from environment or defaults
     if master is None:
-        master = os.getenv("SPARK_MASTER", "local[*]")
+        master = os.getenv("SPARK_MASTER_URL", "local[*]")
 
     driver_memory = os.getenv("SPARK_DRIVER_MEMORY", "4g")
     executor_memory = os.getenv("SPARK_EXECUTOR_MEMORY", "4g")
     executor_cores = os.getenv("SPARK_EXECUTOR_CORES", "4")
+    worker_instances = os.getenv("SPARK_WORKER_INSTANCE_COUNT", "2")
 
     # Build Spark session
     builder = SparkSession.builder.appName(app_name).master(master)
@@ -73,6 +74,7 @@ def create_spark_session(
         builder.config("spark.driver.memory", driver_memory)
         .config("spark.executor.memory", executor_memory)
         .config("spark.executor.cores", executor_cores)
+        .config("spark.executor.instances", worker_instances)
         .config("spark.memory.fraction", "0.8")
         .config("spark.memory.storageFraction", "0.3")
     )
@@ -80,7 +82,7 @@ def create_spark_session(
     # Shuffle Optimization
     builder = (
         builder.config("spark.sql.shuffle.partitions", "200")
-        .config("spark.default.parallelism", "200")
+        # .config("spark.default.parallelism", "200")
         .config("spark.sql.files.maxPartitionBytes", "128MB")
         .config("spark.sql.files.openCostInBytes", "4MB")
     )
@@ -130,19 +132,6 @@ def create_spark_session(
     # Set log level
     spark.sparkContext.setLogLevel(log_level)
 
-    # Print configuration summary
-    print("=" * 60)
-    print(f"✅ Spark Session Created: {app_name}")
-    print("=" * 60)
-    print(f"Master: {master}")
-    print(f"Driver Memory: {driver_memory}")
-    print(f"Executor Memory: {executor_memory}")
-    print(f"Executor Cores: {executor_cores}")
-    print("AQE Enabled: True")
-    print("Broadcast Join Threshold: 100MB")
-    print("Shuffle Partitions: 200")
-    print("=" * 60)
-
     return spark
 
 
@@ -169,9 +158,9 @@ def get_spark_config_summary(spark: SparkSession) -> dict:
         "driver_memory": conf.get("spark.driver.memory", "N/A"),
         "executor_memory": conf.get("spark.executor.memory", "N/A"),
         "executor_cores": conf.get("spark.executor.cores", "N/A"),
-        "aqe_enabled": conf.get("spark.sql.adaptive.enabled", "false"),
-        "shuffle_partitions": conf.get("spark.sql.shuffle.partitions", "N/A"),
-        "broadcast_threshold": conf.get("spark.sql.autoBroadcastJoinThreshold", "N/A"),
+        "aqe_enabled": spark.conf.get("spark.sql.adaptive.enabled", "false"),
+        "shuffle_partitions": spark.conf.get("spark.sql.shuffle.partitions", "N/A"),
+        "broadcast_threshold": spark.conf.get("spark.sql.autoBroadcastJoinThreshold", "N/A"),
     }
 
     return summary
