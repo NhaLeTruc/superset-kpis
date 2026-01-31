@@ -1,7 +1,7 @@
 # GoodNote Analytics Platform - Makefile
 # All commands run via Docker containers (no virtual environment required)
 
-.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
+.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks superset-setup superset-setup-dry superset-setup-wait
 
 # Include environment variables from .env
 -include .env
@@ -62,6 +62,7 @@ help:
 	@echo "  make shell          - Open Spark dev container shell"
 	@echo "  make shell-master   - Open Spark master shell"
 	@echo "  make superset       - Show Superset URL"
+	@echo "  make superset-setup - Setup Superset (database, datasets, dashboards)"
 	@echo "  make spark-ui       - Show Spark UI URLs"
 	@echo ""
 	@echo "Cleanup:"
@@ -318,6 +319,20 @@ superset:
 	command -v open >/dev/null 2>&1 && open http://localhost:8088 || \
 	echo "Please open http://localhost:8088 in your browser"
 
+superset-setup:
+	@echo "Setting up Superset (database, datasets, dashboards)..."
+	.venv/bin/python scripts/setup_superset.py --dashboards superset/dashboards/
+	@echo "Superset setup complete!"
+
+superset-setup-dry:
+	@echo "Dry run - showing what would be set up..."
+	.venv/bin/python scripts/setup_superset.py --dashboards superset/dashboards/ --dry-run
+
+superset-setup-wait:
+	@echo "Waiting for Superset and setting up..."
+	.venv/bin/python scripts/setup_superset.py --wait --dashboards superset/dashboards/
+	@echo "Superset setup complete!"
+
 spark-ui:
 	@echo "Spark UI URLs:"
 	@echo "  - Spark Master:     http://localhost:8080"
@@ -399,7 +414,7 @@ quality: lint typecheck security
 # Run pre-commit checks via Docker
 pre-commit:
 	@echo "Running pre-commit checks via Docker..."
-	docker exec $(SPARK_DEV) pre-commit run --all-files
+	.venv/bin/pre-commit run --all-files
 	@echo "Pre-commit complete"
 
 # Install pre-commit hooks (local - required for git hooks)

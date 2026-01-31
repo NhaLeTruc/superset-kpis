@@ -94,3 +94,25 @@ SUPERSET_WEBSERVER_TIMEOUT = get_int_env("SUPERSET_WEBSERVER_TIMEOUT", 300)
 
 # Enable public role for initial setup (optional)
 PUBLIC_ROLE_LIKE = os.getenv("SUPERSET_PUBLIC_ROLE_LIKE", "Gamma")
+
+# =============================================================================
+# REST API Configuration
+# =============================================================================
+# Enable the REST API security endpoints for authentication
+FAB_ADD_SECURITY_API = True
+
+# API authentication settings
+# Use database authentication for API login
+AUTH_TYPE = 1  # AUTH_DB
+
+# Enable API access for all authenticated users
+FAB_API_SWAGGER_UI = True
+
+# CORS settings for API access (optional, for browser-based clients)
+ENABLE_CORS = get_bool_env("SUPERSET_ENABLE_CORS", False)
+CORS_OPTIONS = {
+    "supports_credentials": True,
+    "allow_headers": ["*"],
+    "resources": ["*"],
+    "origins": ["*"],
+}
