@@ -13,7 +13,7 @@ Usage (via helper script):
 
 Usage (direct spark-submit):
     docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/user_interactions.csv \
         --metadata-path /app/data/raw/user_metadata.csv \
@@ -42,7 +42,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         super().__init__(
             job_name="Data Processing",
             job_type="etl",
-            data_size_gb=0.15,  # Estimated data size for dynamic partitioning
+            data_size_gb=1,  # Estimated data size for dynamic partitioning
         )
 
     def get_argument_parser(self) -> argparse.ArgumentParser:

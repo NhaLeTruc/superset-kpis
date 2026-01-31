@@ -3,6 +3,10 @@
 
 .PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks
 
+# Include environment variables from .env
+-include .env
+export
+
 # Docker container names
 SPARK_DEV := goodnote-spark-dev
 SPARK_MASTER := goodnote-spark-master
@@ -207,7 +211,7 @@ generate-data-large:
 run-job-1:
 	@echo "Running Job 1: Data Processing..."
 	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/user_interactions.csv \
         --metadata-path /app/data/raw/user_metadata.csv \
@@ -217,7 +221,7 @@ run-job-1:
 run-job-2:
 	@echo "Running Job 2: User Engagement..."
 	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/02_user_engagement.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'
@@ -226,7 +230,7 @@ run-job-2:
 run-job-3:
 	@echo "Running Job 3: Performance Metrics..."
 	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/03_performance_metrics.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'
@@ -235,7 +239,7 @@ run-job-3:
 run-job-4:
 	@echo "Running Job 4: Session Analysis..."
 	docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/04_session_analysis.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'

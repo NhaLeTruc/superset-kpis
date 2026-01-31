@@ -11,6 +11,18 @@ services:
     container_name: ${CONTAINER_SPARK_MASTER:-goodnote-spark-master}
     environment:
       - SPARK_NO_DAEMONIZE=true
+      # Spark Configuration
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
+      - SPARK_MASTER_HOST=${SPARK_MASTER_HOST:-spark-master}
+      - SPARK_MASTER_PORT=${SPARK_MASTER_PORT:-7077}
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
+      - SPARK_SQL_SHUFFLE_PARTITIONS=${SPARK_SQL_SHUFFLE_PARTITIONS:-200}
+      - SPARK_SQL_ADAPTIVE_ENABLED=${SPARK_SQL_ADAPTIVE_ENABLED:-true}
+      # Database Configuration
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-analytics}
@@ -41,9 +53,20 @@ services:
     container_name: ${CONTAINER_SPARK_WORKER_1:-goodnote-spark-worker-1}
     environment:
       - SPARK_NO_DAEMONIZE=true
+      # Spark Configuration
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
       - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
       - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
+      # Database Configuration
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-2g} --cores ${SPARK_WORKER_CORES:-2} ${SPARK_MASTER_URL:-spark://spark-master:7077}
     volumes:
       - ./src:/app/src
       - ./data:/app/data
@@ -66,9 +89,20 @@ services:
     container_name: ${CONTAINER_SPARK_WORKER_2:-goodnote-spark-worker-2}
     environment:
       - SPARK_NO_DAEMONIZE=true
+      # Spark Configuration
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
       - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
       - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+      - SPARK_DRIVER_MEMORY=${SPARK_DRIVER_MEMORY:-1g}
+      - SPARK_EXECUTOR_MEMORY=${SPARK_EXECUTOR_MEMORY:-1g}
+      - SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-1}
+      # Database Configuration
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker --memory ${SPARK_WORKER_MEMORY:-2g} --cores ${SPARK_WORKER_CORES:-2} ${SPARK_MASTER_URL:-spark://spark-master:7077}
     volumes:
       - ./src:/app/src
       - ./data:/app/data

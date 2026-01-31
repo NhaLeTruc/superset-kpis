@@ -18,7 +18,7 @@ Usage (via helper script):
 
 Usage (direct spark-submit):
     docker exec goodnote-spark-master bash -c '/opt/spark/bin/spark-submit \
-        --master "local[*]" \
+        --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/02_user_engagement.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'

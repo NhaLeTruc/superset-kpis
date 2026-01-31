@@ -29,7 +29,11 @@ if TYPE_CHECKING:
     from pyspark.sql.types import StructType
 
 from src.config.database_config import write_to_postgres
-from src.config.spark_config import configure_job_specific_settings, create_spark_session
+from src.config.spark_config import (
+    configure_job_specific_settings,
+    create_spark_session,
+    get_spark_config_summary,
+)
 from src.utils.data_quality import detect_nulls
 from src.utils.monitoring import create_monitoring_context, log_monitoring_summary
 
@@ -42,7 +46,7 @@ class BaseAnalyticsJob(ABC):
     Subclasses implement job-specific logic.
     """
 
-    def __init__(self, job_name: str, job_type: str = "analytics", data_size_gb: float = 0.0):
+    def __init__(self, job_name: str, job_type: str = "analytics", data_size_gb: int = 1):
         """
         Initialize base job.
 
@@ -254,6 +258,19 @@ class BaseAnalyticsJob(ABC):
         configure_job_specific_settings(
             self.spark, job_type=self.job_type, data_size_gb=self.data_size_gb
         )
+
+        # Print final config after all tuning applied
+        config = get_spark_config_summary(self.spark)
+        print("=" * 60)
+        print(f"Spark Session: {config['app_name']} ({self.job_type})")
+        print("=" * 60)
+        print(f"Master: {config['master']}")
+        print(f"Driver Memory: {config['driver_memory']}")
+        print(f"Executor Memory: {config['executor_memory']}")
+        print(f"Shuffle Partitions: {config['shuffle_partitions']}")
+        print(f"Broadcast Threshold: {config['broadcast_threshold']}")
+        print(f"AQE Enabled: {config['aqe_enabled']}")
+        print("=" * 60)
 
     def setup_monitoring(self, context_name: str) -> None:
         """

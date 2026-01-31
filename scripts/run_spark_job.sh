@@ -41,7 +41,7 @@ NC='\033[0m'
 
 # Configuration
 SPARK_MASTER_CONTAINER="${CONTAINER_SPARK_MASTER:-goodnote-spark-master}"
-SPARK_MASTER_URL="${SPARK_MASTER_URL:-local[*]}"
+SPARK_MASTER_URL="${SPARK_MASTER_URL:-spark://spark-master:7077}"
 
 # Check arguments
 if [ $# -lt 1 ]; then
@@ -81,6 +81,7 @@ fi
 # Uses bash -c to prevent shell glob expansion of local[*] and ensure proper
 # argument parsing inside the container.
 # PYTHONPATH is set in docker-compose.yml for the spark-master service.
+# PostgreSQL JDBC driver is configured in spark-defaults.conf (see Dockerfile.spark)
 docker exec "${SPARK_MASTER_CONTAINER}" \
     bash -c "/opt/spark/bin/spark-submit \
     --master \"${SPARK_MASTER_URL}\" \
