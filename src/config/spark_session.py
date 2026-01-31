@@ -107,7 +107,7 @@ def create_spark_session(
     # Warehouse & Checkpointing
     warehouse_dir = os.getenv("SPARK_WAREHOUSE_DIR", "/tmp/spark-warehouse")
     checkpoint_dir = os.getenv("SPARK_CHECKPOINT_DIR", "/tmp/spark-checkpoint")
-    event_log_dir = os.getenv("SPARK_EVENT_LOG_DIR", "/tmp/spark-events")
+    event_log_dir = os.getenv("SPARK_EVENTLOG_DIR", "/opt/spark/spark-events")
     os.makedirs(event_log_dir, exist_ok=True)
 
     builder = builder.config("spark.sql.warehouse.dir", warehouse_dir).config(

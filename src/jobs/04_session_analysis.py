@@ -12,6 +12,7 @@ Writes results to PostgreSQL for dashboard consumption.
 Usage (via helper script):
     ./scripts/run_spark_job.sh src/jobs/04_session_analysis.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --dev-mode \
         --write-to-db
 
 Usage (direct spark-submit):
@@ -19,6 +20,7 @@ Usage (direct spark-submit):
         --master "$(SPARK_MASTER_URL)" \
         /opt/spark-apps/src/jobs/04_session_analysis.py \
         --enriched-path /app/data/processed/enriched_interactions.parquet \
+        --dev-mode \
         --write-to-db'
 """
 
@@ -74,6 +76,9 @@ class SessionAnalysisJob(BaseAnalyticsJob):
             "--write-to-db", action="store_true", help="Write results to PostgreSQL"
         )
         parser.add_argument("--output-path", help="Optional: Write results to Parquet")
+        parser.add_argument(
+            "--dev-mode", action="store_true", help="Enable development mode with summary stats"
+        )
         return parser
 
     def compute_metrics(self) -> dict[str, DataFrame]:

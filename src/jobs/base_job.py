@@ -402,7 +402,8 @@ class BaseAnalyticsJob(ABC):
             metrics = self.compute_metrics()
 
             # Print summary
-            self.print_summary(metrics)
+            if hasattr(self.args, "dev_mode") and self.args.dev_mode:
+                self.print_summary(metrics)
 
             # Write to database if requested
             if hasattr(self.args, "write_to_db") and self.args.write_to_db:

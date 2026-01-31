@@ -9,6 +9,7 @@ Usage (via helper script):
     ./scripts/run_spark_job.sh src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/user_interactions.csv \
         --metadata-path /app/data/raw/user_metadata.csv \
+        --dev-mode \
         --output-path /app/data/processed/enriched_interactions.parquet
 
 Usage (direct spark-submit):
@@ -17,6 +18,7 @@ Usage (direct spark-submit):
         /opt/spark-apps/src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/user_interactions.csv \
         --metadata-path /app/data/raw/user_metadata.csv \
+        --dev-mode \
         --output-path /app/data/processed/enriched_interactions.parquet'
 """
 
@@ -54,6 +56,9 @@ class DataProcessingJob(BaseAnalyticsJob):
         parser.add_argument("--metadata-path", required=True, help="Path to metadata Parquet")
         parser.add_argument("--output-path", required=True, help="Path to write enriched data")
         parser.add_argument("--skip-validation", action="store_true", help="Skip data validation")
+        parser.add_argument(
+            "--dev-mode", action="store_true", help="Enable development mode with summary stats"
+        )
         return parser
 
     def enrich_interactions(self, interactions_df: DataFrame, metadata_df: DataFrame) -> DataFrame:
