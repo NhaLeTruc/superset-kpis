@@ -1,0 +1,56 @@
+slice_name: Average Interactions per User
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number
+params:
+  datasource: 1__table
+  viz_type: big_number
+  x_axis: date
+  time_grain_sqla: P1D
+  aggregation: LAST_VALUE
+  metric:
+    expressionType: SQL
+    sqlExpression: SUM(total_interactions)/SUM(daily_active_users)
+    column: null
+    aggregate: null
+    datasourceWarning: false
+    hasCustomLabel: true
+    label: Average Interactions per User
+    optionName: metric_yr6sgxxjs7q_ko4hc229g69
+  adhoc_filters:
+  - clause: WHERE
+    subject: date
+    operator: TEMPORAL_RANGE
+    comparator: No filter
+    expressionType: SIMPLE
+  compare_lag: 1
+  show_timestamp: true
+  show_trend_line: false
+  start_y_axis_at_zero: false
+  color_picker:
+    r: 0
+    g: 122
+    b: 135
+    a: 1
+  header_font_size: 0.4
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.15
+  show_metric_name: false
+  metric_name_font_size: 0.15
+  y_axis_format: SMART_NUMBER
+  time_format: '%Y-%m-%d'
+  rolling_type: None
+  extra_form_data: {}
+  dashboards:
+  - 1
+query_context: '{"datasource":{"id":1,"type":"table"},"force":false,"queries":[{"filters":[{"col":"date","op":"TEMPORAL_RANGE","val":"No
+  filter"}],"extras":{"time_grain_sqla":"P1D","having":"","where":""},"applied_time_extras":{},"columns":[{"timeGrain":"P1D","columnType":"BASE_AXIS","sqlExpression":"date","label":"date","expressionType":"SQL","isColumnReference":true}],"metrics":[{"expressionType":"SQL","sqlExpression":"SUM(total_interactions)/SUM(daily_active_users)","column":null,"aggregate":null,"datasourceWarning":false,"hasCustomLabel":true,"label":"Average
+  Interactions per User","optionName":"metric_yr6sgxxjs7q_ko4hc229g69"}],"annotation_layers":[],"series_limit":0,"group_others_when_limit_reached":false,"order_desc":true,"url_params":{},"custom_params":{},"custom_form_data":{},"post_processing":[{"operation":"pivot","options":{"index":["date"],"columns":[],"aggregates":{"Average
+  Interactions per User":{"operator":"mean"}},"drop_missing_columns":true}},{"operation":"flatten"}]}],"form_data":{"datasource":"1__table","viz_type":"big_number","x_axis":"date","time_grain_sqla":"P1D","aggregation":"LAST_VALUE","metric":{"expressionType":"SQL","sqlExpression":"SUM(total_interactions)/SUM(daily_active_users)","column":null,"aggregate":null,"datasourceWarning":false,"hasCustomLabel":true,"label":"Average
+  Interactions per User","optionName":"metric_yr6sgxxjs7q_ko4hc229g69"},"adhoc_filters":[{"clause":"WHERE","subject":"date","operator":"TEMPORAL_RANGE","comparator":"No
+  filter","expressionType":"SIMPLE"}],"compare_lag":1,"show_timestamp":true,"show_trend_line":false,"start_y_axis_at_zero":false,"color_picker":{"r":0,"g":122,"b":135,"a":1},"header_font_size":0.4,"subheader_font_size":0.15,"subtitle_font_size":0.15,"show_metric_name":false,"metric_name_font_size":0.15,"y_axis_format":"SMART_NUMBER","time_format":"%Y-%m-%d","rolling_type":"None","extra_form_data":{},"dashboards":[1],"force":false,"result_format":"json","result_type":"full"},"result_format":"json","result_type":"full"}'
+cache_timeout: null
+uuid: 63a4393c-f430-4b34-af2e-1e317029a2e0
+version: 1.0.0
+dataset_uuid: 32053956-fe6c-4125-8e2d-0bb39443c2b5

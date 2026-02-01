@@ -1,0 +1,56 @@
+slice_name: Average Engaged Minutes per User
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number
+params:
+  datasource: 1__table
+  viz_type: big_number
+  slice_id: 6
+  x_axis: date
+  time_grain_sqla: P1D
+  aggregation: LAST_VALUE
+  metric:
+    aggregate: null
+    column: null
+    datasourceWarning: false
+    expressionType: SQL
+    hasCustomLabel: true
+    label: Engaged Minutes per User
+    optionName: metric_r0uqkelchha_ikknkyumpfm
+    sqlExpression: AVG(avg_duration_per_user)/60000
+  adhoc_filters:
+  - clause: WHERE
+    comparator: No filter
+    expressionType: SIMPLE
+    operator: TEMPORAL_RANGE
+    subject: date
+  compare_lag: 1
+  show_timestamp: true
+  show_trend_line: false
+  start_y_axis_at_zero: false
+  color_picker:
+    a: 1
+    b: 135
+    g: 122
+    r: 0
+  header_font_size: 0.4
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.15
+  show_metric_name: false
+  y_axis_format: ',.1f'
+  time_format: '%Y-%m-%d'
+  rolling_type: None
+  extra_form_data: {}
+  dashboards:
+  - 1
+query_context: '{"datasource":{"id":1,"type":"table"},"force":false,"queries":[{"filters":[{"col":"date","op":"TEMPORAL_RANGE","val":"No
+  filter"}],"extras":{"time_grain_sqla":"P1D","having":"","where":""},"applied_time_extras":{},"columns":[{"timeGrain":"P1D","columnType":"BASE_AXIS","sqlExpression":"date","label":"date","expressionType":"SQL","isColumnReference":true}],"metrics":[{"aggregate":null,"column":null,"datasourceWarning":false,"expressionType":"SQL","hasCustomLabel":true,"label":"Engaged
+  Minutes per User","optionName":"metric_r0uqkelchha_ikknkyumpfm","sqlExpression":"AVG(avg_duration_per_user)/60000"}],"annotation_layers":[],"series_limit":0,"group_others_when_limit_reached":false,"order_desc":true,"url_params":{},"custom_params":{},"custom_form_data":{},"post_processing":[{"operation":"pivot","options":{"index":["date"],"columns":[],"aggregates":{"Engaged
+  Minutes per User":{"operator":"mean"}},"drop_missing_columns":true}},{"operation":"flatten"}]}],"form_data":{"datasource":"1__table","viz_type":"big_number","slice_id":6,"x_axis":"date","time_grain_sqla":"P1D","aggregation":"LAST_VALUE","metric":{"aggregate":null,"column":null,"datasourceWarning":false,"expressionType":"SQL","hasCustomLabel":true,"label":"Engaged
+  Minutes per User","optionName":"metric_r0uqkelchha_ikknkyumpfm","sqlExpression":"AVG(avg_duration_per_user)/60000"},"adhoc_filters":[{"clause":"WHERE","comparator":"No
+  filter","expressionType":"SIMPLE","operator":"TEMPORAL_RANGE","subject":"date"}],"compare_lag":1,"show_timestamp":true,"show_trend_line":false,"start_y_axis_at_zero":false,"color_picker":{"a":1,"b":135,"g":122,"r":0},"header_font_size":0.4,"subheader_font_size":0.15,"subtitle_font_size":0.15,"show_metric_name":false,"y_axis_format":",.1f","time_format":"%Y-%m-%d","rolling_type":"None","extra_form_data":{},"dashboards":[1],"force":false,"result_format":"json","result_type":"full"},"result_format":"json","result_type":"full"}'
+cache_timeout: null
+uuid: d550ea38-1a52-4960-bf93-bbda5136e8da
+version: 1.0.0
+dataset_uuid: 32053956-fe6c-4125-8e2d-0bb39443c2b5

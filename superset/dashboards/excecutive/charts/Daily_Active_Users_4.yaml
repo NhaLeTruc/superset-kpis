@@ -1,0 +1,96 @@
+slice_name: Daily Active Users
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  datasource: 1__table
+  viz_type: echarts_timeseries_line
+  slice_id: 4
+  x_axis: date
+  time_grain_sqla: P1D
+  metrics:
+  - aggregate: AVG
+    column:
+      advanced_data_type: null
+      certification_details: null
+      certified_by: null
+      column_name: daily_active_users
+      description: null
+      expression: ''
+      filterable: true
+      groupby: true
+      id: 2
+      is_certified: false
+      is_dttm: false
+      python_date_format: null
+      type: BIGINT
+      type_generic: 0
+      uuid: d6faff15-d05b-474f-8248-aac7be1d0ec1
+      verbose_name: null
+      warning_markdown: null
+    datasourceWarning: false
+    expressionType: SIMPLE
+    hasCustomLabel: true
+    label: DAU
+    optionName: metric_q28pgqmw9en_ulbnke8liq
+    sqlExpression: null
+  groupby: []
+  adhoc_filters:
+  - clause: WHERE
+    comparator: No filter
+    expressionType: SIMPLE
+    operator: TEMPORAL_RANGE
+    subject: date
+  limit: 500
+  row_limit: 500
+  truncate_metric: false
+  show_empty_columns: false
+  rolling_type: mean
+  comparison_type: values
+  resample_method: mean
+  annotation_layers: []
+  forecastPeriods: 10
+  forecastInterval: 0.8
+  x_axis_title: ''
+  x_axis_title_margin: 30
+  y_axis_title: DAU
+  y_axis_title_margin: 30
+  y_axis_title_position: Left
+  sort_series_type: sum
+  color_scheme: presetColors
+  time_shift_color: true
+  show_value: true
+  only_total: true
+  area: false
+  opacity: 0.2
+  markerEnabled: false
+  markerSize: 6
+  zoomable: true
+  minorTicks: true
+  show_legend: false
+  legendType: scroll
+  legendOrientation: top
+  x_axis_time_format: smart_date
+  xAxisLabelInterval: auto
+  rich_tooltip: true
+  showTooltipTotal: true
+  tooltipTimeFormat: '%Y-%m-%d'
+  y_axis_format: SMART_NUMBER
+  logAxis: false
+  minorSplitLine: false
+  truncateXAxis: true
+  truncateYAxis: false
+  y_axis_bounds:
+  - null
+  - null
+  extra_form_data: {}
+  dashboards:
+  - 1
+query_context: '{"datasource":{"id":1,"type":"table"},"force":false,"queries":[{"filters":[{"col":"date","op":"TEMPORAL_RANGE","val":"No
+  filter"}],"extras":{"time_grain_sqla":"P1D","having":"","where":""},"applied_time_extras":{},"columns":[{"timeGrain":"P1D","columnType":"BASE_AXIS","sqlExpression":"date","label":"date","expressionType":"SQL","isColumnReference":true}],"metrics":[{"aggregate":"AVG","column":{"advanced_data_type":null,"certification_details":null,"certified_by":null,"column_name":"daily_active_users","description":null,"expression":"","filterable":true,"groupby":true,"id":2,"is_certified":false,"is_dttm":false,"python_date_format":null,"type":"BIGINT","type_generic":0,"uuid":"d6faff15-d05b-474f-8248-aac7be1d0ec1","verbose_name":null,"warning_markdown":null},"datasourceWarning":false,"expressionType":"SIMPLE","hasCustomLabel":true,"label":"DAU","optionName":"metric_q28pgqmw9en_ulbnke8liq","sqlExpression":null}],"orderby":[[{"aggregate":"AVG","column":{"advanced_data_type":null,"certification_details":null,"certified_by":null,"column_name":"daily_active_users","description":null,"expression":"","filterable":true,"groupby":true,"id":2,"is_certified":false,"is_dttm":false,"python_date_format":null,"type":"BIGINT","type_generic":0,"uuid":"d6faff15-d05b-474f-8248-aac7be1d0ec1","verbose_name":null,"warning_markdown":null},"datasourceWarning":false,"expressionType":"SIMPLE","hasCustomLabel":true,"label":"DAU","optionName":"metric_q28pgqmw9en_ulbnke8liq","sqlExpression":null},false]],"annotation_layers":[],"row_limit":500,"series_columns":[],"series_limit":500,"group_others_when_limit_reached":false,"order_desc":true,"url_params":{},"custom_params":{},"custom_form_data":{},"time_offsets":[],"post_processing":[{"operation":"pivot","options":{"index":["date"],"columns":[],"aggregates":{"DAU":{"operator":"mean"}},"drop_missing_columns":true}},{"operation":"rolling","options":{"rolling_type":"mean","window":1,"min_periods":0,"columns":{"DAU":"DAU"}}},{"operation":"flatten"}]}],"form_data":{"datasource":"1__table","viz_type":"echarts_timeseries_line","slice_id":4,"x_axis":"date","time_grain_sqla":"P1D","metrics":[{"aggregate":"AVG","column":{"advanced_data_type":null,"certification_details":null,"certified_by":null,"column_name":"daily_active_users","description":null,"expression":"","filterable":true,"groupby":true,"id":2,"is_certified":false,"is_dttm":false,"python_date_format":null,"type":"BIGINT","type_generic":0,"uuid":"d6faff15-d05b-474f-8248-aac7be1d0ec1","verbose_name":null,"warning_markdown":null},"datasourceWarning":false,"expressionType":"SIMPLE","hasCustomLabel":true,"label":"DAU","optionName":"metric_q28pgqmw9en_ulbnke8liq","sqlExpression":null}],"groupby":[],"adhoc_filters":[{"clause":"WHERE","comparator":"No
+  filter","expressionType":"SIMPLE","operator":"TEMPORAL_RANGE","subject":"date"}],"limit":500,"row_limit":500,"truncate_metric":false,"show_empty_columns":false,"rolling_type":"mean","comparison_type":"values","resample_method":"mean","annotation_layers":[],"forecastPeriods":10,"forecastInterval":0.8,"x_axis_title":"","x_axis_title_margin":30,"y_axis_title":"DAU","y_axis_title_margin":30,"y_axis_title_position":"Left","sort_series_type":"sum","color_scheme":"presetColors","time_shift_color":true,"show_value":true,"only_total":true,"area":false,"opacity":0.2,"markerEnabled":false,"markerSize":6,"zoomable":true,"minorTicks":true,"show_legend":false,"legendType":"scroll","legendOrientation":"top","x_axis_time_format":"smart_date","xAxisLabelInterval":"auto","rich_tooltip":true,"showTooltipTotal":true,"tooltipTimeFormat":"%Y-%m-%d","y_axis_format":"SMART_NUMBER","logAxis":false,"minorSplitLine":false,"truncateXAxis":true,"truncateYAxis":false,"y_axis_bounds":[null,null],"extra_form_data":{},"dashboards":[1],"force":false,"result_format":"json","result_type":"full"},"result_format":"json","result_type":"full"}'
+cache_timeout: null
+uuid: 9d53b2e8-179f-4348-b263-128085b18a56
+version: 1.0.0
+dataset_uuid: 32053956-fe6c-4125-8e2d-0bb39443c2b5

@@ -1,0 +1,17 @@
+database_name: GoodNote Analytics
+sqlalchemy_uri: postgresql+psycopg2://analytics_user:XXXXXXXXXX@postgres:5432/analytics
+cache_timeout: 0
+expose_in_sqllab: true
+allow_run_async: true
+allow_ctas: true
+allow_cvas: true
+allow_dml: false
+allow_file_upload: false
+extra:
+  metadata_params: {}
+  engine_params: {}
+  metadata_cache_timeout: {}
+  schemas_allowed_for_file_upload: []
+impersonate_user: false
+uuid: 5c1b0f51-6fb0-46a8-b9d8-49b553ed7fae
+version: 1.0.0

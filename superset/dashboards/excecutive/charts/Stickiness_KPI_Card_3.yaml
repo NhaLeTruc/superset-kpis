@@ -1,0 +1,77 @@
+slice_name: Stickiness KPI Card
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number
+params:
+  datasource: 3__table
+  viz_type: big_number
+  x_axis: month
+  time_grain_sqla: P1M
+  aggregation: LAST_VALUE
+  metric:
+    expressionType: SIMPLE
+    column:
+      advanced_data_type: null
+      certification_details: null
+      certified_by: null
+      column_name: stickiness_ratio
+      description: null
+      expression: ''
+      filterable: true
+      groupby: true
+      id: 12
+      is_certified: false
+      is_dttm: false
+      python_date_format: null
+      type: DOUBLE PRECISION
+      type_generic: 0
+      uuid: afffa9ed-9852-41fd-aaa1-00d0515112b0
+      verbose_name: null
+      warning_markdown: null
+    aggregate: MAX
+    sqlExpression: null
+    datasourceWarning: false
+    hasCustomLabel: true
+    label: Stickiness
+    optionName: metric_3lw1bxpt1wc_5gbss2s0kvx
+  adhoc_filters:
+  - expressionType: SIMPLE
+    subject: month
+    operator: TEMPORAL_RANGE
+    comparator: No filter
+    clause: WHERE
+    sqlExpression: null
+    isExtra: false
+    isNew: false
+    datasourceWarning: false
+    filterOptionName: filter_re0aagc10a_y5g5agv5i4
+  compare_lag: 1
+  show_timestamp: true
+  show_trend_line: false
+  start_y_axis_at_zero: false
+  color_picker:
+    r: 0
+    g: 122
+    b: 135
+    a: 1
+  header_font_size: 0.4
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.15
+  show_metric_name: true
+  metric_name_font_size: 0.15
+  y_axis_format: .2%
+  time_format: smart_date
+  rolling_type: None
+  extra_form_data: {}
+  dashboards:
+  - 1
+query_context: '{"datasource":{"id":3,"type":"table"},"force":false,"queries":[{"filters":[{"col":"month","op":"TEMPORAL_RANGE","val":"No
+  filter"}],"extras":{"time_grain_sqla":"P1M","having":"","where":""},"applied_time_extras":{},"columns":[{"timeGrain":"P1M","columnType":"BASE_AXIS","sqlExpression":"month","label":"month","expressionType":"SQL","isColumnReference":true}],"metrics":[{"expressionType":"SIMPLE","column":{"advanced_data_type":null,"certification_details":null,"certified_by":null,"column_name":"stickiness_ratio","description":null,"expression":"","filterable":true,"groupby":true,"id":12,"is_certified":false,"is_dttm":false,"python_date_format":null,"type":"DOUBLE
+  PRECISION","type_generic":0,"uuid":"afffa9ed-9852-41fd-aaa1-00d0515112b0","verbose_name":null,"warning_markdown":null},"aggregate":"MAX","sqlExpression":null,"datasourceWarning":false,"hasCustomLabel":true,"label":"Stickiness","optionName":"metric_3lw1bxpt1wc_5gbss2s0kvx"}],"annotation_layers":[],"series_limit":0,"group_others_when_limit_reached":false,"order_desc":true,"url_params":{},"custom_params":{},"custom_form_data":{},"post_processing":[{"operation":"pivot","options":{"index":["month"],"columns":[],"aggregates":{"Stickiness":{"operator":"mean"}},"drop_missing_columns":true}},{"operation":"flatten"}]}],"form_data":{"datasource":"3__table","viz_type":"big_number","x_axis":"month","time_grain_sqla":"P1M","aggregation":"LAST_VALUE","metric":{"expressionType":"SIMPLE","column":{"advanced_data_type":null,"certification_details":null,"certified_by":null,"column_name":"stickiness_ratio","description":null,"expression":"","filterable":true,"groupby":true,"id":12,"is_certified":false,"is_dttm":false,"python_date_format":null,"type":"DOUBLE
+  PRECISION","type_generic":0,"uuid":"afffa9ed-9852-41fd-aaa1-00d0515112b0","verbose_name":null,"warning_markdown":null},"aggregate":"MAX","sqlExpression":null,"datasourceWarning":false,"hasCustomLabel":true,"label":"Stickiness","optionName":"metric_3lw1bxpt1wc_5gbss2s0kvx"},"adhoc_filters":[{"expressionType":"SIMPLE","subject":"month","operator":"TEMPORAL_RANGE","comparator":"No
+  filter","clause":"WHERE","sqlExpression":null,"isExtra":false,"isNew":false,"datasourceWarning":false,"filterOptionName":"filter_re0aagc10a_y5g5agv5i4"}],"compare_lag":1,"show_timestamp":true,"show_trend_line":false,"start_y_axis_at_zero":false,"color_picker":{"r":0,"g":122,"b":135,"a":1},"header_font_size":0.4,"subheader_font_size":0.15,"subtitle_font_size":0.15,"show_metric_name":true,"metric_name_font_size":0.15,"y_axis_format":".2%","time_format":"smart_date","rolling_type":"None","extra_form_data":{},"dashboards":[1],"force":false,"result_format":"json","result_type":"full"},"result_format":"json","result_type":"full"}'
+cache_timeout: null
+uuid: 08f58bc4-f674-40fb-9843-0a7c66ed0bf3
+version: 1.0.0
+dataset_uuid: 6ec614a2-ca35-4a54-ac7f-4b18e1d4c039
