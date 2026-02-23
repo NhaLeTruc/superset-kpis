@@ -1,8 +1,8 @@
 # SuperSet Pipeline Demo
 
-**A production-grade Apache Spark analytics platform for processing 1TB+ user interaction data.**
+**A production-grade Apache Spark analytics platform for processing user interaction data.**
 
-**Status:** 95% Complete | **Stack:** Spark 3.5, PostgreSQL 15, Superset 3.0 | **Tests:** 167 tests (26 test files) | **Optimizations:** 7 techniques implemented
+**Stack:** Spark 3.5, PostgreSQL 15, Superset 3.0 | **Tests:** 167 tests (26 test files) | **Optimizations:** 7 techniques implemented
 
 ---
 
@@ -71,7 +71,6 @@ Utility scripts in the `scripts/` directory:
 |--------|-------------|
 | `generate_sample_data.py` | Generate synthetic user interaction data for testing and development |
 | `run_spark_job.sh` | Execute Spark jobs with proper configuration and classpath |
-| `run_optimization_analysis.sh` | Run performance analysis and capture Spark UI metrics |
 | `setup-tdd.sh` | Install TDD enforcement tools (git hooks, pytest config) |
 | `check-tdd.sh` | Verify TDD compliance (test coverage, file mappings, hooks) |
 
@@ -79,7 +78,7 @@ Utility scripts in the `scripts/` directory:
 
 ```bash
 # Generate sample data
-python scripts/generate_sample_data.py
+python3 scripts/generate_sample_data.py
 
 # Run a specific Spark job
 ./scripts/run_spark_job.sh <job_name>
@@ -113,21 +112,6 @@ python scripts/generate_sample_data.py
 
 ---
 
-## 🎯 Tasks
-
-| Task | Status | Details |
-|------|--------|---------|
-| **Task 1: Data Processing** | ✅ 100% | Hot key detection, salting, optimized joins |
-| **Task 2: User Engagement** | ✅ 100% | DAU, MAU, stickiness, power users, cohorts |
-| **Task 3: Performance** | ✅ 100% | Percentiles, correlation, anomalies |
-| **Task 4: Sessions** | ✅ 100% | Sessionization, metrics, bounce rate |
-| **Task 5: Spark UI** | ⚠️ 70% | Framework ready, execution pending |
-| **Task 6: Monitoring** | ⚙️ Optional | Not implemented (print logging used) |
-
-**See:** [TESTING_GUIDE.md](./docs/TESTING_GUIDE.md) for test details
-
----
-
 ## ⚡ Optimizations
 
 7 major techniques implemented for 30-60% performance improvement:
@@ -144,13 +128,33 @@ python scripts/generate_sample_data.py
 
 ---
 
+## BI Dashboards examples
+
+![](.\docs\Screenshot%202026-02-01%20161707_result.jpg)
+![](.\docs\Screenshot%202026-02-01%20161742_result.jpg)
+![](.\docs\Screenshot%202026-02-01%20161806_result.jpg)
+
+---
+
+## Spark Jobs run history
+
+![](.\docs\Screenshot%202026-02-01%20162305_result.jpg)
+
+---
+
+## Spark Jobs Runs UI
+
+**See:** *.jpg files in `./docs/SparkUI` for detailed screenshots
+
+---
+
 ## 🏗️ Technology Stack
 
-**Processing:** Apache Spark 3.5 (PySpark), Python 3.9+
-**Storage:** PostgreSQL 15, Parquet (columnar)
-**Visualization:** Apache Superset 3.0, Redis 7
-**Development:** Docker Compose, Jupyter, pytest + chispa
-**Monitoring:** Spark UI (ports 8080, 4040, 18080)
+- **Processing:** Apache Spark 3.5 (PySpark), Python 3.9+
+- **Storage:** PostgreSQL 15, Parquet (columnar)
+- **Visualization:** Apache Superset 3.0, Redis 7
+- **Development:** Docker Compose, Jupyter, pytest + chispa
+- **Monitoring:** Spark UI (ports 8080, 4040, 18080)
 
 **See:** [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams
 
@@ -199,7 +203,7 @@ All services are fully configurable through the `.env` file. No hardcoded values
 
 3. Wait ~30 seconds for initialization, then log in with your new credentials
 
-**Note:** The `superset fab create-admin` command doesn't update existing users. You must delete the database to apply new credentials.
+**Note:** The `superset fab create-admin` command doesn't update existing users. You must delete superset's database to apply new credentials.
 
 ### Other Configurable Parameters
 
@@ -217,29 +221,11 @@ All aspects of the environment can be controlled via `.env`:
 
 ## 🚨 Troubleshooting
 
-**Containers restarting?** → Increase Docker memory to 16GB
-**Tests fail?** → Run `make test` (inside Docker), not `pytest` on host
-**Superset shows "No Data"?** → Run `make run-jobs` to populate database
-**Superset login fails?** → Check credentials in `.env`, see Configuration Management above
+- **Containers restarting?** → Increase Docker memory to 16GB
+- **Tests fail?** → Run `make test` (inside Docker), not `pytest` on host
+- **Superset shows "No Data"?** → Run `make run-jobs` to populate database
+- **Superset login fails?** → Check credentials in `.env`, see Configuration Management above
 
 **See:** [SETUP_GUIDE.md](./docs/SETUP_GUIDE.md#troubleshooting) for 10+ common issues
 
 ---
-
-## 🎓 Next Steps to Complete
-
-1. **Spark UI Analysis** (4-6 hours) - Execute jobs, capture screenshots, validate optimizations
-2. **Superset Dashboards** (2-3 hours) - Import 4 dashboard specs to UI
-3. **Integration Tests** (3-4 hours) - End-to-end pipeline testing
-
-**See:** [DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) for workflow details
-
----
-
-## 👨‍💻 Project Info
-
-**Status:** 95% Complete | **Updated:** 2026-01-28
-
----
-
-**📚 Questions?** See documentation above or run `make help`
