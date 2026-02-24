@@ -130,15 +130,15 @@ python3 scripts/generate_sample_data.py
 
 ## BI Dashboards examples
 
-![](.\docs\Screenshot%202026-02-01%20161707_result.jpg)
-![](.\docs\Screenshot%202026-02-01%20161742_result.jpg)
-![](.\docs\Screenshot%202026-02-01%20161806_result.jpg)
+![](./docs/Screenshot%202026-02-01%20161707_result.jpg)
+![](./docs/Screenshot%202026-02-01%20161742_result.jpg)
+![](./docs/Screenshot%202026-02-01%20161806_result.jpg)
 
 ---
 
 ## Spark Jobs run history
 
-![](.\docs\Screenshot%202026-02-01%20162305_result.jpg)
+![](./docs/Screenshot%202026-02-01%20162305_result.jpg)
 
 ---
 
