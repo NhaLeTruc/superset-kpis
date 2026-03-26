@@ -8,12 +8,13 @@ Provides user engagement analytics functions:
 """
 
 from .active_users import calculate_dau, calculate_mau
-from .cohort_retention import calculate_cohort_retention
+from .cohort_retention import calculate_cohort_retention, calculate_cohort_retention_by_segment
 from .segmentation import calculate_stickiness, identify_power_users
 
 
 __all__ = [
     "calculate_cohort_retention",
+    "calculate_cohort_retention_by_segment",
     "calculate_dau",
     "calculate_mau",
     "calculate_stickiness",

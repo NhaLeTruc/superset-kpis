@@ -35,13 +35,14 @@ from pathlib import Path
 # =============================================================================
 # DATE RANGES
 # =============================================================================
-ACT_START_DATE = datetime(2024, 3, 31)
+ACT_START_DATE = datetime(2024, 1, 1)
 ACT_END_DATE = datetime(2024, 12, 31)
 REG_START_DATE = datetime(2024, 1, 1)
-REG_END_DATE = datetime(2024, 3, 31)
+REG_END_DATE = datetime(2024, 9, 30)
 
 # Session timeout must match Spark job constant
-SESSION_TIMEOUT_SECONDS = 1800
+# NOTE: Must match SESSION_TIMEOUT_SECONDS in src/config/constants.py.
+SESSION_TIMEOUT_SECONDS = 600
 
 # =============================================================================
 # BASIC DISTRIBUTIONS (used by both uniform and realistic modes)
@@ -65,7 +66,19 @@ COUNTRY_DISTRIBUTION = {
 
 SUBSCRIPTION_DISTRIBUTION = {"free": 0.60, "premium": 0.30, "enterprise": 0.10}
 
+# VERSION_DISTRIBUTION is kept as fallback for any code that references it directly.
 VERSION_DISTRIBUTION = {"3.0.0": 0.10, "3.0.1": 0.15, "3.1.0": 0.25, "3.1.1": 0.30, "3.2.0": 0.20}
+
+# Time-aware version rollout: older versions dominate early, newer ones roll out progressively.
+VERSION_TIMELINE = [
+    (datetime(2024, 1,  1), {"3.0.0": 0.80, "3.0.1": 0.20}),
+    (datetime(2024, 2, 15), {"3.0.0": 0.30, "3.0.1": 0.70}),
+    (datetime(2024, 4,  1), {"3.0.1": 0.40, "3.1.0": 0.60}),
+    (datetime(2024, 6,  1), {"3.1.0": 0.50, "3.1.1": 0.50}),
+    (datetime(2024, 8,  1), {"3.1.0": 0.20, "3.1.1": 0.60, "3.2.0": 0.20}),
+    (datetime(2024, 10, 1), {"3.1.1": 0.30, "3.2.0": 0.70}),
+    (datetime(2024, 12, 1), {"3.2.0": 1.00}),
+]
 
 # =============================================================================
 # TEMPORAL PATTERNS (for realistic mode)
@@ -294,6 +307,14 @@ def sample_from_cdf(cdf: list) -> int:
 # =============================================================================
 # TEMPORAL UTILITIES
 # =============================================================================
+def get_version_for_date(current_date: datetime) -> str:
+    """Return an app version sampled from the time-appropriate distribution."""
+    for start, dist in reversed(VERSION_TIMELINE):
+        if current_date >= start:
+            return weighted_random_choice(dist)
+    return weighted_random_choice(VERSION_TIMELINE[0][1])
+
+
 def get_seasonal_multiplier(date: datetime) -> float:
     """Get seasonal activity multiplier for a date."""
     month, day = date.month, date.day
@@ -500,7 +521,7 @@ def create_user_profiles(users: list, pareto_alpha: float = 1.5, churn_rate: flo
         churn_week = None
         if random.random() < churn_rate:
             # Churn mostly happens in first 12 weeks
-            churn_week = int(log_normal_sample(2.0, 0.8))  # median ~7 weeks
+            churn_week = max(1, int(log_normal_sample(2.0, 0.8)))  # median ~7 weeks, minimum 1
 
         # Session parameters vary by activity level
         avg_sessions = 1.5 + activity * 0.5
@@ -548,11 +569,17 @@ def generate_user_interactions_uniform(
         user_pool = user_ids * (num_interactions // len(user_ids) + 1)
         random.shuffle(user_pool)
 
+    reg_map = {u["user_id"]: datetime.strptime(u["registration_date"], "%Y-%m-%d") for u in users}
+
     interactions = []
-    date_range = (ACT_END_DATE - ACT_START_DATE).days
 
     for i in range(num_interactions):
-        timestamp = ACT_START_DATE + timedelta(
+        uid = user_pool[i % len(user_pool)]
+        ts_min = max(ACT_START_DATE, reg_map[uid])
+        date_range = (ACT_END_DATE - ts_min).days
+        if date_range <= 0:
+            continue
+        timestamp = ts_min + timedelta(
             days=random.randint(0, date_range),
             hours=random.randint(0, 23),
             minutes=random.randint(0, 59),
@@ -568,12 +595,12 @@ def generate_user_interactions_uniform(
             duration_ms = random.randint(60000, 300000)
 
         interaction = {
-            "user_id": user_pool[i % len(user_pool)],
+            "user_id": uid,
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "action_type": weighted_random_choice(ACTION_DISTRIBUTION),
             "page_id": f"p{random.randint(1, 100):03d}",
             "duration_ms": duration_ms,
-            "app_version": weighted_random_choice(VERSION_DISTRIBUTION),
+            "app_version": get_version_for_date(timestamp),
         }
         interactions.append(interaction)
 
@@ -633,7 +660,7 @@ def generate_user_interactions_realistic(
 
             # Generate sessions for this user on this day
             num_sessions = profile.generate_session_count()
-            app_version = weighted_random_choice(VERSION_DISTRIBUTION)
+            app_version = get_version_for_date(current_date)
 
             for _ in range(num_sessions):
                 # Session start time (hour-weighted)
@@ -655,23 +682,36 @@ def generate_user_interactions_realistic(
 
     # Adjust to target if significantly off - preserve session integrity
     if actual_count > target_interactions * 1.2:
-        # Group interactions by (user_id, date, hour) to approximate sessions
-        sessions = defaultdict(list)
-        for interaction in interactions:
-            ts = interaction["timestamp"]
-            # Session key: user + date + hour
-            session_key = (interaction["user_id"], ts[:13])  # "YYYY-MM-DD HH"
-            sessions[session_key].append(interaction)
+        keep_rate = target_interactions / actual_count
 
-        # Randomly select sessions until we hit target
-        session_keys = list(sessions.keys())
-        random.shuffle(session_keys)
+        # Group by user
+        by_user: dict = defaultdict(list)
+        for ix in interactions:
+            by_user[ix["user_id"]].append(ix)
 
-        sampled = []
-        for key in session_keys:
-            if len(sampled) >= target_interactions:
-                break
-            sampled.extend(sessions[key])
+        # For each user, split their interactions into real sessions using the
+        # actual timeout, then sample sessions proportionally (min 1 per user).
+        sampled: list = []
+        for uid, user_ixs in by_user.items():
+            user_ixs.sort(key=lambda x: x["timestamp"])
+
+            # Split into sessions by time gap
+            user_sessions: list = []
+            current_session = [user_ixs[0]]
+            for ix in user_ixs[1:]:
+                t_prev = datetime.strptime(current_session[-1]["timestamp"], "%Y-%m-%d %H:%M:%S")
+                t_curr = datetime.strptime(ix["timestamp"], "%Y-%m-%d %H:%M:%S")
+                if (t_curr - t_prev).total_seconds() > SESSION_TIMEOUT_SECONDS:
+                    user_sessions.append(current_session)
+                    current_session = [ix]
+                else:
+                    current_session.append(ix)
+            user_sessions.append(current_session)
+
+            n_keep = max(1, round(len(user_sessions) * keep_rate))
+            chosen = random.sample(user_sessions, min(n_keep, len(user_sessions)))
+            for s in chosen:
+                sampled.extend(s)
 
         interactions = sampled
         print(f"   Downsampled to {len(interactions):,} interactions (preserving sessions)")

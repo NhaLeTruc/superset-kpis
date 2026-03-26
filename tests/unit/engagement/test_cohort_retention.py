@@ -6,6 +6,7 @@ Tests calculate_cohort_retention() function from engagement transforms.
 
 from datetime import date, datetime, timedelta
 
+import pytest
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
 
@@ -214,7 +215,184 @@ class TestCalculateCohortRetention:
 
         # Assert
         results = result_df.orderBy("week_number").collect()
-        assert results[0]["active_users"] == 1  # Week 0
-        assert results[1]["active_users"] == 1  # Week 1
-        assert results[2]["active_users"] == 0  # Week 2 - NOT active
-        assert results[3]["active_users"] == 1  # Week 3 - back
+        assert results[0]["retained_users"] == 1  # Week 0
+        assert results[1]["retained_users"] == 1  # Week 1
+        assert results[2]["retained_users"] == 0  # Week 2 - NOT active
+        assert results[3]["retained_users"] == 1  # Week 3 - back
+
+
+class TestCalculateCohortRetentionBySegment:
+    """Tests for calculate_cohort_retention_by_segment() function."""
+
+    def test_returns_all_three_segment_types(self, spark):
+        """
+        GIVEN: Users with different subscription types, devices, and countries
+        WHEN: calculate_cohort_retention_by_segment() is called
+        THEN: Results contain rows for all three segment_type values
+        """
+        from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
+
+        from src.transforms.engagement import calculate_cohort_retention_by_segment
+
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=True),
+                StructField("device_type", StringType(), nullable=True),
+                StructField("country", StringType(), nullable=True),
+            ]
+        )
+        from datetime import date, datetime
+
+        metadata_data = [
+            ("u001", date(2023, 1, 2), "free", "iPhone", "US"),
+            ("u002", date(2023, 1, 2), "premium", "iPad", "UK"),
+            ("u003", date(2023, 1, 2), "free", "Android Phone", "US"),
+        ]
+        metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
+
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
+        interactions_data = [
+            ("u001", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u002", datetime(2023, 1, 2, 11, 0, 0)),
+            ("u003", datetime(2023, 1, 9, 10, 0, 0)),
+        ]
+        interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
+
+        result_df = calculate_cohort_retention_by_segment(
+            interactions_df, metadata_df, retention_weeks=2
+        )
+
+        segment_types = {row["segment_type"] for row in result_df.select("segment_type").collect()}
+        assert "subscription_type" in segment_types
+        assert "device_type" in segment_types
+        assert "country" in segment_types
+
+    def test_segment_retention_rates_are_correct(self, spark):
+        """
+        GIVEN:
+            - 4 free users and 2 premium users, all in cohort week 2023-01-02
+            - Week 0: all 6 active
+            - Week 1: 2 free active, 1 premium active
+        WHEN: calculate_cohort_retention_by_segment() is called
+        THEN:
+            - subscription_type=free  W0=1.0, W1=0.5
+            - subscription_type=premium W0=1.0, W1=0.5
+        """
+        from datetime import date, datetime
+
+        from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
+
+        from src.transforms.engagement import calculate_cohort_retention_by_segment
+
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=True),
+                StructField("device_type", StringType(), nullable=True),
+                StructField("country", StringType(), nullable=True),
+            ]
+        )
+        metadata_data = [
+            ("u001", date(2023, 1, 2), "free", "iPhone", "US"),
+            ("u002", date(2023, 1, 2), "free", "iPhone", "US"),
+            ("u003", date(2023, 1, 2), "free", "iPhone", "US"),
+            ("u004", date(2023, 1, 2), "free", "iPhone", "US"),
+            ("u005", date(2023, 1, 2), "premium", "iPad", "US"),
+            ("u006", date(2023, 1, 2), "premium", "iPad", "US"),
+        ]
+        metadata_df = spark.createDataFrame(metadata_data, schema=metadata_schema)
+
+        interactions_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("timestamp", TimestampType(), nullable=False),
+            ]
+        )
+        # Week 0: all 6 active (2023-01-02)
+        # Week 1: u001, u002 (free) + u005 (premium)
+        interactions_data = [
+            ("u001", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u002", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u003", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u004", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u005", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u006", datetime(2023, 1, 2, 10, 0, 0)),
+            ("u001", datetime(2023, 1, 9, 10, 0, 0)),
+            ("u002", datetime(2023, 1, 9, 10, 0, 0)),
+            ("u005", datetime(2023, 1, 9, 10, 0, 0)),
+        ]
+        interactions_df = spark.createDataFrame(interactions_data, schema=interactions_schema)
+
+        result_df = calculate_cohort_retention_by_segment(
+            interactions_df, metadata_df, retention_weeks=2
+        )
+
+        from pyspark.sql import functions as F
+
+        free_rows = (
+            result_df.filter(
+                (F.col("segment_type") == "subscription_type")
+                & (F.col("segment_value") == "free")
+            )
+            .orderBy("week_number")
+            .collect()
+        )
+        premium_rows = (
+            result_df.filter(
+                (F.col("segment_type") == "subscription_type")
+                & (F.col("segment_value") == "premium")
+            )
+            .orderBy("week_number")
+            .collect()
+        )
+
+        assert free_rows[0]["retention_rate"] == pytest.approx(1.0)
+        assert free_rows[1]["retention_rate"] == pytest.approx(0.5)
+        assert premium_rows[0]["retention_rate"] == pytest.approx(1.0)
+        assert premium_rows[1]["retention_rate"] == pytest.approx(0.5)
+
+    def test_empty_interactions_returns_empty(self, spark):
+        """
+        GIVEN: Empty interactions DataFrame
+        WHEN: calculate_cohort_retention_by_segment() is called
+        THEN: Returns empty DataFrame with correct schema
+        """
+        from datetime import date
+
+        from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
+
+        from src.transforms.engagement import calculate_cohort_retention_by_segment
+        from src.schemas.interactions_schema import INTERACTIONS_SCHEMA
+
+        metadata_schema = StructType(
+            [
+                StructField("user_id", StringType(), nullable=False),
+                StructField("registration_date", DateType(), nullable=False),
+                StructField("subscription_type", StringType(), nullable=True),
+                StructField("device_type", StringType(), nullable=True),
+                StructField("country", StringType(), nullable=True),
+            ]
+        )
+        metadata_df = spark.createDataFrame(
+            [("u001", date(2023, 1, 1), "free", "iPhone", "US")],
+            schema=metadata_schema,
+        )
+        empty_interactions = spark.createDataFrame([], INTERACTIONS_SCHEMA)
+
+        result_df = calculate_cohort_retention_by_segment(
+            empty_interactions, metadata_df, retention_weeks=4
+        )
+
+        assert result_df.count() == 0
+        assert "segment_type" in result_df.columns
+        assert "segment_value" in result_df.columns
+        assert "retained_users" in result_df.columns
+        assert "retention_rate" in result_df.columns

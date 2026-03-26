@@ -37,6 +37,7 @@ from pyspark.sql import functions as F
 from src.config.constants import (
     HOT_KEY_THRESHOLD_PERCENTILE,
     TABLE_COHORT_RETENTION,
+    TABLE_COHORT_RETENTION_BY_SEGMENT,
     TABLE_DAILY_ACTIVE_USERS,
     TABLE_MONTHLY_ACTIVE_USERS,
     TABLE_POWER_USERS,
@@ -52,6 +53,7 @@ from src.schemas.columns import (
 )
 from src.transforms.engagement import (
     calculate_cohort_retention,
+    calculate_cohort_retention_by_segment,
     calculate_dau,
     calculate_mau,
     calculate_stickiness,
@@ -139,6 +141,14 @@ class UserEngagementJob(BaseAnalyticsJob):
             )
             print("   ✅ Cohort retention calculation complete")
             metrics["cohort_retention"] = cohort_df
+
+            # 6. Cohort Retention by Segment (subscription, device, country)
+            print("\n📊 Calculating Cohort Retention by Segment...")
+            cohort_segment_df = calculate_cohort_retention_by_segment(
+                enriched_df, metadata_df, retention_weeks=26
+            )
+            print("   ✅ Cohort retention by segment calculation complete")
+            metrics["cohort_retention_by_segment"] = cohort_segment_df
 
         finally:
             # Ensure unpersist is called even if an exception occurs
@@ -234,6 +244,7 @@ class UserEngagementJob(BaseAnalyticsJob):
             "stickiness": TABLE_USER_STICKINESS,
             "power_users": TABLE_POWER_USERS,
             "cohort_retention": TABLE_COHORT_RETENTION,
+            "cohort_retention_by_segment": TABLE_COHORT_RETENTION_BY_SEGMENT,
         }
 
 

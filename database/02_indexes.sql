@@ -134,6 +134,11 @@ CREATE INDEX IF NOT EXISTS idx_mau_yearmonth_desc ON monthly_active_users(year_m
 -- Optimize cohort heatmap queries
 CREATE INDEX IF NOT EXISTS idx_cohort_week_weeknum ON cohort_retention(cohort_week, week_number);
 
+-- cohort_retention_by_segment indexes
+-- Primary key already covers (cohort_week, week_number, segment_type, segment_value)
+CREATE INDEX IF NOT EXISTS idx_cohort_seg_type_value ON cohort_retention_by_segment(segment_type, segment_value);
+CREATE INDEX IF NOT EXISTS idx_cohort_seg_week ON cohort_retention_by_segment(cohort_week, segment_type);
+
 -- Dashboard 3: Performance Monitoring
 -- Optimize version performance comparison
 CREATE INDEX IF NOT EXISTS idx_perf_version_date_composite ON performance_by_version(app_version, metric_date DESC);

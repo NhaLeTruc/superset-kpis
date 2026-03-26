@@ -87,19 +87,39 @@ COMMENT ON COLUMN power_users.total_duration_hours IS 'Total engagement time in 
 -- Cohort Retention
 -- Weekly cohort analysis (6 months retention)
 CREATE TABLE IF NOT EXISTS cohort_retention (
-    cohort_week VARCHAR(10) NOT NULL,  -- Format: 'YYYY-Wnn'
-    week_number INTEGER NOT NULL,       -- 0, 1, 2, ... 25 (6 months)
-    cohort_size INTEGER NOT NULL,
-    retained_users INTEGER NOT NULL,
-    retention_rate DOUBLE PRECISION NOT NULL,
+    cohort_week DATE NOT NULL,           -- Monday of the registration week (e.g. 2024-01-01)
+    week_number INTEGER NOT NULL,        -- 0, 1, 2, ... 25 (6 months)
+    cohort_size BIGINT NOT NULL,
+    retained_users BIGINT NOT NULL,
+    retention_rate DOUBLE PRECISION NOT NULL,  -- 0.0 to 1.0
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (cohort_week, week_number)
 );
 
-COMMENT ON TABLE cohort_retention IS 'Weekly cohort retention analysis over 6 months';
-COMMENT ON COLUMN cohort_retention.cohort_week IS 'Week when users joined (YYYY-Wnn format)';
-COMMENT ON COLUMN cohort_retention.week_number IS 'Weeks since joining (0-25)';
-COMMENT ON COLUMN cohort_retention.retention_rate IS 'Percentage of cohort still active';
+COMMENT ON TABLE cohort_retention IS 'Weekly cohort retention — overall, across all users';
+COMMENT ON COLUMN cohort_retention.cohort_week IS 'Monday of the week users registered';
+COMMENT ON COLUMN cohort_retention.week_number IS 'Weeks since registration (0 = registration week)';
+COMMENT ON COLUMN cohort_retention.retention_rate IS 'Fraction of cohort active in this week (0.0–1.0)';
+
+-- Cohort Retention by Segment
+-- Enables per-subscription, per-device, per-country retention analysis in Superset.
+-- Filter on segment_type to choose the breakdown dimension.
+CREATE TABLE IF NOT EXISTS cohort_retention_by_segment (
+    cohort_week DATE NOT NULL,
+    week_number INTEGER NOT NULL,
+    segment_type VARCHAR(30) NOT NULL,   -- 'subscription_type' | 'device_type' | 'country'
+    segment_value VARCHAR(50) NOT NULL,  -- e.g. 'free', 'iPhone', 'US'
+    cohort_size BIGINT NOT NULL,
+    retained_users BIGINT NOT NULL,
+    retention_rate DOUBLE PRECISION NOT NULL,  -- 0.0 to 1.0
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (cohort_week, week_number, segment_type, segment_value)
+);
+
+COMMENT ON TABLE cohort_retention_by_segment IS 'Cohort retention broken down by subscription, device, and country';
+COMMENT ON COLUMN cohort_retention_by_segment.segment_type IS 'Dimension name: subscription_type, device_type, or country';
+COMMENT ON COLUMN cohort_retention_by_segment.segment_value IS 'Dimension value, e.g. free, iPhone, US';
+COMMENT ON COLUMN cohort_retention_by_segment.retention_rate IS 'Fraction of segment cohort active in this week (0.0–1.0)';
 
 
 -- ============================================
