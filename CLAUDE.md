@@ -89,6 +89,7 @@ Everything else (`test`, `lint`, `run-job-*`) runs inside containers.
 | PostgreSQL | `goodnote-postgres` | 5432 |
 | Redis | `goodnote-redis` | 6379 |
 | Superset | `goodnote-superset` | 8088 |
+| Jupyter | `goodnote-jupyter` | 8888 |
 
 All containers share network `goodnote-network`. Services reach each other by
 service name (e.g. `postgres`, `spark-master`, `redis`).
@@ -98,8 +99,8 @@ service name (e.g. `postgres`, `spark-master`, `redis`).
 - `goodnote-spark-master`: `/opt/spark-apps`  → `from src.xxx` resolves there
 - `goodnote-spark-dev`: `/app`                → `from src.xxx` resolves there
 
-Jupyter is **not yet in docker-compose.yml** — see [docs/ML_PLAN.md](docs/ML_PLAN.md)
-for the planned service block when adding ML notebooks.
+Jupyter (`goodnote-jupyter`) is defined in `docker-compose.yml`. Start it separately with
+`make jupyter-up`; access at `http://localhost:8888` (token: `goodnote`).
 
 ---
 
@@ -246,9 +247,19 @@ Connection (inside containers): `host=postgres port=5432 dbname=analytics user=a
 
 ---
 
+## ML Notebooks
+
+Four Spark MLlib feasibility notebooks live in `notebooks/`:
+
+| Notebook | Model | Target |
+| --- | --- | --- |
+| `01_churn_prediction.ipynb` | `GBTClassifier` | Predict 30-day churn (AUC-ROC) |
+| `02_behavioral_segmentation.ipynb` | `KMeans` | Discover user clusters (silhouette) |
+| `03_ml_anomaly_detection.ipynb` | `KMeans` + distance | Compare vs Z-score anomalies |
+| `04_retention_forecasting.ipynb` | `GBTRegressor` + `LinearRegression` | Forecast week-12 retention (RMSE) |
+
+Start Jupyter with `make jupyter-up`, then open `http://localhost:8888` (token: `goodnote`).
+
 ## Active Plans
 
-- [docs/ML_PLAN.md](docs/ML_PLAN.md) — Adds Jupyter to docker-compose + 4 ML feasibility
-  notebooks (churn prediction, behavioural segmentation, ML anomaly detection, retention
-  forecasting) using Spark MLlib. No new pip dependencies required.
 - [docs/EXPANSION_PLAN.md](docs/EXPANSION_PLAN.md) — Broader roadmap items.

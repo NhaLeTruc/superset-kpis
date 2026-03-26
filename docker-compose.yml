@@ -122,6 +122,39 @@ services:
       timeout: 10s
       retries: 3
 
+  # Jupyter Notebook — ML feasibility environment
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: goodnote-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-goodnote}
+      # Postgres — same env vars already used by all other services
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
+      # Spark cluster connection
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
+    volumes:
+      - ./src:/home/jovyan/work/src
+      - ./data:/home/jovyan/work/data
+      - ./requirements.txt:/tmp/requirements.txt
+      - ./notebooks:/home/jovyan/work/notebooks
+    command: >
+      bash -c "pip install --quiet psycopg2-binary python-dotenv &&
+               start-notebook.sh --NotebookApp.token='${JUPYTER_TOKEN:-goodnote}'"
+    networks:
+      - goodnote-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+
   # Spark History Server (view completed job DAGs)
   spark-history:
     build:

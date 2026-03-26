@@ -1,7 +1,7 @@
 # GoodNote Analytics Platform - Makefile
 # All commands run via Docker containers (no virtual environment required)
 
-.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks superset-setup superset-setup-dry superset-setup-wait
+.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks superset-setup superset-setup-dry superset-setup-wait jupyter-up jupyter-url jupyter-logs jupyter-shell
 
 # Include environment variables from .env
 -include .env
@@ -64,6 +64,9 @@ help:
 	@echo "  make superset       - Show Superset URL"
 	@echo "  make superset-setup - Setup Superset (database, datasets, dashboards)"
 	@echo "  make spark-ui       - Show Spark UI URLs"
+	@echo "  make jupyter-up     - Start Jupyter ML environment (port 8888)"
+	@echo "  make jupyter-url    - Show Jupyter URL"
+	@echo "  make jupyter-logs   - View Jupyter container logs"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          - Stop services and clean volumes"
@@ -342,6 +345,32 @@ spark-ui:
 	@command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:8080 || \
 	command -v open >/dev/null 2>&1 && open http://localhost:8080 || \
 	echo "Please open http://localhost:8080 in your browser"
+
+jupyter-up:
+	@echo "Starting Jupyter ML environment..."
+	docker compose up -d jupyter
+	@echo "Waiting for Jupyter to start (20 seconds)..."
+	@sleep 20
+	@echo ""
+	@echo "Jupyter Lab is ready:"
+	@echo "  http://localhost:8888  (token: goodnote)"
+	@echo ""
+
+jupyter-url:
+	@echo "Jupyter Lab URL:"
+	@echo "  http://localhost:8888  (token: goodnote)"
+	@echo ""
+	@command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:8888/lab?token=goodnote" || \
+	command -v open >/dev/null 2>&1 && open "http://localhost:8888/lab?token=goodnote" || \
+	echo "Open: http://localhost:8888/lab?token=goodnote"
+
+jupyter-logs:
+	@echo "Jupyter container logs (Ctrl+C to exit):"
+	docker compose logs -f jupyter
+
+jupyter-shell:
+	@echo "Opening Jupyter container shell..."
+	docker exec -it goodnote-jupyter bash
 
 # ============================================================================
 # Cleanup
