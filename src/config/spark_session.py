@@ -135,6 +135,19 @@ def create_spark_session(
     return spark
 
 
+def _safe_get_conf(spark: SparkSession, key: str, default: str = "N/A") -> str:
+    """Retrieve a Spark conf value, returning `default` on any error.
+
+    Spark 3.5 validates default values for typed configs (e.g. byte-sized
+    configs reject "N/A" as a default). Using try/except avoids the
+    NumberFormatException when the config is unset or has an unexpected type.
+    """
+    try:
+        return spark.conf.get(key)
+    except Exception:
+        return default
+
+
 def get_spark_config_summary(spark: SparkSession) -> dict:
     """
     Get summary of current Spark configuration.
@@ -160,7 +173,7 @@ def get_spark_config_summary(spark: SparkSession) -> dict:
         "executor_cores": conf.get("spark.executor.cores", "N/A"),
         "aqe_enabled": spark.conf.get("spark.sql.adaptive.enabled", "false"),
         "shuffle_partitions": spark.conf.get("spark.sql.shuffle.partitions", "N/A"),
-        "broadcast_threshold": spark.conf.get("spark.sql.autoBroadcastJoinThreshold", "N/A"),
+        "broadcast_threshold": _safe_get_conf(spark, "spark.sql.autoBroadcastJoinThreshold"),
     }
 
     return summary

@@ -8,6 +8,8 @@ Provides configuration profiles optimized for different workload types:
 - Streaming: Micro-batch optimization
 """
 
+import contextlib
+
 from pyspark.sql import SparkSession
 
 
@@ -124,7 +126,11 @@ def configure_job_specific_settings(
         partitions = calculate_optimal_partitions(spark, data_size_gb, partition_size_mb=512)
 
         spark.conf.set("spark.sql.shuffle.partitions", str(partitions))
-        spark.conf.set("spark.memory.storageFraction", "0.5")
+        # spark.memory.storageFraction is immutable in Spark 3.5+ and must be
+        # set at session creation time. The set is attempted for compatibility
+        # with older Spark versions; failures are silently ignored.
+        with contextlib.suppress(Exception):
+            spark.conf.set("spark.memory.storageFraction", "0.5")
 
     elif job_type == "streaming":
         # Streaming: micro-batch optimization

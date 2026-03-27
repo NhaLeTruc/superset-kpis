@@ -36,7 +36,7 @@ class TestBaseAnalyticsJob:
         job = DataProcessingJob()
 
         assert hasattr(job, "data_size_gb")
-        assert isinstance(job.data_size_gb, int | float)
+        assert isinstance(job.data_size_gb, (int, float))  # noqa: UP038
         assert job.data_size_gb >= 0
 
 
