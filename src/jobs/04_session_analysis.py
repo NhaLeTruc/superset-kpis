@@ -3,7 +3,7 @@
 Job 4: Session Analysis
 
 Calculates session metrics using Spark's native session_window():
-- Session metrics (duration, actions count, bounce flag) with 30-minute timeout
+- Session metrics (duration, actions count, bounce flag) with 10-minute timeout
 - Bounce rates (overall and by dimensions)
 
 Uses session_window() for single-pass sessionization and aggregation.
@@ -41,6 +41,7 @@ from src.config.constants import (
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
     COL_ACTION_COUNT,
+    COL_BOUNCE_RATE,
     COL_COUNTRY,
     COL_DEVICE_TYPE,
     COL_DURATION_MS,
@@ -210,9 +211,14 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         results["bounce_rates"] = bounce_rates_df
 
-        # Unpersist DataFrames to free memory
-        session_metrics_df.unpersist()
-        enriched_df.unpersist()
+        # session_metrics_df and enriched_df are NOT unpersisted here.
+        # session_freq_df and bounce_rates_df are lazy DataFrames that reference
+        # session_metrics_df in their execution plans.  Unpersisting session_metrics_df
+        # before those DataFrames are materialized (during write_to_database in run())
+        # would force Spark to redo the full session_window() computation — one of
+        # the most expensive Spark operations.  Similarly, unpersisting enriched_df
+        # would force a Parquet re-read.  Both are released when spark.stop() is
+        # called in base_job.run().
 
         return results
 

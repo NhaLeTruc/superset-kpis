@@ -51,9 +51,9 @@ class DataProcessingJob(BaseAnalyticsJob):
         """Configure job-specific arguments."""
         parser = argparse.ArgumentParser(description="GoodNote Data Processing Job")
         parser.add_argument(
-            "--interactions-path", required=True, help="Path to interactions Parquet"
+            "--interactions-path", required=True, help="Path to interactions CSV"
         )
-        parser.add_argument("--metadata-path", required=True, help="Path to metadata Parquet")
+        parser.add_argument("--metadata-path", required=True, help="Path to metadata CSV")
         parser.add_argument("--output-path", required=True, help="Path to write enriched data")
         parser.add_argument("--skip-validation", action="store_true", help="Skip data validation")
         parser.add_argument(
@@ -114,16 +114,11 @@ class DataProcessingJob(BaseAnalyticsJob):
             self.args.interactions_path,
             name="interactions",
             schema=INTERACTIONS_SCHEMA,
-            num_partitions=1,
+            num_partitions=8,
         )
         metadata_df = self.read_csv(
             self.args.metadata_path, name="user metadata", schema=METADATA_SCHEMA, num_partitions=1
         )
-
-        # Track initial record count
-        interaction_count = interactions_df.count()
-        if self.monitoring_ctx:
-            self.monitoring_ctx["record_counter"].add(interaction_count)
 
         # Validate data quality
         if not self.args.skip_validation:
@@ -146,11 +141,6 @@ class DataProcessingJob(BaseAnalyticsJob):
 
         # Enrich interactions with metadata
         enriched_df = self.enrich_interactions(interactions_df, metadata_df)
-
-        # Unpersist input dataframes to free memory
-        interactions_df.unpersist()
-        metadata_df.unpersist()
-        print("   🧹 Released input DataFrames from memory")
 
         # Add date partition column for downstream partitioned writes
         enriched_df = enriched_df.withColumn("date", F.to_date(COL_TIMESTAMP))
@@ -188,7 +178,6 @@ class DataProcessingJob(BaseAnalyticsJob):
         for row in device_counts.collect():
             print(f"  {row[COL_DEVICE_TYPE]}: {row['count']:,}")
 
-        enriched_df.unpersist()
         print("=" * 60)
 
     def get_table_mapping(self) -> dict[str, str] | None:

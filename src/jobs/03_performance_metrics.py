@@ -197,6 +197,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             .otherwise("low"),
         )
 
+        # Rename baseline_mean → expected_value to match the DB schema column definition
+        anomalies_df = anomalies_df.withColumnRenamed("baseline_mean", "expected_value")
+
         # Add detection timestamp and description
         anomalies_df = (
             anomalies_df.withColumn("detected_at", F.current_timestamp())
@@ -217,6 +220,24 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
                     F.lit(")"),
                 ),
             )
+        )
+
+        # Drop internal computation columns and irrelevant interaction fields.
+        # detect_anomalies_statistical() returns the full enriched_df row for each
+        # anomaly, including intermediate stats (initial_mean, initial_stddev,
+        # initial_z_score, baseline_stddev) and raw interaction fields that belong
+        # only in the source data, not in the anomalies output table.
+        anomalies_df = anomalies_df.select(
+            COL_APP_VERSION,
+            COL_DEVICE_TYPE,
+            COL_METRIC_DATE,
+            "metric_name",
+            "metric_value",
+            "expected_value",
+            "z_score",
+            COL_SEVERITY,
+            "detected_at",
+            "description",
         )
 
         # Cache and count once
@@ -257,7 +278,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         # Version Performance Summary
         version_df = metrics["performance_by_version"]
         print("\nPerformance by Version:")
-        print(f"  Total Combinations: {self._counts.get('version', version_df.count()):,}")
+        print(f"  Total Combinations: {self._counts.get('version') or version_df.count():,}")
 
         version_summary = version_df.agg(
             F.avg("p50_duration_ms").alias("avg_p50"),
@@ -275,7 +296,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         # Device Performance Summary
         device_df = metrics["device_performance"]
         print("\nDevice Performance:")
-        print(f"  Total Combinations: {self._counts.get('device', device_df.count()):,}")
+        print(f"  Total Combinations: {self._counts.get('device') or device_df.count():,}")
 
         device_summary = (
             device_df.groupBy(COL_DEVICE_TYPE)
@@ -314,7 +335,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print("\nPerformance Anomalies:")
         print(f"  Total Detected: {anomaly_count}")
 
-        if anomaly_count and anomaly_count > 0:
+        if anomaly_count > 0:
             severity_dist = anomalies_df.groupBy(COL_SEVERITY).count().orderBy(F.desc("count"))
             print("  By Severity:")
             for row in severity_dist.collect():

@@ -239,6 +239,7 @@ class BaseAnalyticsJob(ABC):
             metrics: Dictionary mapping metric names to DataFrames
             output_path: Base directory path for outputs
             partition_by: Optional list of column names to partition by
+            coalesce_partitions: Optional number of output partitions to coalesce to
         """
         print(f"\n💾 Writing metrics to Parquet: {output_path}")
 
@@ -291,7 +292,7 @@ class BaseAnalyticsJob(ABC):
         # Print key arguments
         if self.args:
             for key, value in vars(self.args).items():
-                if value and key not in ["func"]:  # Skip empty and internal args
+                if value and key != "func":  # Skip empty and internal args
                     print(f"{key.replace('_', ' ').title()}: {value}")
 
         print("=" * 60)
@@ -355,7 +356,6 @@ class BaseAnalyticsJob(ABC):
         """
         pass
 
-    @abstractmethod
     def get_table_mapping(self) -> dict[str, str] | None:
         """
         Get mapping from metric names to database table names.
@@ -419,7 +419,6 @@ class BaseAnalyticsJob(ABC):
 
             # Log monitoring summary
             if self.monitoring_ctx:
-                print("\n")
                 log_monitoring_summary(self.monitoring_ctx, self.job_name)
 
             # Print footer

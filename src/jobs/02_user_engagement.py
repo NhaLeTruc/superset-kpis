@@ -107,53 +107,54 @@ class UserEngagementJob(BaseAnalyticsJob):
             .persist()
         )
 
-        try:
-            # 1. Daily Active Users (DAU)
-            print("\n📊 Calculating Daily Active Users (DAU)...")
-            dau_df = calculate_dau(enriched_df)
-            print("   ✅ DAU calculation complete")
-            metrics["dau"] = dau_df
+        # 1. Daily Active Users (DAU)
+        print("\n📊 Calculating Daily Active Users (DAU)...")
+        dau_df = calculate_dau(enriched_df)
+        print("   ✅ DAU calculation complete")
+        metrics["dau"] = dau_df
 
-            # 2. Monthly Active Users (MAU)
-            print("\n📊 Calculating Monthly Active Users (MAU)...")
-            mau_df = calculate_mau(enriched_df)
-            print("   ✅ MAU calculation complete")
-            metrics["mau"] = mau_df
+        # 2. Monthly Active Users (MAU)
+        print("\n📊 Calculating Monthly Active Users (MAU)...")
+        mau_df = calculate_mau(enriched_df)
+        print("   ✅ MAU calculation complete")
+        metrics["mau"] = mau_df
 
-            # 3. Stickiness Ratio (DAU/MAU)
-            print("\n📊 Calculating Stickiness Ratio...")
-            stickiness_df = calculate_stickiness(dau_df, mau_df)
-            print("   ✅ Stickiness calculation complete")
-            metrics["stickiness"] = stickiness_df
+        # 3. Stickiness Ratio (DAU/MAU)
+        print("\n📊 Calculating Stickiness Ratio...")
+        stickiness_df = calculate_stickiness(dau_df, mau_df)
+        print("   ✅ Stickiness calculation complete")
+        metrics["stickiness"] = stickiness_df
 
-            # 4. Power Users (Top 1%)
-            print("\n📊 Identifying Power Users...")
-            power_users_df = identify_power_users(
-                enriched_df, metadata_df, percentile=HOT_KEY_THRESHOLD_PERCENTILE
-            )
-            print("   ✅ Power users identification complete")
-            metrics["power_users"] = power_users_df
+        # 4. Power Users (Top 1%)
+        print("\n📊 Identifying Power Users...")
+        power_users_df = identify_power_users(
+            enriched_df, metadata_df, percentile=HOT_KEY_THRESHOLD_PERCENTILE
+        )
+        print("   ✅ Power users identification complete")
+        metrics["power_users"] = power_users_df
 
-            # 5. Cohort Retention (Weekly cohorts, 6 months)
-            print("\n📊 Calculating Cohort Retention...")
-            cohort_df = calculate_cohort_retention(
-                enriched_df, metadata_df, cohort_period="week", retention_weeks=26
-            )
-            print("   ✅ Cohort retention calculation complete")
-            metrics["cohort_retention"] = cohort_df
+        # 5. Cohort Retention (Weekly cohorts, 6 months)
+        print("\n📊 Calculating Cohort Retention...")
+        cohort_df = calculate_cohort_retention(
+            enriched_df, metadata_df, cohort_period="week", retention_weeks=26
+        )
+        print("   ✅ Cohort retention calculation complete")
+        metrics["cohort_retention"] = cohort_df
 
-            # 6. Cohort Retention by Segment (subscription, device, country)
-            print("\n📊 Calculating Cohort Retention by Segment...")
-            cohort_segment_df = calculate_cohort_retention_by_segment(
-                enriched_df, metadata_df, retention_weeks=26
-            )
-            print("   ✅ Cohort retention by segment calculation complete")
-            metrics["cohort_retention_by_segment"] = cohort_segment_df
+        # 6. Cohort Retention by Segment (subscription, device, country)
+        print("\n📊 Calculating Cohort Retention by Segment...")
+        cohort_segment_df = calculate_cohort_retention_by_segment(
+            enriched_df, metadata_df, retention_weeks=26
+        )
+        print("   ✅ Cohort retention by segment calculation complete")
+        metrics["cohort_retention_by_segment"] = cohort_segment_df
 
-        finally:
-            # Ensure unpersist is called even if an exception occurs
-            metadata_df.unpersist()
-            enriched_df.unpersist()
+        # metadata_df was persisted for reuse across power_users and cohort steps.
+        # It is NOT unpersisted here because cohort_df and cohort_segment_df are lazy
+        # and still reference it in their execution plans.  Unpersisting before those
+        # DataFrames are materialized (during write_to_database in run()) would force
+        # Spark to re-compute metadata from enriched_df, then re-read the Parquet file.
+        # Both will be released when spark.stop() is called in base_job.run().
 
         return metrics
 

@@ -55,9 +55,9 @@ class TestBaseJobMethods:
 
         assert hasattr(BaseAnalyticsJob, "setup_monitoring")
 
-    def test_has_run_abstract_method(self):
-        """Test that run is an abstract method."""
+    def test_run_is_not_abstract(self):
+        """Test that run is a concrete template method, not abstract."""
         from src.jobs.base_job import BaseAnalyticsJob
 
-        # Check that 'run' is in abstract methods
-        assert "run" in BaseAnalyticsJob.__abstractmethods__
+        # run() is the template method orchestrator — it must NOT be abstract
+        assert "run" not in BaseAnalyticsJob.__abstractmethods__
