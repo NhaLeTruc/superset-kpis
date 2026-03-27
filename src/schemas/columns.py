@@ -13,6 +13,7 @@ COL_SUBSCRIPTION_TYPE = "subscription_type"
 COL_REGISTRATION_DATE = "registration_date"
 
 # Derived columns (used across 2+ files)
+COL_DATE = "date"
 COL_METRIC_DATE = "metric_date"
 COL_SESSION_ID = "session_id"
 COL_SESSION_DURATION_MS = "session_duration_ms"

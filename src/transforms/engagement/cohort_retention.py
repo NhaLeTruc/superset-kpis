@@ -103,7 +103,7 @@ def calculate_cohort_retention(
     # Build complete grid (every cohort × every week, including zero-activity weeks)
     spark = interactions_df.sparkSession
     weeks_df = spark.range(retention_weeks).withColumnRenamed("id", "weeks_since_join")
-    complete_grid = cohort_sizes.crossJoin(weeks_df)
+    complete_grid = cohort_sizes.crossJoin(F.broadcast(weeks_df))
 
     result_df = complete_grid.join(
         retention_df.select(
@@ -174,7 +174,7 @@ def _compute_segment_retention(
     # Complete grid: every (cohort, segment_value, week) combination
     spark = interactions_df.sparkSession
     weeks_df = spark.range(retention_weeks).withColumnRenamed("id", "weeks_since_join")
-    complete_grid = cohort_sizes.crossJoin(weeks_df)
+    complete_grid = cohort_sizes.crossJoin(F.broadcast(weeks_df))
 
     result_df = complete_grid.join(
         retention_df.select(

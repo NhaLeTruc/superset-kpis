@@ -6,13 +6,15 @@ Handles reading data from PostgreSQL into Spark DataFrames.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
-
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
 
 from .connection import get_postgres_connection_props
+
+_TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def read_from_postgres(
@@ -93,7 +95,7 @@ def read_from_postgres(
     else:
         df = spark.read.jdbc(url=jdbc_url, table=table_name, properties=properties)
 
-    print(f"✅ Successfully read {df.count()} rows from {table_name}")
+    print(f"✅ Successfully read data from {table_name}")
 
     return df
 
@@ -147,6 +149,9 @@ def get_table_row_count(spark: SparkSession, table_name: str) -> int:
         >>> count = get_table_row_count(spark, "daily_active_users")
         >>> print(f"Table has {count} rows")
     """
+    if not _TABLE_NAME_RE.match(table_name):
+        raise ValueError(f"Invalid table name: {table_name!r}")
+
     jdbc_url, properties = get_postgres_connection_props()
 
     count_df = spark.read.jdbc(
@@ -155,4 +160,7 @@ def get_table_row_count(spark: SparkSession, table_name: str) -> int:
         properties=properties,
     )
 
-    return count_df.first()["count"]
+    row = count_df.first()
+    if row is None:
+        return 0
+    return row["count"]

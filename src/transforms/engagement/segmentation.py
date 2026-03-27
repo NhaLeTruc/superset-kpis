@@ -14,7 +14,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StructField
 
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
-from src.schemas.columns import COL_DURATION_MS, COL_PAGE_ID, COL_TIMESTAMP, COL_USER_ID
+from src.schemas.columns import COL_DATE, COL_DURATION_MS, COL_PAGE_ID, COL_TIMESTAMP, COL_USER_ID
 
 
 logger = logging.getLogger(__name__)
@@ -81,13 +81,13 @@ def identify_power_users(
     filtered_df = interactions_df.filter(F.col(COL_DURATION_MS) <= max_duration_ms)
 
     # Add date column for days_active calculation
-    filtered_df = filtered_df.withColumn("date", F.to_date(F.col(COL_TIMESTAMP)))
+    filtered_df = filtered_df.withColumn(COL_DATE, F.to_date(F.col(COL_TIMESTAMP)))
 
     # Build aggregation expressions
     agg_exprs = [
         F.sum(COL_DURATION_MS).alias("total_duration_ms"),
         F.count("*").alias("total_interactions"),
-        F.countDistinct("date").alias("days_active"),
+        F.countDistinct(COL_DATE).alias("days_active"),
     ]
 
     # Add unique_pages only if page_id column exists
@@ -115,70 +115,76 @@ def identify_power_users(
     # Cache user_metrics before count() to avoid recomputation
     user_metrics = user_metrics.cache()
 
-    # Calculate how many users to include based on percentile threshold
-    # Original semantics: include users where percent_rank >= percentile
-    # percent_rank = (rank - 1) / (n - 1), so we derive count from that formula
-    total_users = user_metrics.count()
+    try:
+        # Calculate how many users to include based on percentile threshold
+        # Original semantics: include users where percent_rank >= percentile
+        # percent_rank = (rank - 1) / (n - 1), so we derive count from that formula
+        total_users = user_metrics.count()
 
-    if total_users == 0:
-        power_users = user_metrics
-    elif total_users == 1:
-        # Single user is always a power user
-        power_users = user_metrics
-    else:
-        # Calculate exact count to include (matches percent_rank >= percentile semantics)
-        users_to_include = total_users - math.ceil(percentile * (total_users - 1))
-        users_to_include = max(1, users_to_include)  # Always include at least 1
+        if total_users == 0:
+            power_users = user_metrics
+        elif total_users == 1:
+            # Single user is always a power user
+            power_users = user_metrics
+        else:
+            # Calculate exact count to include (matches percent_rank >= percentile semantics)
+            users_to_include = total_users - math.ceil(percentile * (total_users - 1))
+            users_to_include = max(1, users_to_include)  # Always include at least 1
 
-        # Sort by total_duration_ms descending and take top N
-        # This avoids a global window function which would move all data to one partition
-        power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(
-            users_to_include
-        )
+            # Sort by total_duration_ms descending and take top N
+            # This avoids a global window function which would move all data to one partition
+            power_users = user_metrics.orderBy(F.col("total_duration_ms").desc()).limit(
+                users_to_include
+            )
 
-    # Calculate percentile rank without window function (avoids single-partition warning)
-    # Power users is a small dataset (top 1%), so collect is usually safe
-    power_users_count = power_users.count()
+        # Calculate percentile rank without window function (avoids single-partition warning)
+        # Cache power_users before count() so the subsequent collect() reads from cache,
+        # avoiding a redundant global sort on the same data.
+        _pw_cached = power_users.cache()
+        power_users_count = _pw_cached.count()
 
-    if power_users_count <= 1:
-        # Single user or empty: assign max percentile
-        power_users = power_users.withColumn("percentile_rank", F.lit(100.0))
-    elif power_users_count > MAX_POWER_USERS_COLLECT:
-        # Safety limit: skip percentile_rank calculation for very large result sets
-        # to avoid overwhelming driver memory
-        logger.warning(
-            f"Power users count ({power_users_count:,}) exceeds MAX_POWER_USERS_COLLECT "
-            f"({MAX_POWER_USERS_COLLECT:,}). Skipping percentile_rank calculation - "
-            f"column will contain NULL values. Consider increasing the percentile "
-            f"threshold to reduce the result set size."
-        )
-        power_users = power_users.withColumn("percentile_rank", F.lit(None).cast("double"))
-    else:
-        # Collect, sort, compute rank mathematically, then recreate DataFrame
-        spark = power_users.sparkSession
-        schema = power_users.schema
+        if power_users_count <= 1:
+            # Single user or empty: assign max percentile
+            power_users = _pw_cached.withColumn("percentile_rank", F.lit(100.0))
+            _pw_cached.unpersist()
+        elif power_users_count > MAX_POWER_USERS_COLLECT:
+            # Safety limit: skip percentile_rank calculation for very large result sets
+            # to avoid overwhelming driver memory
+            logger.warning(
+                f"Power users count ({power_users_count:,}) exceeds MAX_POWER_USERS_COLLECT "
+                f"({MAX_POWER_USERS_COLLECT:,}). Skipping percentile_rank calculation - "
+                f"column will contain NULL values. Consider increasing the percentile "
+                f"threshold to reduce the result set size."
+            )
+            power_users = _pw_cached.withColumn("percentile_rank", F.lit(None).cast("double"))
+            _pw_cached.unpersist()
+        else:
+            # Collect, sort, compute rank mathematically, then recreate DataFrame
+            spark = _pw_cached.sparkSession
+            schema = _pw_cached.schema
 
-        # Collect and sort by total_duration_ms ascending
-        rows = power_users.collect()
-        sorted_rows = sorted(rows, key=lambda r: r["total_duration_ms"])
+            # Collect from cache (no redundant sort/scan) and sort by duration ascending
+            rows = _pw_cached.collect()
+            _pw_cached.unpersist()
+            sorted_rows = sorted(rows, key=lambda r: r["total_duration_ms"])
 
-        # Compute percentile_rank for each row
-        # Row 0 (lowest) -> percentile * 100, Row N-1 (highest) -> 100
-        ranked_data = []
-        for i, row in enumerate(sorted_rows):
-            pct_rank = percentile * 100 + (i / (power_users_count - 1)) * (1 - percentile) * 100
-            ranked_data.append((*row, float(pct_rank)))
+            # Compute percentile_rank for each row
+            # Row 0 (lowest) -> percentile * 100, Row N-1 (highest) -> 100
+            ranked_data = []
+            for i, row in enumerate(sorted_rows):
+                pct_rank = percentile * 100 + (i / (power_users_count - 1)) * (1 - percentile) * 100
+                ranked_data.append((*row, float(pct_rank)))
 
-        # Recreate DataFrame with percentile_rank column
-        new_schema = schema.add(StructField("percentile_rank", DoubleType(), True))
-        power_users = spark.createDataFrame(ranked_data, schema=new_schema)
+            # Recreate DataFrame with percentile_rank column
+            new_schema = schema.add(StructField("percentile_rank", DoubleType(), True))
+            power_users = spark.createDataFrame(ranked_data, schema=new_schema)
 
-    # Join with metadata
-    result_df = power_users.join(metadata_df, on=COL_USER_ID, how="left")
-
-    # Release the cache — user_metrics was only needed for count() and ordering
-    # within this function.  Spark caches persist until explicitly freed; leaving
-    # them would leak memory for the lifetime of the SparkSession.
-    user_metrics.unpersist()
+        # Join with metadata
+        result_df = power_users.join(metadata_df, on=COL_USER_ID, how="left")
+    finally:
+        # Release the cache — user_metrics was only needed for count() and ordering
+        # within this function.  Spark caches persist until explicitly freed; leaving
+        # them would leak memory for the lifetime of the SparkSession.
+        user_metrics.unpersist()
 
     return result_df
