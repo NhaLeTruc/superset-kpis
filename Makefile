@@ -77,7 +77,13 @@ help:
 # Quick Start Commands
 # ============================================================================
 
-quickstart: setup generate-data run-job-1 run-job-2 run-job-3 run-job-4
+quickstart: setup
+	@if [ -z "$$(ls -A data/raw 2>/dev/null)" ]; then \
+		$(MAKE) generate-data; \
+	else \
+		echo "data/raw is not empty, skipping data generation"; \
+	fi
+	$(MAKE) run-job-1 run-job-2 run-job-3 run-job-4
 	@echo ""
 	@echo "Quickstart Complete!"
 	@echo ""
