@@ -79,7 +79,8 @@ services:
     networks:
       - goodnote-network
     depends_on:
-      - spark-master
+      spark-master:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8081' || exit 1"]
       interval: 30s
@@ -115,7 +116,8 @@ services:
     networks:
       - goodnote-network
     depends_on:
-      - spark-master
+      spark-master:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8081' || exit 1"]
       interval: 30s
@@ -206,7 +208,8 @@ services:
     networks:
       - goodnote-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 --version && test -d /app/src"]
       interval: 30s
@@ -316,8 +319,10 @@ services:
     networks:
       - goodnote-network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
       interval: 30s
@@ -328,7 +333,7 @@ services:
       sh -c "superset db upgrade &&
       superset fab create-admin --username \"$$SUPERSET_ADMIN_USERNAME\" --firstname \"$$SUPERSET_ADMIN_FIRSTNAME\" --lastname \"$$SUPERSET_ADMIN_LASTNAME\" --email \"$$SUPERSET_ADMIN_EMAIL\" --password \"$$SUPERSET_ADMIN_PASSWORD\" || true &&
       superset init &&
-      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
+      superset run -h 0.0.0.0 -p 8088 --with-threads --reload"
 
 # =================================================================
 # Networks
@@ -356,5 +361,4 @@ volumes:
     driver: local
   spark_events:
     driver: local
-  superset_home:
-    driver: local
+  # superset uses a bind mount (./superset:/app/superset_home), not a named volume

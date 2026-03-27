@@ -16,11 +16,17 @@ RUN mkdir -p /opt/spark/conf && \
     echo "spark.driver.extraClassPath /opt/spark/jars/postgresql-42.7.1.jar" >> /opt/spark/conf/spark-defaults.conf && \
     echo "spark.executor.extraClassPath /opt/spark/jars/postgresql-42.7.1.jar" >> /opt/spark/conf/spark-defaults.conf
 
-# Create required runtime directories
-RUN mkdir -p /tmp/spark-events /app/data/raw /app/data/processed
+# Create required runtime directories.
+# Note: /opt/spark/spark-events is the real event-log dir (SPARK_EVENTLOG_DIR env var),
+# mounted as a named volume from docker-compose.  /tmp/spark-events is never used.
+RUN mkdir -p /app/data/raw /app/data/processed
 
 # Set PYTHONPATH so 'from src.xxx import' resolves against the mounted volume
 ENV PYTHONPATH=/opt/spark-apps
 
 # Use a neutral working directory to avoid spark-submit treating CWD as a JAR
 WORKDIR /opt/spark
+
+# Switch back to non-root user — master, workers, and history server should not
+# run as root.  Dockerfile (spark-dev) already does this; keep both consistent.
+USER spark

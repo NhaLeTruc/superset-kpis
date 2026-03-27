@@ -6,8 +6,10 @@ FROM ${SUPERSET_IMAGE}:${SUPERSET_VERSION}
 # Note: Must install as root, but the venv is set up to include system packages
 USER root
 
-# Detect Python version dynamically and install psycopg2-binary
-RUN PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2) && \
-    /usr/local/bin/pip install --target=/app/.venv/lib/python${PYTHON_VERSION}/site-packages psycopg2-binary
+# Install psycopg2-binary using the venv's own pip so it lands in the correct
+# site-packages automatically.  The previous approach detected the Python version
+# by parsing `python3 --version` and constructed a --target path that could fail
+# if the venv layout changed (e.g. different Python patch release).
+RUN /app/.venv/bin/pip install --no-cache-dir psycopg2-binary
 
 USER superset
