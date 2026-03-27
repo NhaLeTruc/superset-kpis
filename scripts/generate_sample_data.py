@@ -71,11 +71,11 @@ VERSION_DISTRIBUTION = {"3.0.0": 0.10, "3.0.1": 0.15, "3.1.0": 0.25, "3.1.1": 0.
 
 # Time-aware version rollout: older versions dominate early, newer ones roll out progressively.
 VERSION_TIMELINE = [
-    (datetime(2024, 1,  1), {"3.0.0": 0.80, "3.0.1": 0.20}),
+    (datetime(2024, 1, 1), {"3.0.0": 0.80, "3.0.1": 0.20}),
     (datetime(2024, 2, 15), {"3.0.0": 0.30, "3.0.1": 0.70}),
-    (datetime(2024, 4,  1), {"3.0.1": 0.40, "3.1.0": 0.60}),
-    (datetime(2024, 6,  1), {"3.1.0": 0.50, "3.1.1": 0.50}),
-    (datetime(2024, 8,  1), {"3.1.0": 0.20, "3.1.1": 0.60, "3.2.0": 0.20}),
+    (datetime(2024, 4, 1), {"3.0.1": 0.40, "3.1.0": 0.60}),
+    (datetime(2024, 6, 1), {"3.1.0": 0.50, "3.1.1": 0.50}),
+    (datetime(2024, 8, 1), {"3.1.0": 0.20, "3.1.1": 0.60, "3.2.0": 0.20}),
     (datetime(2024, 10, 1), {"3.1.1": 0.30, "3.2.0": 0.70}),
     (datetime(2024, 12, 1), {"3.2.0": 1.00}),
 ]
@@ -609,7 +609,7 @@ def generate_user_interactions_uniform(
     return interactions
 
 
-def generate_user_interactions_realistic(
+def generate_user_interactions_realistic(  # noqa: PLR0912
     target_interactions: int,
     users: list,
     pareto_alpha: float = 1.5,
@@ -692,7 +692,7 @@ def generate_user_interactions_realistic(
         # For each user, split their interactions into real sessions using the
         # actual timeout, then sample sessions proportionally (min 1 per user).
         sampled: list = []
-        for uid, user_ixs in by_user.items():
+        for _uid, user_ixs in by_user.items():
             user_ixs.sort(key=lambda x: x["timestamp"])
 
             # Split into sessions by time gap

@@ -36,7 +36,13 @@ while IFS= read -r src_file; do
     filename=$(basename "$src_file" .py)
 
     if [[ "$src_file" == src/transforms/* ]]; then
-        test_file="tests/unit/test_${filename}.py"
+        rel="${src_file#src/transforms/}"   # e.g. engagement/cohort_retention.py
+        subdir=$(dirname "$rel")            # e.g. engagement  (or "." if top-level)
+        if [ "$subdir" = "." ]; then
+            test_file="tests/unit/test_${filename}.py"
+        else
+            test_file="tests/unit/${subdir}/test_${filename}.py"
+        fi
     elif [[ "$src_file" == src/utils/* ]]; then
         test_file="tests/unit/test_${filename}.py"
     elif [[ "$src_file" == src/jobs/* ]]; then

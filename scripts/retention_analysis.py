@@ -1,8 +1,10 @@
 """Retention analysis script for GoodNote Analytics data."""
+
 import csv
 import json
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from collections import defaultdict, Counter
+
 
 # ── Load ──────────────────────────────────────────────────────────────────────
 meta = {}
@@ -40,8 +42,7 @@ MAX_WEEKS = 12
 user_cohort = {uid: week_start(info["reg_date"]) for uid, info in meta.items()}
 
 user_active_weeks = {
-    uid: set(week_start(ts) for ts in ts_list)
-    for uid, ts_list in interactions.items()
+    uid: {week_start(ts) for ts in ts_list} for uid, ts_list in interactions.items()
 }
 
 # ── Cohort retention matrix ───────────────────────────────────────────────────
@@ -79,13 +80,13 @@ print(header)
 print("-" * len(header))
 for c in all_cohorts:
     n = sizes[c]
-    row = f"{str(c.date()):<12}  {n:>4}  "
+    row = f"{c.date()!s:<12}  {n:>4}  "
     for w in range(MAX_WEEKS + 1):
         v = ret[c][w]
         if v is None:
             row += "  -- "
         else:
-            row += f"{v*100:4.1f}%"
+            row += f"{v * 100:4.1f}%"
         if w < MAX_WEEKS:
             row += "  "
     print(row)
@@ -97,7 +98,7 @@ for w in range(MAX_WEEKS + 1):
     vals = [ret[c][w] for c in mature_cohorts if ret[c][w] is not None]
     avg_ret[w] = sum(vals) / len(vals) if vals else 0.0
     bar = "|" * int(avg_ret[w] * 50)
-    print(f"  W{w:02d}: {avg_ret[w]*100:5.1f}%  {bar}")
+    print(f"  W{w:02d}: {avg_ret[w] * 100:5.1f}%  {bar}")
 
 # ── Week-over-week drop-off ───────────────────────────────────────────────────
 print("\n--- WEEK-OVER-WEEK DROP-OFF ---")
@@ -105,7 +106,7 @@ for w in range(1, MAX_WEEKS + 1):
     prev = avg_ret[w - 1]
     curr = avg_ret[w]
     drop = (prev - curr) / prev * 100 if prev > 0 else 0
-    print(f"  W{w-1:02d}->W{w:02d}: {prev*100:.1f}% -> {curr*100:.1f}%  (drop {drop:.1f}%)")
+    print(f"  W{w - 1:02d}->W{w:02d}: {prev * 100:.1f}% -> {curr * 100:.1f}%  (drop {drop:.1f}%)")
 
 # ── Retention by subscription ─────────────────────────────────────────────────
 print("\n--- RETENTION BY SUBSCRIPTION TYPE (mature cohorts avg) ---")
@@ -124,9 +125,7 @@ for sub in ["free", "premium", "enterprise"]:
         w: (sum(week_rates[w]) / len(week_rates[w]) if week_rates[w] else 0.0)
         for w in range(MAX_WEEKS + 1)
     }
-    spot = "  ".join(
-        f"W{w:02d}={sub_avg[sub][w]*100:4.1f}%" for w in [0, 1, 2, 4, 8, 12]
-    )
+    spot = "  ".join(f"W{w:02d}={sub_avg[sub][w] * 100:4.1f}%" for w in [0, 1, 2, 4, 8, 12])
     print(f"  {sub:<12}: {spot}")
 
 # ── Retention by device ───────────────────────────────────────────────────────
@@ -147,7 +146,9 @@ for device in ["iPhone", "iPad", "Android Phone", "Android Tablet"]:
         for w in [1, 4, 8, 12]
     }
     vals = device_avg[device]
-    print(f"  {device:<18}: W01={vals[1]*100:4.1f}%  W04={vals[4]*100:4.1f}%  W08={vals[8]*100:4.1f}%  W12={vals[12]*100:4.1f}%")
+    print(
+        f"  {device:<18}: W01={vals[1] * 100:4.1f}%  W04={vals[4] * 100:4.1f}%  W08={vals[8] * 100:4.1f}%  W12={vals[12] * 100:4.1f}%"
+    )
 
 # ── Registration-to-first-interaction gap ─────────────────────────────────────
 print("\n--- REGISTRATION TO FIRST INTERACTION GAP ---")
@@ -167,14 +168,14 @@ n = len(gaps_days)
 print(f"  Users with interactions : {n}")
 print(f"  Users never active      : {never_active}")
 print(f"  Min gap (days)          : {gaps_days[0]}")
-print(f"  Median gap (days)       : {gaps_days[n//2]}")
-print(f"  Mean gap (days)         : {sum(gaps_days)/n:.1f}")
-print(f"  P75 gap (days)          : {gaps_days[int(n*0.75)]}")
-print(f"  P90 gap (days)          : {gaps_days[int(n*0.90)]}")
+print(f"  Median gap (days)       : {gaps_days[n // 2]}")
+print(f"  Mean gap (days)         : {sum(gaps_days) / n:.1f}")
+print(f"  P75 gap (days)          : {gaps_days[int(n * 0.75)]}")
+print(f"  P90 gap (days)          : {gaps_days[int(n * 0.90)]}")
 print(f"  Max gap (days)          : {gaps_days[-1]}")
-print(f"  Activated within 7d     : {sum(1 for g in gaps_days if g<=7)/n*100:.1f}%")
-print(f"  Activated within 30d    : {sum(1 for g in gaps_days if g<=30)/n*100:.1f}%")
-print(f"  Activated within 90d    : {sum(1 for g in gaps_days if g<=90)/n*100:.1f}%")
+print(f"  Activated within 7d     : {sum(1 for g in gaps_days if g <= 7) / n * 100:.1f}%")
+print(f"  Activated within 30d    : {sum(1 for g in gaps_days if g <= 30) / n * 100:.1f}%")
+print(f"  Activated within 90d    : {sum(1 for g in gaps_days if g <= 90) / n * 100:.1f}%")
 
 # ── Country retention ─────────────────────────────────────────────────────────
 print("\n--- W01/W04/W08 RETENTION BY COUNTRY (top 5) ---")
@@ -192,35 +193,24 @@ for country in top_countries:
             active = sum(1 for u in cu if target in user_active_weeks.get(u, set()))
             week_rates[w].append(active / len(cu))
     country_avg[country] = {
-        w: (sum(week_rates[w]) / len(week_rates[w]) if week_rates[w] else 0.0)
-        for w in [1, 4, 8]
+        w: (sum(week_rates[w]) / len(week_rates[w]) if week_rates[w] else 0.0) for w in [1, 4, 8]
     }
     vals = country_avg[country]
     n_country = country_counts[country]
-    print(f"  {country:<4} (n={n_country:>4}): W01={vals[1]*100:4.1f}%  W04={vals[4]*100:4.1f}%  W08={vals[8]*100:4.1f}%")
+    print(
+        f"  {country:<4} (n={n_country:>4}): W01={vals[1] * 100:4.1f}%  W04={vals[4] * 100:4.1f}%  W08={vals[8] * 100:4.1f}%"
+    )
 
 # ── Save results ──────────────────────────────────────────────────────────────
 out = {
     "all_cohorts": [str(c.date()) for c in all_cohorts],
     "mature_cohorts": [str(c.date()) for c in mature_cohorts],
     "sizes": {str(k.date()): v for k, v in sizes.items()},
-    "retention": {
-        str(k.date()): {str(wk): vv for wk, vv in v.items()}
-        for k, v in ret.items()
-    },
+    "retention": {str(k.date()): {str(wk): vv for wk, vv in v.items()} for k, v in ret.items()},
     "avg_ret": {str(w): v for w, v in avg_ret.items()},
-    "sub_avg": {
-        sub: {str(w): v for w, v in d.items()}
-        for sub, d in sub_avg.items()
-    },
-    "device_avg": {
-        dev: {str(w): v for w, v in d.items()}
-        for dev, d in device_avg.items()
-    },
-    "country_avg": {
-        ctry: {str(w): v for w, v in d.items()}
-        for ctry, d in country_avg.items()
-    },
+    "sub_avg": {sub: {str(w): v for w, v in d.items()} for sub, d in sub_avg.items()},
+    "device_avg": {dev: {str(w): v for w, v in d.items()} for dev, d in device_avg.items()},
+    "country_avg": {ctry: {str(w): v for w, v in d.items()} for ctry, d in country_avg.items()},
     "gaps_summary": {
         "min": gaps_days[0],
         "median": gaps_days[n // 2],

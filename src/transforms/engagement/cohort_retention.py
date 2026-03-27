@@ -80,9 +80,7 @@ def calculate_cohort_retention(
     joined_df = joined_df.withColumn(
         "weeks_since_join",
         (F.datediff(F.col("interaction_week"), F.col("cohort_week")) / 7).cast("int"),
-    ).filter(
-        (F.col("weeks_since_join") >= 0) & (F.col("weeks_since_join") < retention_weeks)
-    )
+    ).filter((F.col("weeks_since_join") >= 0) & (F.col("weeks_since_join") < retention_weeks))
 
     # Cohort sizes
     cohort_sizes = metadata_with_cohort.groupBy("cohort_week").agg(
@@ -100,15 +98,13 @@ def calculate_cohort_retention(
         "retention_rate", (F.col("retained_users") / F.col("cohort_size")).cast("double")
     )
 
-    # Build complete grid (every cohort × every week, including zero-activity weeks)
+    # Build complete grid (every cohort x every week, including zero-activity weeks)
     spark = interactions_df.sparkSession
     weeks_df = spark.range(retention_weeks).withColumnRenamed("id", "weeks_since_join")
     complete_grid = cohort_sizes.crossJoin(F.broadcast(weeks_df))
 
     result_df = complete_grid.join(
-        retention_df.select(
-            "cohort_week", "weeks_since_join", "retained_users", "retention_rate"
-        ),
+        retention_df.select("cohort_week", "weeks_since_join", "retained_users", "retention_rate"),
         on=["cohort_week", "weeks_since_join"],
         how="left",
     )
@@ -151,25 +147,23 @@ def _compute_segment_retention(
     )
 
     # Join interactions with user cohort + segment
-    joined_df = interactions_with_week.join(
-        metadata_with_cohort, on=COL_USER_ID, how="inner"
-    ).withColumn(
-        "weeks_since_join",
-        (F.datediff(F.col("interaction_week"), F.col("cohort_week")) / 7).cast("int"),
-    ).filter(
-        (F.col("weeks_since_join") >= 0) & (F.col("weeks_since_join") < retention_weeks)
+    joined_df = (
+        interactions_with_week.join(metadata_with_cohort, on=COL_USER_ID, how="inner")
+        .withColumn(
+            "weeks_since_join",
+            (F.datediff(F.col("interaction_week"), F.col("cohort_week")) / 7).cast("int"),
+        )
+        .filter((F.col("weeks_since_join") >= 0) & (F.col("weeks_since_join") < retention_weeks))
     )
 
     # Retained users per (cohort_week, segment_value, week)
-    retained_per_week = joined_df.groupBy(
-        "cohort_week", "segment_value", "weeks_since_join"
-    ).agg(F.countDistinct(COL_USER_ID).alias("retained_users"))
+    retained_per_week = joined_df.groupBy("cohort_week", "segment_value", "weeks_since_join").agg(
+        F.countDistinct(COL_USER_ID).alias("retained_users")
+    )
 
     retention_df = retained_per_week.join(
         cohort_sizes, on=["cohort_week", "segment_value"], how="left"
-    ).withColumn(
-        "retention_rate", (F.col("retained_users") / F.col("cohort_size")).cast("double")
-    )
+    ).withColumn("retention_rate", (F.col("retained_users") / F.col("cohort_size")).cast("double"))
 
     # Complete grid: every (cohort, segment_value, week) combination
     spark = interactions_df.sparkSession
