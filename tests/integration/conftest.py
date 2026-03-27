@@ -2,8 +2,10 @@
 Pytest configuration for integration tests.
 
 This module provides shared fixtures for integration testing,
-including Spark session setup, test data generation, and
-database connection management.
+including test data generation and database connection management.
+
+Note: The `spark` fixture is inherited from tests/conftest.py (session-scoped).
+Integration-specific Spark configs are applied via `configure_integration_spark`.
 """
 
 import os
@@ -12,35 +14,21 @@ import tempfile
 from datetime import datetime, timedelta
 
 import pytest
-from pyspark.sql import SparkSession
 
 
-@pytest.fixture(scope="session")
-def spark():
+@pytest.fixture(scope="session", autouse=True)
+def configure_integration_spark(spark):
     """
-    Create a Spark session for integration testing.
+    Apply integration-specific Spark configurations to the shared session.
 
-    This session is configured for local testing with minimal resources.
+    This runs once per session and enables AQE and higher parallelism
+    needed for realistic integration testing.
     """
-    spark = (
-        SparkSession.builder.appName("GoodNote_Integration_Tests")
-        .master("local[2]")
-        .config("spark.driver.memory", "2g")
-        .config("spark.executor.memory", "2g")
-        .config("spark.sql.shuffle.partitions", "4")
-        .config("spark.default.parallelism", "4")
-        .config("spark.sql.adaptive.enabled", "true")
-        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        .getOrCreate()
-    )
-
-    # Set log level to reduce output
+    spark.conf.set("spark.sql.shuffle.partitions", "4")
+    spark.conf.set("spark.default.parallelism", "4")
+    spark.conf.set("spark.sql.adaptive.enabled", "true")
+    spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
     spark.sparkContext.setLogLevel("WARN")
-
-    yield spark
-
-    # Cleanup
-    spark.stop()
 
 
 @pytest.fixture(scope="function")

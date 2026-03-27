@@ -6,6 +6,8 @@ data processing jobs, including record counting, data quality tracking,
 and partition skew detection.
 """
 
+import sys
+
 from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 
@@ -99,8 +101,9 @@ class TestMonitoringAccumulators:
         from src.utils.monitoring import PartitionSkewDetector
 
         # Create accumulator using sparkContext.accumulator() - auto-registers in PySpark 3.x
+        # Note: sys.maxsize is used instead of float("inf") to avoid serialization issues
         acc = spark.sparkContext.accumulator(
-            {"max_partition_size": 0, "min_partition_size": float("inf"), "partition_count": 0},
+            {"max_partition_size": 0, "min_partition_size": sys.maxsize, "partition_count": 0},
             PartitionSkewDetector(),
         )
 

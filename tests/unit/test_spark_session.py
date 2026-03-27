@@ -36,13 +36,15 @@ class TestGetSparkConfigSummary:
         """Test that SQL configs are retrieved correctly via spark.conf API."""
         from src.config.spark_session import get_spark_config_summary
 
-        # Set a SQL config
-        spark.conf.set("spark.sql.shuffle.partitions", "42")
-
-        summary = get_spark_config_summary(spark)
-
-        # The fix ensures we use spark.conf.get() for SQL configs
-        assert summary["shuffle_partitions"] == "42"
+        # Save and restore the original value to avoid leaking state to other tests
+        original = spark.conf.get("spark.sql.shuffle.partitions", "200")
+        try:
+            spark.conf.set("spark.sql.shuffle.partitions", "42")
+            summary = get_spark_config_summary(spark)
+            # The fix ensures we use spark.conf.get() for SQL configs
+            assert summary["shuffle_partitions"] == "42"
+        finally:
+            spark.conf.set("spark.sql.shuffle.partitions", original)
 
     def test_includes_aqe_status(self, spark):
         """Test that AQE enabled status is included."""
