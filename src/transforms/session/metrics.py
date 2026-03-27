@@ -104,14 +104,16 @@ def calculate_session_metrics(
         >>> metrics_df.filter("is_bounce = true").count()
         1542  # Number of bounce sessions
     """
-    # Convert integer to string format if needed
+    # Convert integer to string format if needed, or validate and store the
+    # parsed seconds value — used later when computing session_duration_ms.
     if isinstance(session_timeout, int):
         if session_timeout <= 0:
             raise ValueError(f"Session timeout must be positive, got {session_timeout}")
+        _timeout_seconds = session_timeout
         session_timeout = f"{session_timeout} seconds"
     else:
-        # Validate session_timeout format early (fail-fast)
-        _parse_session_timeout(session_timeout)
+        # Validate early (fail-fast) and store result to avoid a second parse below.
+        _timeout_seconds = _parse_session_timeout(session_timeout)
 
     # Validate required columns
     required_cols = [COL_USER_ID, COL_TIMESTAMP, COL_DURATION_MS]
@@ -174,7 +176,7 @@ def calculate_session_metrics(
         .otherwise(
             # Time from first to last interaction + last action duration
             (F.unix_timestamp("session_end_time") - F.unix_timestamp("session_start_time")) * 1000
-            - _parse_session_timeout(session_timeout) * 1000  # Subtract the gap threshold
+            - _timeout_seconds * 1000  # Subtract the gap threshold
             + F.col("last_action_duration_ms")
         )
         .cast(LongType()),

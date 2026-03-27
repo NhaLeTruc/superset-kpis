@@ -121,14 +121,11 @@ def detect_nulls(df: DataFrame, non_nullable_columns: list[str]) -> DataFrame:
         *[F.when(F.col(col_name).isNull(), F.lit(col_name)) for col_name in non_nullable_columns]
     )
 
-    # Filter out None values from the array using native Spark SQL expression
-    # array_compact removes null values (available in Spark 3.4+), fallback to filter with SQL expr
-    try:
-        # Try array_compact first (Spark 3.4+)
-        null_columns_filtered = F.array_compact(null_columns_expr)
-    except AttributeError:
-        # Fallback: use expr-based filter for older Spark versions
-        null_columns_filtered = F.expr(f"filter({null_columns_expr}, x -> x is not null)")
+    # Filter out None values from the array.
+    # array_compact is available in Spark 3.4+; this project targets Spark 3.5.
+    # The previous try/except fallback was broken: it interpolated a Column object
+    # into an f-string, producing invalid SQL like "filter(Column<'array(...)'>, ...)".
+    null_columns_filtered = F.array_compact(null_columns_expr)
 
     # Add the null_columns column
     result_df = rows_with_nulls.withColumn("null_columns", null_columns_filtered)

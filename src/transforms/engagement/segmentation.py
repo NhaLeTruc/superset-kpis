@@ -176,4 +176,9 @@ def identify_power_users(
     # Join with metadata
     result_df = power_users.join(metadata_df, on=COL_USER_ID, how="left")
 
+    # Release the cache — user_metrics was only needed for count() and ordering
+    # within this function.  Spark caches persist until explicitly freed; leaving
+    # them would leak memory for the lifetime of the SparkSession.
+    user_metrics.unpersist()
+
     return result_df

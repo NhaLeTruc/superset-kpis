@@ -63,28 +63,36 @@ def read_from_postgres(
     """
     jdbc_url, properties = get_postgres_connection_props()
 
-    reader = spark.read.jdbc(url=jdbc_url, table=table_name, properties=properties)
-
-    # Apply predicate pushdown if specified
-    if predicate_pushdown:
-        reader = reader.option("predicates", [predicate_pushdown])
-
-    # Apply partitioning if specified
-    if partition_column:
-        if any(v is None for v in [num_partitions, lower_bound, upper_bound]):
-            raise ValueError(
-                "For partitioned reads, must specify: "
-                "partition_column, num_partitions, lower_bound, upper_bound"
-            )
-
-        reader = (
-            reader.option("partitionColumn", partition_column)
-            .option("numPartitions", num_partitions)
-            .option("lowerBound", lower_bound)
-            .option("upperBound", upper_bound)
+    # Validate partition config before any I/O
+    if partition_column and any(v is None for v in [num_partitions, lower_bound, upper_bound]):
+        raise ValueError(
+            "For partitioned reads, must specify: "
+            "partition_column, num_partitions, lower_bound, upper_bound"
         )
 
-    df = reader.load()
+    # spark.read.jdbc() returns a DataFrame directly — .option()/.load() chaining is
+    # only valid on DataFrameReader (spark.read.format("jdbc")...).  Use the correct
+    # parameter-based overloads instead.
+    if partition_column:
+        df = spark.read.jdbc(
+            url=jdbc_url,
+            table=table_name,
+            column=partition_column,
+            lowerBound=lower_bound,
+            upperBound=upper_bound,
+            numPartitions=num_partitions,
+            properties=properties,
+        )
+    elif predicate_pushdown:
+        df = spark.read.jdbc(
+            url=jdbc_url,
+            table=table_name,
+            predicates=[predicate_pushdown],
+            properties=properties,
+        )
+    else:
+        df = spark.read.jdbc(url=jdbc_url, table=table_name, properties=properties)
+
     print(f"✅ Successfully read {df.count()} rows from {table_name}")
 
     return df
@@ -115,9 +123,11 @@ def execute_sql(spark: SparkSession, sql_query: str) -> DataFrame:
     """
     jdbc_url, properties = get_postgres_connection_props()
 
+    # spark.read.jdbc() already returns a DataFrame — .load() is not needed and
+    # raises AttributeError because DataFrame has no such method.
     df = spark.read.jdbc(
         url=jdbc_url, table=f"({sql_query}) as query", properties=properties
-    ).load()
+    )
 
     return df
 
@@ -143,6 +153,6 @@ def get_table_row_count(spark: SparkSession, table_name: str) -> int:
         url=jdbc_url,
         table=f"(SELECT COUNT(*) as count FROM {table_name}) as count_query",
         properties=properties,
-    ).load()
+    )
 
     return count_df.first()["count"]

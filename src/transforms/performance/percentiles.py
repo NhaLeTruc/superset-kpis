@@ -169,6 +169,10 @@ def calculate_device_correlation(
         .orderBy(F.col("avg_duration_ms").desc())
     )
 
+    # Release the cache — device_metrics was only needed for count() and the two
+    # aggregations above.  Spark caches persist until explicitly freed.
+    device_metrics.unpersist()
+
     return result_df.select(
         COL_DEVICE_TYPE,
         "avg_duration_ms",

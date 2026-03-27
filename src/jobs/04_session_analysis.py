@@ -105,7 +105,7 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         # 1. Calculate Session Metrics (uses session_window() internally)
         print("\n📊 Calculating session metrics...")
-        print("   ⏱️  Session timeout: 30 minutes")
+        print(f"   ⏱️  Session timeout: {SESSION_TIMEOUT_SECONDS // 60} minutes")
 
         # Pass timeout as integer - the function handles conversion internally
         session_metrics_df = calculate_session_metrics(
@@ -182,8 +182,15 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         ).withColumnRenamed(COL_DEVICE_TYPE, "dimension_value")
 
         print("   ✅ Bounce rates by device type:")
-        for row in device_bounce_df.select("dimension_value", "bounce_rate").distinct().collect():
-            print(f"      {row['dimension_value']}: {row['bounce_rate']:.2f}%")
+        # device_bounce_df has one row per (device_type, metric_date), so average across
+        # dates to get a single per-device summary.  .distinct() on (device, rate) would
+        # return multiple rows per device when rates differ across dates.
+        for row in (
+            device_bounce_df.groupBy("dimension_value")
+            .agg(F.avg(COL_BOUNCE_RATE).alias(COL_BOUNCE_RATE))
+            .collect()
+        ):
+            print(f"      {row['dimension_value']}: {row[COL_BOUNCE_RATE]:.2f}%")
 
         # By Country
         country_bounce_df = calculate_bounce_rate(
