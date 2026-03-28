@@ -50,9 +50,7 @@ class DataProcessingJob(BaseAnalyticsJob):
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
         parser = argparse.ArgumentParser(description="GoodNote Data Processing Job")
-        parser.add_argument(
-            "--interactions-path", required=True, help="Path to interactions CSV"
-        )
+        parser.add_argument("--interactions-path", required=True, help="Path to interactions CSV")
         parser.add_argument("--metadata-path", required=True, help="Path to metadata CSV")
         parser.add_argument("--output-path", required=True, help="Path to write enriched data")
         parser.add_argument("--skip-validation", action="store_true", help="Skip data validation")

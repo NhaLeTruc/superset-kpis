@@ -9,10 +9,12 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
 
 from .connection import get_postgres_connection_props
+
 
 _TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
@@ -127,9 +129,7 @@ def execute_sql(spark: SparkSession, sql_query: str) -> DataFrame:
 
     # spark.read.jdbc() already returns a DataFrame — .load() is not needed and
     # raises AttributeError because DataFrame has no such method.
-    df = spark.read.jdbc(
-        url=jdbc_url, table=f"({sql_query}) as query", properties=properties
-    )
+    df = spark.read.jdbc(url=jdbc_url, table=f"({sql_query}) as query", properties=properties)
 
     return df
 

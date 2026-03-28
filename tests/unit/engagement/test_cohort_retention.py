@@ -339,8 +339,7 @@ class TestCalculateCohortRetentionBySegment:
 
         free_rows = (
             result_df.filter(
-                (F.col("segment_type") == "subscription_type")
-                & (F.col("segment_value") == "free")
+                (F.col("segment_type") == "subscription_type") & (F.col("segment_value") == "free")
             )
             .orderBy("week_number")
             .collect()
@@ -367,10 +366,10 @@ class TestCalculateCohortRetentionBySegment:
         """
         from datetime import date
 
-        from pyspark.sql.types import DateType, StringType, StructField, StructType, TimestampType
+        from pyspark.sql.types import DateType, StringType, StructField, StructType
 
-        from src.transforms.engagement import calculate_cohort_retention_by_segment
         from src.schemas.interactions_schema import INTERACTIONS_SCHEMA
+        from src.transforms.engagement import calculate_cohort_retention_by_segment
 
         metadata_schema = StructType(
             [
