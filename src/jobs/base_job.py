@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import traceback
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 
@@ -46,7 +46,7 @@ class BaseAnalyticsJob(ABC):
     Subclasses implement job-specific logic.
     """
 
-    def __init__(self, job_name: str, job_type: str = "analytics", data_size_gb: int = 1):
+    def __init__(self, job_name: str, job_type: str = "analytics", data_size_gb: float = 1.0):
         """
         Initialize base job.
 
@@ -63,7 +63,7 @@ class BaseAnalyticsJob(ABC):
         self.spark: SparkSession | None = None
         self.monitoring_ctx: dict | None = None
         self.args = None
-        self.partition_by: list[str] = ["date"]  # Default partition columns for parquet output
+        self.partition_by: list[str] = []  # Default partition columns for parquet output
 
     def read_parquet(self, path: str, name: str = "data") -> DataFrame:
         """
@@ -76,6 +76,8 @@ class BaseAnalyticsJob(ABC):
         Returns:
             DataFrame
         """
+        if self.spark is None:
+            raise RuntimeError("Spark session not initialized. Call setup_spark() first.")
         print(f"📖 Reading {name} from: {path}")
         df = self.spark.read.parquet(path).persist()
         record_count = df.count()
@@ -92,7 +94,7 @@ class BaseAnalyticsJob(ABC):
         path: str,
         name: str = "data",
         schema: StructType | None = None,
-        num_partitions: int = 1,
+        num_partitions: int | None = None,
     ) -> DataFrame:
         """
         Generic method to read any CSV file.
@@ -101,11 +103,14 @@ class BaseAnalyticsJob(ABC):
             path: Path to CSV file
             name: Display name for logging
             schema: Optional StructType schema for reading
-            num_partitions: Number of partitions to repartition DataFrame into
+            num_partitions: Number of partitions to repartition DataFrame into.
+                            If None, uses Spark's default parallelism (recommended for large files).
 
         Returns:
             DataFrame
         """
+        if self.spark is None:
+            raise RuntimeError("Spark session not initialized. Call setup_spark() first.")
         print(f"📖 Reading {name} from: {path}")
 
         if schema:
@@ -113,7 +118,9 @@ class BaseAnalyticsJob(ABC):
         else:
             df = self.spark.read.csv(path, header=True, inferSchema=True)
 
-        df = df.repartition(num_partitions).persist()
+        if num_partitions is not None:
+            df = df.repartition(num_partitions)
+        df = df.persist()
         record_count = df.count()
 
         # Track in monitoring
@@ -198,7 +205,9 @@ class BaseAnalyticsJob(ABC):
         Args:
             metrics: Dictionary mapping metric names to DataFrames
             table_mapping: Dictionary mapping metric names to table names
-            mode: Write mode - "append", "overwrite", "error", "ignore"
+            mode: Write mode - "append", "overwrite", "error", "ignore".
+                  Defaults to "overwrite" because ETL jobs do full recomputation
+                  on every run and must replace stale data, not append duplicates.
             batch_size: Rows per batch for JDBC
             num_partitions: Number of parallel write partitions
         """
@@ -245,7 +254,7 @@ class BaseAnalyticsJob(ABC):
 
         for metric_name, df in metrics.items():
             output_file = f"{output_path}/{metric_name}"
-            if coalesce_partitions:
+            if coalesce_partitions is not None:
                 df = df.coalesce(coalesce_partitions)
             writer = df.write.mode("overwrite")
             if partition_by:
@@ -280,6 +289,8 @@ class BaseAnalyticsJob(ABC):
         Args:
             context_name: Name for monitoring context (e.g., "user_engagement")
         """
+        if self.spark is None:
+            raise RuntimeError("Spark session not initialized. Call setup_spark() first.")
         self.monitoring_ctx = create_monitoring_context(self.spark.sparkContext, context_name)
 
     def print_job_header(self) -> None:
@@ -287,12 +298,14 @@ class BaseAnalyticsJob(ABC):
         print("=" * 60)
         print(f"🚀 GoodNote {self.job_name}")
         print("=" * 60)
-        print(f"Start Time: {datetime.now()}")
+        print(f"Start Time: {datetime.now(timezone.utc)}")
 
         # Print key arguments
         if self.args:
             for key, value in vars(self.args).items():
-                if value and key != "func":  # Skip empty and internal args
+                if (
+                    value is not None and key != "func"
+                ):  # Skip internal args; falsy values are still valid
                     print(f"{key.replace('_', ' ').title()}: {value}")
 
         print("=" * 60)
@@ -309,7 +322,7 @@ class BaseAnalyticsJob(ABC):
             print("✅ Job completed successfully!")
         else:
             print("❌ Job failed!")
-        print(f"End Time: {datetime.now()}")
+        print(f"End Time: {datetime.now(timezone.utc)}")
         print("=" * 60)
 
     @abstractmethod
@@ -343,10 +356,9 @@ class BaseAnalyticsJob(ABC):
         """
         pass
 
-    @abstractmethod
-    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:  # noqa: B027 — intentional no-op default; subclasses override for dev-mode reporting
         """
-        Print job-specific summary.
+        Print job-specific summary. Override to provide custom reporting.
 
         Args:
             metrics: Computed metrics dictionary

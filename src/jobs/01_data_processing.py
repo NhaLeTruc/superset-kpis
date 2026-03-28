@@ -33,7 +33,14 @@ from pyspark.sql import functions as F
 from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas import INTERACTIONS_SCHEMA, METADATA_SCHEMA
-from src.schemas.columns import COL_ACTION_TYPE, COL_DEVICE_TYPE, COL_TIMESTAMP, COL_USER_ID
+from src.schemas.columns import (
+    COL_ACTION_TYPE,
+    COL_DATE,
+    COL_DEVICE_TYPE,
+    COL_PROCESSING_TIMESTAMP,
+    COL_TIMESTAMP,
+    COL_USER_ID,
+)
 from src.transforms.join.execution import identify_hot_keys, optimized_join
 
 
@@ -46,6 +53,7 @@ class DataProcessingJob(BaseAnalyticsJob):
             job_type="etl",
             data_size_gb=1,  # Estimated data size for dynamic partitioning
         )
+        self.partition_by = [COL_DATE]  # Partition enriched output by date for downstream jobs
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
@@ -78,26 +86,29 @@ class DataProcessingJob(BaseAnalyticsJob):
             threshold_percentile=HOT_KEY_THRESHOLD_PERCENTILE,
         ).persist()
 
-        hot_key_count = hot_keys_df.count()
-        if hot_key_count > 0:
-            print(f"   ⚠️  Found {hot_key_count} hot keys (top 1% users)")
-            print("   🧂 Applying salting strategy...")
-        else:
-            print("   ✅ No significant data skew detected")
+        try:
+            hot_key_count = hot_keys_df.count()
+            if hot_key_count > 0:
+                pct = round((1 - HOT_KEY_THRESHOLD_PERCENTILE) * 100)
+                print(f"   ⚠️  Found {hot_key_count} hot keys (top {pct}% users)")
+                print("   🧂 Applying salting strategy...")
+            else:
+                print("   ✅ No significant data skew detected")
 
-        # Perform optimized join with hot keys for salting
-        enriched_df = optimized_join(
-            large_df=interactions_df,
-            small_df=metadata_df,
-            join_key=COL_USER_ID,
-            join_type="left",
-            hot_keys_df=hot_keys_df,
-        )
+            # Perform optimized join with hot keys for salting
+            enriched_df = optimized_join(
+                large_df=interactions_df,
+                small_df=metadata_df,
+                join_key=COL_USER_ID,
+                join_type="left",
+                hot_keys_df=hot_keys_df,
+            )
+        finally:
+            hot_keys_df.unpersist()
 
-        # Add processing metadata (use Spark's current_timestamp for consistency across cluster)
-        enriched_df = enriched_df.withColumn("processing_timestamp", F.current_timestamp())
+        # Add processing timestamp (current_timestamp is evaluated per-task at executors; use for auditing only)
+        enriched_df = enriched_df.withColumn(COL_PROCESSING_TIMESTAMP, F.current_timestamp())
 
-        hot_keys_df.unpersist()
         return enriched_df
 
     def compute_metrics(self) -> dict[str, DataFrame]:
@@ -141,7 +152,7 @@ class DataProcessingJob(BaseAnalyticsJob):
         enriched_df = self.enrich_interactions(interactions_df, metadata_df)
 
         # Add date partition column for downstream partitioned writes
-        enriched_df = enriched_df.withColumn("date", F.to_date(COL_TIMESTAMP))
+        enriched_df = enriched_df.withColumn(COL_DATE, F.to_date(COL_TIMESTAMP))
 
         return {"enriched_interactions": enriched_df}
 
@@ -149,34 +160,37 @@ class DataProcessingJob(BaseAnalyticsJob):
         """Print summary statistics of enriched data."""
         enriched_df = metrics["enriched_interactions"].persist()
 
-        print("\n📊 Enriched Data Summary:")
-        print("=" * 60)
+        try:
+            print("\n📊 Enriched Data Summary:")
+            print("=" * 60)
 
-        # Combine all aggregations into a single pass to avoid multiple Spark jobs
-        summary_stats = enriched_df.agg(
-            F.min(COL_TIMESTAMP).alias("min_date"),
-            F.max(COL_TIMESTAMP).alias("max_date"),
-            F.count("*").alias("total_records"),
-            F.countDistinct(COL_USER_ID).alias("unique_users"),
-        ).collect()[0]
+            # Combine all aggregations into a single pass to avoid multiple Spark jobs
+            summary_stats = enriched_df.agg(
+                F.min(COL_TIMESTAMP).alias("min_date"),
+                F.max(COL_TIMESTAMP).alias("max_date"),
+                F.count("*").alias("total_records"),
+                F.countDistinct(COL_USER_ID).alias("unique_users"),
+            ).collect()[0]
 
-        print(f"Date Range: {summary_stats['min_date']} to {summary_stats['max_date']}")
-        print(f"Total Interactions: {summary_stats['total_records']:,}")
-        print(f"Unique Users: {summary_stats['unique_users']:,}")
+            print(f"Date Range: {summary_stats['min_date']} to {summary_stats['max_date']}")
+            print(f"Total Interactions: {summary_stats['total_records']:,}")
+            print(f"Unique Users: {summary_stats['unique_users']:,}")
 
-        # Action type distribution
-        print("\nAction Type Distribution:")
-        action_counts = enriched_df.groupBy(COL_ACTION_TYPE).count().orderBy(F.desc("count"))
-        for row in action_counts.collect()[:10]:
-            print(f"  {row[COL_ACTION_TYPE]}: {row['count']:,}")
+            # Action type distribution
+            print("\nAction Type Distribution:")
+            action_counts = enriched_df.groupBy(COL_ACTION_TYPE).count().orderBy(F.desc("count"))
+            for row in action_counts.limit(10).collect():
+                print(f"  {row[COL_ACTION_TYPE]}: {row['count']:,}")
 
-        # Device type distribution
-        print("\nDevice Type Distribution:")
-        device_counts = enriched_df.groupBy(COL_DEVICE_TYPE).count().orderBy(F.desc("count"))
-        for row in device_counts.collect():
-            print(f"  {row[COL_DEVICE_TYPE]}: {row['count']:,}")
+            # Device type distribution
+            print("\nDevice Type Distribution:")
+            device_counts = enriched_df.groupBy(COL_DEVICE_TYPE).count().orderBy(F.desc("count"))
+            for row in device_counts.collect():
+                print(f"  {row[COL_DEVICE_TYPE]}: {row['count']:,}")
 
-        print("=" * 60)
+            print("=" * 60)
+        finally:
+            enriched_df.unpersist()
 
     def get_table_mapping(self) -> dict[str, str] | None:
         """This job writes to Parquet, not database."""

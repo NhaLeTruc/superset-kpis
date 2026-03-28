@@ -45,13 +45,30 @@ from src.config.constants import (
 )
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
+    COL_ANOMALY_TYPE,
     COL_APP_VERSION,
+    COL_AVG_DURATION_MS,
+    COL_BASELINE_MEAN,
+    COL_DESCRIPTION,
+    COL_DETECTED_AT,
     COL_DEVICE_TYPE,
     COL_DURATION_MS,
+    COL_ETA_SQUARED,
+    COL_EXPECTED_VALUE,
+    COL_F_STATISTIC,
     COL_METRIC_DATE,
+    COL_METRIC_NAME,
+    COL_METRIC_VALUE,
+    COL_P50,
+    COL_P50_DURATION_MS,
+    COL_P95,
+    COL_P95_DURATION_MS,
+    COL_P99,
+    COL_P99_DURATION_MS,
     COL_SEVERITY,
     COL_TIMESTAMP,
     COL_USER_ID,
+    COL_Z_SCORE,
 )
 from src.transforms.performance import (
     calculate_device_correlation,
@@ -66,6 +83,15 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
     def __init__(self):
         super().__init__(job_name="Performance Metrics", job_type="analytics")
         self._counts: dict[str, int] = {}
+
+    @staticmethod
+    def _rename_percentile_columns(df: DataFrame) -> DataFrame:
+        """Rename raw p50/p95/p99 output from calculate_percentiles to *_duration_ms names."""
+        return (
+            df.withColumnRenamed(COL_P50, COL_P50_DURATION_MS)
+            .withColumnRenamed(COL_P95, COL_P95_DURATION_MS)
+            .withColumnRenamed(COL_P99, COL_P99_DURATION_MS)
+        )
 
     def get_argument_parser(self) -> argparse.ArgumentParser:
         """Configure job-specific arguments."""
@@ -121,12 +147,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         )
 
         # Rename percentile columns to match database schema
-        version_perf_df = (
-            version_perf_df.withColumnRenamed("p50", "p50_duration_ms")
-            .withColumnRenamed("p95", "p95_duration_ms")
-            .withColumnRenamed("p99", "p99_duration_ms")
-            .persist()
-        )
+        version_perf_df = self._rename_percentile_columns(version_perf_df).persist()
 
         version_count = version_perf_df.count()
         print(f"   ✅ Computed percentiles for {version_count} app version-date combinations")
@@ -141,11 +162,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             percentiles=DEFAULT_PERCENTILES,
         )
 
-        device_percentiles = (
-            device_percentiles.withColumnRenamed("p50", "p50_duration_ms")
-            .withColumnRenamed("p95", "p95_duration_ms")
-            .withColumnRenamed("p99", "p99_duration_ms")
-        )
+        device_percentiles = self._rename_percentile_columns(device_percentiles)
 
         # Add user count
         device_perf_with_users = enriched_df.groupBy(COL_DEVICE_TYPE, COL_METRIC_DATE).agg(
@@ -170,10 +187,10 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         print(f"   ✅ Computed correlation for {correlation_count} device types")
 
         # Show ANOVA results
-        anova_stats = device_correlation_df.select("f_statistic", "eta_squared").first()
-        if anova_stats and anova_stats["f_statistic"] is not None:
-            print(f"   📈 F-statistic: {anova_stats['f_statistic']:.2f}")
-            print(f"   📈 Eta-squared (effect size): {anova_stats['eta_squared']:.4f}")
+        anova_stats = device_correlation_df.select(COL_F_STATISTIC, COL_ETA_SQUARED).first()
+        if anova_stats and anova_stats[COL_F_STATISTIC] is not None:
+            print(f"   📈 F-statistic: {anova_stats[COL_F_STATISTIC]:.2f}")
+            print(f"   📈 Eta-squared (effect size): {anova_stats[COL_ETA_SQUARED]:.4f}")
         metrics["device_correlation"] = device_correlation_df
 
         # 3. Statistical Anomaly Detection
@@ -186,37 +203,37 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         )
 
         # Rename duration_ms to metric_value for database schema
-        anomalies_df = anomalies_df.withColumnRenamed("duration_ms", "metric_value")
+        anomalies_df = anomalies_df.withColumnRenamed(COL_DURATION_MS, COL_METRIC_VALUE)
 
         # Enrich anomalies with severity classification
         anomalies_df = anomalies_df.withColumn(
             COL_SEVERITY,
-            F.when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_CRITICAL, "critical")
-            .when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_HIGH, "high")
-            .when(F.abs(F.col("z_score")) >= ANOMALY_SEVERITY_MEDIUM, "medium")
+            F.when(F.abs(F.col(COL_Z_SCORE)) >= ANOMALY_SEVERITY_CRITICAL, "critical")
+            .when(F.abs(F.col(COL_Z_SCORE)) >= ANOMALY_SEVERITY_HIGH, "high")
+            .when(F.abs(F.col(COL_Z_SCORE)) >= ANOMALY_SEVERITY_MEDIUM, "medium")
             .otherwise("low"),
         )
 
         # Rename baseline_mean → expected_value to match the DB schema column definition
-        anomalies_df = anomalies_df.withColumnRenamed("baseline_mean", "expected_value")
+        anomalies_df = anomalies_df.withColumnRenamed(COL_BASELINE_MEAN, COL_EXPECTED_VALUE)
 
         # Add detection timestamp and description
         anomalies_df = (
-            anomalies_df.withColumn("detected_at", F.current_timestamp())
-            .withColumn("metric_name", F.lit("duration_ms"))
+            anomalies_df.withColumn(COL_DETECTED_AT, F.current_timestamp())
+            .withColumn(COL_METRIC_NAME, F.lit(COL_DURATION_MS))
             .withColumn(
-                "description",
+                COL_DESCRIPTION,
                 F.concat(
                     F.lit("Performance anomaly detected for "),
                     F.col(COL_APP_VERSION),
                     F.lit(" on "),
                     F.col(COL_METRIC_DATE).cast("string"),
                     F.lit(": "),
-                    F.round("metric_value", 2).cast("string"),
+                    F.round(F.col(COL_METRIC_VALUE), 2).cast("string"),
                     F.lit("ms ("),
-                    F.round(F.abs("z_score"), 2).cast("string"),
+                    F.round(F.abs(F.col(COL_Z_SCORE)), 2).cast("string"),
                     F.lit(" std deviations, "),
-                    F.col("anomaly_type"),
+                    F.col(COL_ANOMALY_TYPE),
                     F.lit(")"),
                 ),
             )
@@ -231,13 +248,13 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
             COL_APP_VERSION,
             COL_DEVICE_TYPE,
             COL_METRIC_DATE,
-            "metric_name",
-            "metric_value",
-            "expected_value",
-            "z_score",
+            COL_METRIC_NAME,
+            COL_METRIC_VALUE,
+            COL_EXPECTED_VALUE,
+            COL_Z_SCORE,
             COL_SEVERITY,
-            "detected_at",
-            "description",
+            COL_DETECTED_AT,
+            COL_DESCRIPTION,
         )
 
         # Cache and count once
@@ -269,7 +286,7 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         return metrics
 
-    def print_summary(self, metrics: dict[str, DataFrame]) -> None:
+    def print_summary(self, metrics: dict[str, DataFrame]) -> None:  # noqa: PLR0915
         """Print summary of computed metrics."""
         print("\n" + "=" * 60)
         print("📊 Performance Metrics Summary")
@@ -277,13 +294,16 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Version Performance Summary
         version_df = metrics["performance_by_version"]
+        version_count = self._counts.get("version")
+        if version_count is None:
+            version_count = version_df.count()
         print("\nPerformance by Version:")
-        print(f"  Total Combinations: {self._counts.get('version') or version_df.count():,}")
+        print(f"  Total Combinations: {version_count:,}")
 
         version_summary = version_df.agg(
-            F.avg("p50_duration_ms").alias("avg_p50"),
-            F.avg("p95_duration_ms").alias("avg_p95"),
-            F.avg("p99_duration_ms").alias("avg_p99"),
+            F.avg(COL_P50_DURATION_MS).alias("avg_p50"),
+            F.avg(COL_P95_DURATION_MS).alias("avg_p95"),
+            F.avg(COL_P99_DURATION_MS).alias("avg_p99"),
         ).collect()[0]
 
         avg_p50 = version_summary["avg_p50"] if version_summary["avg_p50"] is not None else 0.0
@@ -295,12 +315,15 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Device Performance Summary
         device_df = metrics["device_performance"]
+        device_count = self._counts.get("device")
+        if device_count is None:
+            device_count = device_df.count()
         print("\nDevice Performance:")
-        print(f"  Total Combinations: {self._counts.get('device') or device_df.count():,}")
+        print(f"  Total Combinations: {device_count:,}")
 
         device_summary = (
             device_df.groupBy(COL_DEVICE_TYPE)
-            .agg(F.avg("avg_duration_ms").alias("avg_duration"))
+            .agg(F.avg(COL_AVG_DURATION_MS).alias("avg_duration"))
             .orderBy(F.desc("avg_duration"))
         )
 
@@ -312,10 +335,10 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
         # Device Correlation Summary (ANOVA)
         correlation_df = metrics["device_correlation"]
         print("\nDevice-Performance Correlation (ANOVA):")
-        anova_row = correlation_df.select("f_statistic", "eta_squared").first()
-        if anova_row and anova_row["f_statistic"] is not None:
-            f_stat = anova_row["f_statistic"]
-            eta_sq = anova_row["eta_squared"]
+        anova_row = correlation_df.select(COL_F_STATISTIC, COL_ETA_SQUARED).first()
+        if anova_row and anova_row[COL_F_STATISTIC] is not None:
+            f_stat = anova_row[COL_F_STATISTIC]
+            eta_sq = anova_row[COL_ETA_SQUARED]
             print(f"  F-statistic: {f_stat:.2f}")
             print(f"  Eta-squared: {eta_sq:.4f} ({eta_sq * 100:.1f}% variance explained)")
             # Interpret effect size
@@ -331,7 +354,9 @@ class PerformanceMetricsJob(BaseAnalyticsJob):
 
         # Anomalies Summary
         anomalies_df = metrics["performance_anomalies"]
-        anomaly_count = self._counts.get("anomaly") or anomalies_df.count()
+        anomaly_count = self._counts.get("anomaly")
+        if anomaly_count is None:
+            anomaly_count = anomalies_df.count()
         print("\nPerformance Anomalies:")
         print(f"  Total Detected: {anomaly_count}")
 

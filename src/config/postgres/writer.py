@@ -64,7 +64,7 @@ def write_to_postgres(
     jdbc_url, properties = get_postgres_connection_props()
 
     # Optimize partitioning if specified
-    if num_partitions:
+    if num_partitions is not None:
         df = df.repartition(num_partitions)
 
     # Write to PostgreSQL

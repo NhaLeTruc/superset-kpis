@@ -41,14 +41,23 @@ from src.config.constants import (
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
     COL_ACTION_COUNT,
+    COL_ACTIONS_COUNT,
+    COL_AVG_ACTION_DURATION_MS,
+    COL_AVG_SESSIONS_PER_DAY,
     COL_BOUNCE_RATE,
     COL_COUNTRY,
     COL_DEVICE_TYPE,
+    COL_DIMENSION_NAME,
+    COL_DIMENSION_VALUE,
     COL_DURATION_MS,
     COL_IS_BOUNCE,
     COL_METRIC_DATE,
     COL_SESSION_DURATION_MS,
+    COL_SESSION_END_TIME,
+    COL_SESSION_ID,
+    COL_SESSION_START_TIME,
     COL_TIMESTAMP,
+    COL_TOTAL_SESSIONS,
     COL_USER_ID,
 )
 from src.transforms.session import (
@@ -115,11 +124,11 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         # Add metric date for time-series analysis
         session_metrics_df = session_metrics_df.withColumn(
-            COL_METRIC_DATE, F.to_date("session_start_time")
+            COL_METRIC_DATE, F.to_date(COL_SESSION_START_TIME)
         )
 
         # Persist session_metrics_df as it's used multiple times
-        session_metrics_df.persist()
+        session_metrics_df = session_metrics_df.persist()
 
         self._session_count = session_metrics_df.count()
         print(f"   ✅ Created {self._session_count:,} sessions")
@@ -131,7 +140,23 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         print(f"   📊 Bounce sessions: {self._bounce_count:,} ({bounce_percentage:.1f}%)")
 
-        results["session_metrics"] = session_metrics_df
+        # Select only the columns defined in the DB schema.
+        # Renames action_count → actions_count (DB schema column name) and casts
+        # is_bounce from Boolean to INTEGER (schema: INTEGER NOT NULL, 0 or 1).
+        # Drops compute artifacts (total_action_duration_ms, last_action_duration_ms,
+        # session_duration_seconds) and raw enriched_df passthrough columns.
+        results["session_metrics"] = session_metrics_df.select(
+            COL_SESSION_ID,
+            COL_USER_ID,
+            COL_SESSION_START_TIME,
+            COL_SESSION_END_TIME,
+            COL_SESSION_DURATION_MS,
+            F.col(COL_ACTION_COUNT).cast("int").alias(COL_ACTIONS_COUNT),
+            COL_AVG_ACTION_DURATION_MS,
+            F.col(COL_IS_BOUNCE).cast("int").alias(COL_IS_BOUNCE),
+            COL_DEVICE_TYPE,
+            COL_COUNTRY,
+        )
 
         # 2. Calculate Session Frequency
         print("\n📊 Calculating session frequency...")
@@ -143,10 +168,10 @@ class SessionAnalysisJob(BaseAnalyticsJob):
 
         # Calculate summary stats for session frequency
         freq_stats = session_freq_df.agg(
-            F.avg("total_sessions").alias("avg_sessions_per_user"),
-            F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
+            F.avg(COL_TOTAL_SESSIONS).alias("avg_sessions_per_user"),
+            F.avg(COL_AVG_SESSIONS_PER_DAY).alias("avg_daily_freq"),
             (
-                F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
+                F.sum(F.when(F.col(COL_TOTAL_SESSIONS) >= 2, 1).otherwise(0)) / F.count("*") * 100
             ).alias("return_user_rate"),
         ).collect()[0]
 
@@ -164,13 +189,13 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         overall_bounce_df = calculate_bounce_rate(session_metrics_df)
         overall_bounce_df = (
             overall_bounce_df.withColumn(COL_METRIC_DATE, F.current_date())
-            .withColumn("dimension_name", F.lit(None).cast("string"))
-            .withColumn("dimension_value", F.lit(None).cast("string"))
+            .withColumn(COL_DIMENSION_NAME, F.lit(None).cast("string"))
+            .withColumn(COL_DIMENSION_VALUE, F.lit(None).cast("string"))
         )
 
         overall_bounce_row = overall_bounce_df.collect()
-        if overall_bounce_row and overall_bounce_row[0]["bounce_rate"] is not None:
-            print(f"   ✅ Overall bounce rate: {overall_bounce_row[0]['bounce_rate']:.2f}%")
+        if overall_bounce_row and overall_bounce_row[0][COL_BOUNCE_RATE] is not None:
+            print(f"   ✅ Overall bounce rate: {overall_bounce_row[0][COL_BOUNCE_RATE]:.2f}%")
         else:
             print("   ✅ Overall bounce rate: N/A (no data)")
 
@@ -179,27 +204,27 @@ class SessionAnalysisJob(BaseAnalyticsJob):
             session_metrics_df, group_by_columns=[COL_DEVICE_TYPE, COL_METRIC_DATE]
         )
         device_bounce_df = device_bounce_df.withColumn(
-            "dimension_name", F.lit(COL_DEVICE_TYPE)
-        ).withColumnRenamed(COL_DEVICE_TYPE, "dimension_value")
+            COL_DIMENSION_NAME, F.lit(COL_DEVICE_TYPE)
+        ).withColumnRenamed(COL_DEVICE_TYPE, COL_DIMENSION_VALUE)
 
         print("   ✅ Bounce rates by device type:")
         # device_bounce_df has one row per (device_type, metric_date), so average across
         # dates to get a single per-device summary.  .distinct() on (device, rate) would
         # return multiple rows per device when rates differ across dates.
         for row in (
-            device_bounce_df.groupBy("dimension_value")
+            device_bounce_df.groupBy(COL_DIMENSION_VALUE)
             .agg(F.avg(COL_BOUNCE_RATE).alias(COL_BOUNCE_RATE))
             .collect()
         ):
-            print(f"      {row['dimension_value']}: {row[COL_BOUNCE_RATE]:.2f}%")
+            print(f"      {row[COL_DIMENSION_VALUE]}: {row[COL_BOUNCE_RATE]:.2f}%")
 
         # By Country
         country_bounce_df = calculate_bounce_rate(
             session_metrics_df, group_by_columns=[COL_COUNTRY, COL_METRIC_DATE]
         )
         country_bounce_df = country_bounce_df.withColumn(
-            "dimension_name", F.lit(COL_COUNTRY)
-        ).withColumnRenamed(COL_COUNTRY, "dimension_value")
+            COL_DIMENSION_NAME, F.lit(COL_COUNTRY)
+        ).withColumnRenamed(COL_COUNTRY, COL_DIMENSION_VALUE)
 
         # Combine all bounce rates
         bounce_rates_df = overall_bounce_df.unionByName(device_bounce_df).unionByName(
@@ -236,15 +261,23 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         session_stats = session_df.agg(
             F.avg(COL_SESSION_DURATION_MS).alias("avg_duration"),
             F.max(COL_SESSION_DURATION_MS).alias("max_duration"),
-            F.avg(COL_ACTION_COUNT).alias("avg_actions"),
+            F.avg(COL_ACTIONS_COUNT).alias("avg_actions"),
             F.sum(F.col(COL_IS_BOUNCE).cast("int")).alias("bounce_count"),
         ).collect()[0]
 
         # Extract with null safety
-        avg_duration = session_stats["avg_duration"] or 0
-        max_duration = session_stats["max_duration"] or 0
-        avg_actions = session_stats["avg_actions"] or 0
-        bounce_count = session_stats["bounce_count"] or 0
+        avg_duration = (
+            session_stats["avg_duration"] if session_stats["avg_duration"] is not None else 0
+        )
+        max_duration = (
+            session_stats["max_duration"] if session_stats["max_duration"] is not None else 0
+        )
+        avg_actions = (
+            session_stats["avg_actions"] if session_stats["avg_actions"] is not None else 0
+        )
+        bounce_count = (
+            session_stats["bounce_count"] if session_stats["bounce_count"] is not None else 0
+        )
 
         print("\nSession Metrics:")
         print(f"  Total Sessions: {total_sessions:,}")
@@ -282,34 +315,34 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         print("\nBounce Rates:")
 
         # Overall
-        overall_bounce = bounce_df.filter(F.col("dimension_name").isNull()).collect()
+        overall_bounce = bounce_df.filter(F.col(COL_DIMENSION_NAME).isNull()).collect()
         if overall_bounce:
-            print(f"  Overall: {overall_bounce[0]['bounce_rate']:.2f}%")
+            print(f"  Overall: {overall_bounce[0][COL_BOUNCE_RATE]:.2f}%")
 
         # By Device
         device_bounces = (
-            bounce_df.filter(F.col("dimension_name") == COL_DEVICE_TYPE)
-            .groupBy("dimension_value")
-            .agg(F.avg("bounce_rate").alias("avg_bounce"))
+            bounce_df.filter(F.col(COL_DIMENSION_NAME) == COL_DEVICE_TYPE)
+            .groupBy(COL_DIMENSION_VALUE)
+            .agg(F.avg(COL_BOUNCE_RATE).alias("avg_bounce"))
             .orderBy(F.desc("avg_bounce"))
         )
 
         print("  By Device Type:")
         for row in device_bounces.collect():
-            print(f"    {row['dimension_value']}: {row['avg_bounce']:.2f}%")
+            print(f"    {row[COL_DIMENSION_VALUE]}: {row['avg_bounce']:.2f}%")
 
         # Top countries with high bounce rates
         country_bounces = (
-            bounce_df.filter(F.col("dimension_name") == COL_COUNTRY)
-            .groupBy("dimension_value")
-            .agg(F.avg("bounce_rate").alias("avg_bounce"))
+            bounce_df.filter(F.col(COL_DIMENSION_NAME) == COL_COUNTRY)
+            .groupBy(COL_DIMENSION_VALUE)
+            .agg(F.avg(COL_BOUNCE_RATE).alias("avg_bounce"))
             .orderBy(F.desc("avg_bounce"))
             .limit(5)
         )
 
         print("  Top 5 Countries by Bounce Rate:")
         for row in country_bounces.collect():
-            print(f"    {row['dimension_value']}: {row['avg_bounce']:.2f}%")
+            print(f"    {row[COL_DIMENSION_VALUE]}: {row['avg_bounce']:.2f}%")
 
         # Session Frequency Summary
         if "session_frequency" in metrics:
@@ -322,18 +355,18 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         print("\nSession Frequency:")
 
         freq_stats = freq_df.agg(
-            F.avg("total_sessions").alias("avg_sessions"),
-            F.max("total_sessions").alias("max_sessions"),
-            F.avg("avg_sessions_per_day").alias("avg_daily_freq"),
+            F.avg(COL_TOTAL_SESSIONS).alias("avg_sessions"),
+            F.max(COL_TOTAL_SESSIONS).alias("max_sessions"),
+            F.avg(COL_AVG_SESSIONS_PER_DAY).alias("avg_daily_freq"),
             (
-                F.sum(F.when(F.col("total_sessions") >= 2, 1).otherwise(0)) / F.count("*") * 100
+                F.sum(F.when(F.col(COL_TOTAL_SESSIONS) >= 2, 1).otherwise(0)) / F.count("*") * 100
             ).alias("return_rate"),
         ).collect()[0]
 
-        avg_sessions = freq_stats["avg_sessions"] or 0
-        max_sessions = freq_stats["max_sessions"] or 0
-        avg_daily = freq_stats["avg_daily_freq"] or 0
-        return_rate = freq_stats["return_rate"] or 0
+        avg_sessions = freq_stats["avg_sessions"] if freq_stats["avg_sessions"] is not None else 0
+        max_sessions = freq_stats["max_sessions"] if freq_stats["max_sessions"] is not None else 0
+        avg_daily = freq_stats["avg_daily_freq"] if freq_stats["avg_daily_freq"] is not None else 0
+        return_rate = freq_stats["return_rate"] if freq_stats["return_rate"] is not None else 0
 
         print(f"  Avg Sessions per User: {avg_sessions:.2f}")
         print(f"  Max Sessions per User: {int(max_sessions):,}")
@@ -343,7 +376,7 @@ class SessionAnalysisJob(BaseAnalyticsJob):
         # Session frequency by device
         device_freq = (
             freq_df.groupBy(COL_DEVICE_TYPE)
-            .agg(F.avg("total_sessions").alias("avg_sessions"))
+            .agg(F.avg(COL_TOTAL_SESSIONS).alias("avg_sessions"))
             .orderBy(F.desc("avg_sessions"))
         )
 

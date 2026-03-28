@@ -46,10 +46,16 @@ from src.config.constants import (
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas.columns import (
     COL_COUNTRY,
+    COL_DAILY_ACTIVE_USERS,
     COL_DEVICE_TYPE,
+    COL_HOURS_SPENT,
+    COL_MONTHLY_ACTIVE_USERS,
     COL_REGISTRATION_DATE,
+    COL_RETENTION_RATE,
+    COL_STICKINESS_RATIO,
     COL_SUBSCRIPTION_TYPE,
     COL_USER_ID,
+    COL_WEEK_NUMBER,
 )
 from src.transforms.engagement import (
     calculate_cohort_retention,
@@ -167,9 +173,9 @@ class UserEngagementJob(BaseAnalyticsJob):
         # DAU Summary - single aggregation
         dau_df = metrics["dau"]
         dau_stats = dau_df.agg(
-            F.avg("daily_active_users").alias("avg_dau"),
-            F.max("daily_active_users").alias("max_dau"),
-            F.min("daily_active_users").alias("min_dau"),
+            F.avg(COL_DAILY_ACTIVE_USERS).alias("avg_dau"),
+            F.max(COL_DAILY_ACTIVE_USERS).alias("max_dau"),
+            F.min(COL_DAILY_ACTIVE_USERS).alias("min_dau"),
         ).collect()[0]
         print("\nDaily Active Users:")
         avg_dau = dau_stats["avg_dau"] if dau_stats["avg_dau"] is not None else 0.0
@@ -181,7 +187,7 @@ class UserEngagementJob(BaseAnalyticsJob):
 
         # MAU Summary
         mau_df = metrics["mau"]
-        mau_stats = mau_df.agg(F.avg("monthly_active_users").alias("avg_mau")).collect()[0]
+        mau_stats = mau_df.agg(F.avg(COL_MONTHLY_ACTIVE_USERS).alias("avg_mau")).collect()[0]
         print("\nMonthly Active Users:")
         avg_mau = mau_stats["avg_mau"] if mau_stats["avg_mau"] is not None else 0.0
         print(f"  Average MAU: {avg_mau:,.0f}")
@@ -189,9 +195,9 @@ class UserEngagementJob(BaseAnalyticsJob):
         # Stickiness Summary - single aggregation
         stickiness_df = metrics["stickiness"]
         stickiness_stats = stickiness_df.agg(
-            F.avg("stickiness_ratio").alias("avg_stick"),
-            F.max("stickiness_ratio").alias("max_stick"),
-            F.min("stickiness_ratio").alias("min_stick"),
+            F.avg(COL_STICKINESS_RATIO).alias("avg_stick"),
+            F.max(COL_STICKINESS_RATIO).alias("max_stick"),
+            F.min(COL_STICKINESS_RATIO).alias("min_stick"),
         ).collect()[0]
         print("\nStickiness Ratio:")
         avg_stick = (
@@ -211,26 +217,27 @@ class UserEngagementJob(BaseAnalyticsJob):
         power_users_df = metrics["power_users"]
         power_stats = power_users_df.agg(
             F.count("*").alias("count"),
-            F.sum("hours_spent").alias("total_hours"),
+            F.sum(COL_HOURS_SPENT).alias("total_hours"),
         ).collect()[0]
         power_user_count = power_stats["count"]
         total_hours = power_stats["total_hours"] if power_stats["total_hours"] is not None else 0.0
+        pct = round((1 - HOT_KEY_THRESHOLD_PERCENTILE) * 100)
         print("\nPower Users:")
-        print(f"  Count: {power_user_count:,} (top 1%)")
+        print(f"  Count: {power_user_count:,} (top {pct}%)")
         print(f"  Total Engagement: {total_hours:,.0f} hours")
 
         # Cohort Retention Summary - combined query
         cohort_df = metrics["cohort_retention"]
         cohort_stats = (
-            cohort_df.filter("week_number IN (0, 12)")
-            .groupBy("week_number")
-            .agg(F.avg("retention_rate").alias("avg_retention"))
+            cohort_df.filter(F.col(COL_WEEK_NUMBER).isin(0, 12))
+            .groupBy(COL_WEEK_NUMBER)
+            .agg(F.avg(COL_RETENTION_RATE).alias("avg_retention"))
             .collect()
         )
 
-        retention_by_week = {row["week_number"]: row["avg_retention"] for row in cohort_stats}
-        avg_retention = retention_by_week.get(0, 0.0) or 0.0
-        week_12_avg = retention_by_week.get(12, 0.0) or 0.0
+        retention_by_week = {row[COL_WEEK_NUMBER]: row["avg_retention"] for row in cohort_stats}
+        avg_retention = retention_by_week.get(0) or 0.0
+        week_12_avg = retention_by_week.get(12) or 0.0
         print("\nCohort Retention:")
         print(f"  Average Week 0: {avg_retention:.2%}")
         print(f"  Average Week 12: {week_12_avg:.2%}")
