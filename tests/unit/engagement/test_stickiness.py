@@ -97,3 +97,52 @@ class TestCalculateStickiness:
         # Assert
         result = result_df.collect()[0]
         assert abs(result["stickiness_ratio"] - 0.1) < 0.01
+
+    def test_calculate_stickiness_zero_mau_returns_null_ratio(self, spark):
+        """
+        GIVEN:
+            - MAU for January = 0 (degenerate edge case)
+            - DAU data for January exists
+        WHEN: calculate_stickiness() is called
+        THEN:
+            - stickiness_ratio is null (Spark returns null on division by zero, not an error)
+
+        Documents the division-by-zero behaviour: the implementation uses plain
+        division so Spark yields null rather than raising or returning infinity.
+        """
+        from datetime import date
+
+        from pyspark.sql.types import (
+            DateType,
+            DoubleType,
+            LongType,
+            StructField,
+            StructType,
+        )
+
+        dau_data = [(date(2023, 1, day), 5, 50, 25000, 5000.0) for day in range(1, 32)]
+        dau_schema = StructType(
+            [
+                StructField("date", DateType(), nullable=False),
+                StructField("daily_active_users", LongType(), nullable=False),
+                StructField("total_interactions", LongType(), nullable=False),
+                StructField("total_duration_ms", LongType(), nullable=False),
+                StructField("avg_duration_per_user", DoubleType(), nullable=False),
+            ]
+        )
+        dau_df = spark.createDataFrame(dau_data, schema=dau_schema)
+
+        mau_schema = StructType(
+            [
+                StructField("month", DateType(), nullable=False),
+                StructField("monthly_active_users", LongType(), nullable=False),
+                StructField("total_interactions", LongType(), nullable=False),
+            ]
+        )
+        mau_df = spark.createDataFrame([(date(2023, 1, 1), 0, 0)], schema=mau_schema)
+
+        result_df = calculate_stickiness(dau_df, mau_df)
+
+        result = result_df.collect()[0]
+        # Spark returns null (not infinity or error) for x / 0
+        assert result["stickiness_ratio"] is None

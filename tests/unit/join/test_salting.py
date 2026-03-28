@@ -187,3 +187,106 @@ class TestApplySalting:
 
         assert "salt_factor" in str(exc_info.value).lower()
         assert ">= 2" in str(exc_info.value) or "must be" in str(exc_info.value).lower()
+
+
+class TestExplodeForSalting:
+    """Tests for explode_for_salting() function."""
+
+    def test_explodes_hot_keys(self, spark):
+        """
+        GIVEN: A single hot-key row and hot_keys_df containing that key
+        WHEN: explode_for_salting() is called with salt_factor=10
+        THEN:
+            - Returns 10 rows (one per salt value 0–9)
+            - Salt values cover exactly 0..9
+        """
+        from src.transforms.join.optimization import explode_for_salting
+
+        data = [("hot", "metadata1")]
+        df = spark.createDataFrame(data, ["key", "data"])
+        hot_keys_df = spark.createDataFrame([("hot", 100)], ["key", "count"])
+
+        result = explode_for_salting(df, hot_keys_df, "key", salt_factor=10)
+
+        assert result.count() == 10
+        salt_values = sorted([r["salt"] for r in result.select("salt").collect()])
+        assert salt_values == list(range(10))
+
+    def test_non_hot_keys_not_exploded(self, spark):
+        """
+        GIVEN: A single normal-key row (not in hot_keys_df)
+        WHEN: explode_for_salting() is called with salt_factor=10
+        THEN:
+            - Returns 1 row
+            - salt=0 and key_salted="{key}_0"
+        """
+        from src.transforms.join.optimization import explode_for_salting
+
+        data = [("normal", "data1")]
+        df = spark.createDataFrame(data, ["key", "data"])
+        hot_keys_df = spark.createDataFrame([("hot", 100)], ["key", "count"])
+
+        result = explode_for_salting(df, hot_keys_df, "key", salt_factor=10)
+
+        assert result.count() == 1
+        row = result.collect()[0]
+        assert row["salt"] == 0
+        assert row["key_salted"] == "normal_0"
+
+    def test_mixed_hot_and_normal_keys(self, spark):
+        """
+        GIVEN: 1 hot key row + 1 normal key row; salt_factor=5
+        WHEN: explode_for_salting() is called
+        THEN:
+            - hot key produces 5 rows
+            - normal key produces 1 row
+            - total = 6 rows
+        """
+        from src.transforms.join.optimization import explode_for_salting
+
+        data = [("hot", "hot_data"), ("normal", "normal_data")]
+        df = spark.createDataFrame(data, ["key", "data"])
+        hot_keys_df = spark.createDataFrame([("hot", 100)], ["key", "count"])
+
+        result = explode_for_salting(df, hot_keys_df, "key", salt_factor=5)
+
+        assert result.count() == 6
+        assert result.filter("key = 'hot'").count() == 5
+        assert result.filter("key = 'normal'").count() == 1
+
+    def test_preserves_all_columns(self, spark):
+        """
+        GIVEN: A hot-key row with multiple typed columns
+        WHEN: explode_for_salting() is called with salt_factor=3
+        THEN: All original columns and their values are preserved in every exploded row
+        """
+        from src.transforms.join.optimization import explode_for_salting
+
+        data = [("hot", "value1", 100, 1.5)]
+        df = spark.createDataFrame(data, ["key", "str_col", "int_col", "float_col"])
+        hot_keys_df = spark.createDataFrame([("hot", 50)], ["key", "count"])
+
+        result = explode_for_salting(df, hot_keys_df, "key", salt_factor=3)
+
+        assert "str_col" in result.columns
+        assert "int_col" in result.columns
+        assert "float_col" in result.columns
+        for row in result.collect():
+            assert row["str_col"] == "value1"
+            assert row["int_col"] == 100
+            assert row["float_col"] == 1.5
+
+    def test_raises_error_for_missing_column(self, spark):
+        """
+        GIVEN: DataFrame without the requested key column
+        WHEN: explode_for_salting() is called with a non-existent column name
+        THEN: Raises ValueError with "not found"
+        """
+        from src.transforms.join.optimization import explode_for_salting
+
+        data = [("a", 1)]
+        df = spark.createDataFrame(data, ["key", "value"])
+        hot_keys_df = spark.createDataFrame([("a", 1)], ["key", "count"])
+
+        with pytest.raises(ValueError, match="not found"):
+            explode_for_salting(df, hot_keys_df, "nonexistent", salt_factor=5)

@@ -159,3 +159,46 @@ class TestDetectAnomaliesStatistical:
 
         # Assert - function returns only anomalies, so empty = no anomalies
         assert result_df.count() == 0, "Expected no anomalies"
+
+    def test_detect_anomalies_statistical_low_anomaly(self, spark):
+        """
+        GIVEN:
+            - 28 days with values around 1000ms
+            - 2 days with extreme low values: 10ms, 5ms (far below baseline)
+        WHEN: detect_anomalies_statistical() with z_threshold=3.0
+        THEN:
+            - Returns 2 anomalies
+            - Both have z_score < -3.0 (negative — below mean)
+            - anomaly_type = "low"
+        """
+        # Arrange
+        schema = StructType(
+            [
+                StructField("date", DateType(), nullable=False),
+                StructField("avg_duration_ms", DoubleType(), nullable=False),
+            ]
+        )
+
+        import random
+
+        random.seed(99)
+        normal_data = [
+            (date(2023, 1, day), 1000.0 + random.randint(-50, 50)) for day in range(1, 29)
+        ]
+        # Values far below baseline (z-score << -3)
+        low_outlier_data = [(date(2023, 1, 29), 10.0), (date(2023, 1, 30), 5.0)]
+
+        df = spark.createDataFrame(normal_data + low_outlier_data, schema=schema)
+
+        # Act
+        result_df = detect_anomalies_statistical(
+            df, value_column="avg_duration_ms", z_threshold=3.0
+        )
+
+        # Assert
+        assert result_df.count() == 2, "Expected 2 low anomalies"
+
+        anomalies = result_df.collect()
+        for row in anomalies:
+            assert row["z_score"] < -3.0, f"Expected z_score < -3.0, got {row['z_score']}"
+            assert row["anomaly_type"] == "low"

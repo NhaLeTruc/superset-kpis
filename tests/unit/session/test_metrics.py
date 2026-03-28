@@ -1,11 +1,14 @@
 """
 Unit tests for session metrics transforms.
 
-Tests calculate_session_metrics() and calculate_bounce_rate() functions from session transforms.
+Tests _parse_session_timeout(), calculate_session_metrics(), calculate_session_frequency(),
+and calculate_bounce_rate() functions from session transforms.
 """
 
 from datetime import datetime
 
+import pytest
+from pyspark.sql import functions as F
 from pyspark.sql.types import (
     IntegerType,
     LongType,
@@ -16,6 +19,7 @@ from pyspark.sql.types import (
 )
 
 from src.transforms.session import calculate_bounce_rate, calculate_session_metrics
+from src.transforms.session.metrics import _parse_session_timeout, calculate_session_frequency
 
 
 class TestCalculateSessionMetrics:
@@ -346,3 +350,134 @@ class TestCalculateBounceRate:
         assert results[1]["bounce_rate"] == 0.0  # 0% bounce rate
         assert results[1]["total_sessions"] == 2
         assert results[1]["bounced_sessions"] == 0
+
+
+class TestParseSessionTimeout:
+    """Tests for _parse_session_timeout() helper function."""
+
+    def test_parses_seconds_format(self):
+        """
+        GIVEN: Valid timeout strings in "N seconds" / "1 second" format
+        WHEN: _parse_session_timeout() is called
+        THEN: Returns the integer value in seconds
+        """
+        assert _parse_session_timeout("1800 seconds") == 1800
+        assert _parse_session_timeout("60 seconds") == 60
+        assert _parse_session_timeout("1 second") == 1
+
+    def test_handles_whitespace(self):
+        """
+        GIVEN: A valid timeout string with leading/trailing whitespace
+        WHEN: _parse_session_timeout() is called
+        THEN: Whitespace is stripped and value is parsed correctly
+        """
+        assert _parse_session_timeout("  1800 seconds  ") == 1800
+
+    def test_raises_error_for_invalid_format(self):
+        """
+        GIVEN: A timeout string in an unsupported format (e.g., "30 minutes")
+        WHEN: _parse_session_timeout() is called
+        THEN: Raises ValueError with "Invalid session_timeout format"
+        """
+        with pytest.raises(ValueError, match="Invalid session_timeout format"):
+            _parse_session_timeout("30 minutes")
+
+        with pytest.raises(ValueError, match="Invalid session_timeout format"):
+            _parse_session_timeout("invalid")
+
+    def test_raises_error_for_zero_or_negative(self):
+        """
+        GIVEN: A timeout string with value <= 0
+        WHEN: _parse_session_timeout() is called
+        THEN: Raises ValueError with "must be positive"
+        """
+        with pytest.raises(ValueError, match="must be positive"):
+            _parse_session_timeout("0 seconds")
+
+
+class TestCalculateSessionFrequency:
+    """Tests for calculate_session_frequency() function."""
+
+    def test_basic_frequency_calculation(self, spark):
+        """
+        GIVEN: User u001 with 3 sessions across 2 distinct dates
+        WHEN: calculate_session_frequency() is called
+        THEN:
+            - total_sessions=3
+            - active_days=2
+            - avg_sessions_per_day=1.5
+        """
+        data = [
+            ("u001", "2023-01-01"),
+            ("u001", "2023-01-01"),
+            ("u001", "2023-01-02"),
+        ]
+        df = spark.createDataFrame(data, ["user_id", "metric_date"]).withColumn(
+            "metric_date", F.to_date("metric_date")
+        )
+
+        result = calculate_session_frequency(df)
+
+        row = result.collect()[0]
+        assert row["total_sessions"] == 3
+        assert row["active_days"] == 2
+        assert row["avg_sessions_per_day"] == 1.5
+
+    def test_first_and_last_session_dates(self, spark):
+        """
+        GIVEN: User u001 with sessions on Jan 5, 10, 15
+        WHEN: calculate_session_frequency() is called
+        THEN:
+            - first_session_date = 2023-01-05
+            - last_session_date = 2023-01-15
+        """
+        data = [
+            ("u001", "2023-01-05"),
+            ("u001", "2023-01-10"),
+            ("u001", "2023-01-15"),
+        ]
+        df = spark.createDataFrame(data, ["user_id", "metric_date"]).withColumn(
+            "metric_date", F.to_date("metric_date")
+        )
+
+        result = calculate_session_frequency(df)
+
+        row = result.collect()[0]
+        assert str(row["first_session_date"]) == "2023-01-05"
+        assert str(row["last_session_date"]) == "2023-01-15"
+
+    def test_with_group_by_columns(self, spark):
+        """
+        GIVEN: Two users with different device types
+        WHEN: calculate_session_frequency() is called with group_by_columns=["device_type"]
+        THEN:
+            - Each row includes the device_type column
+            - Per-user totals are correct
+        """
+        data = [
+            ("u001", "2023-01-01", "iPad"),
+            ("u001", "2023-01-02", "iPad"),
+            ("u002", "2023-01-01", "iPhone"),
+        ]
+        df = spark.createDataFrame(data, ["user_id", "metric_date", "device_type"]).withColumn(
+            "metric_date", F.to_date("metric_date")
+        )
+
+        result = calculate_session_frequency(df, group_by_columns=["device_type"])
+
+        assert "device_type" in result.columns
+        rows = {r["user_id"]: r for r in result.collect()}
+        assert rows["u001"]["total_sessions"] == 2
+        assert rows["u002"]["total_sessions"] == 1
+
+    def test_raises_error_for_missing_columns(self, spark):
+        """
+        GIVEN: DataFrame without the metric_date column
+        WHEN: calculate_session_frequency() is called
+        THEN: Raises ValueError with "Missing required columns"
+        """
+        data = [("u001",)]
+        df = spark.createDataFrame(data, ["user_id"])
+
+        with pytest.raises(ValueError, match="Missing required columns"):
+            calculate_session_frequency(df)
