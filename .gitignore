@@ -26,6 +26,7 @@ venv/
 ENV/
 env/
 .venv
+memory/
 
 # Testing
 .pytest_cache/
