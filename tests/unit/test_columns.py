@@ -10,7 +10,7 @@ import inspect
 import src.schemas.columns as columns_module
 
 
-def _all_col_constants() -> dict[str, str]:
+def _all_col_constants():
     """Return all COL_* names and their string values from the module."""
     return {
         name: value
@@ -46,7 +46,7 @@ class TestColumnConstants:
         produce two columns named "foo").
         """
         constants = _all_col_constants()
-        seen: dict[str, str] = {}
+        seen = {}
         for name, value in constants.items():
             if value in seen:
                 raise AssertionError(

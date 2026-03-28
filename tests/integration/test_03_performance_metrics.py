@@ -205,7 +205,7 @@ class TestPerformanceMetricsPipeline:
             df=df,
             value_column=COL_DURATION_MS,
             z_threshold=3.0,
-            group_by_columns=[COL_APP_VERSION, "metric_date"],
+            group_by_columns=[COL_APP_VERSION],
         )
 
         assert result.count() >= 2

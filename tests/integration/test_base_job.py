@@ -103,15 +103,13 @@ class TestGetTableMapping:
         """
         import argparse
 
-        from pyspark.sql import DataFrame
-
         from src.jobs.base_job import BaseAnalyticsJob
 
         class _MinimalJob(BaseAnalyticsJob):
             def get_argument_parser(self) -> argparse.ArgumentParser:
                 return argparse.ArgumentParser()
 
-            def compute_metrics(self) -> dict[str, DataFrame]:
+            def compute_metrics(self):
                 return {}
 
         job = _MinimalJob(job_name="test", job_type="analytics")
@@ -180,14 +178,12 @@ class TestWriteToDatabase:
         metrics = {"performance_by_version": df}
         table_mapping = {"performance_by_version": "performance_by_version"}
 
-        with (
-            patch(
-                "src.config.database_config.get_postgres_connection_props",
-                side_effect=ValueError("POSTGRES_PASSWORD not set"),
-            ),
-            pytest.raises(ValueError, match="POSTGRES_PASSWORD"),
+        with patch(  # noqa: SIM117
+            "src.config.postgres.writer.get_postgres_connection_props",
+            side_effect=ValueError("POSTGRES_PASSWORD not set"),
         ):
-            job.write_to_database(metrics, table_mapping)
+            with pytest.raises(ValueError, match="POSTGRES_PASSWORD"):
+                job.write_to_database(metrics, table_mapping)
 
     def test_skips_metrics_not_in_table_mapping(self, spark, capsys):
         """
@@ -205,7 +201,7 @@ class TestWriteToDatabase:
         metrics = {"known_metric": df, "unknown_metric": df}
         table_mapping = {"known_metric": "some_table"}
 
-        with patch("src.config.database_config.write_to_postgres") as mock_write:
+        with patch("src.jobs.base_job.write_to_postgres") as mock_write:
             job.write_to_database(metrics, table_mapping)
 
         # known_metric written once; unknown_metric skipped

@@ -4,7 +4,7 @@ Unit tests for PostgreSQL reader module.
 Tests read_from_postgres, execute_sql, and get_table_row_count functions.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,7 +16,7 @@ FAKE_PROPS = {"user": "test", "password": "secret", "driver": "org.postgresql.Dr
 class TestReadFromPostgres:
     """Tests for read_from_postgres() function."""
 
-    def test_basic_read_calls_jdbc_with_table(self, spark):
+    def test_basic_read_calls_jdbc_with_table(self):
         """
         GIVEN: A table name with no partition or predicate args
         WHEN: read_from_postgres() is called
@@ -24,23 +24,22 @@ class TestReadFromPostgres:
         """
         from src.config.postgres.reader import read_from_postgres
 
-        mock_df = spark.createDataFrame([(1,)], ["id"])
+        mock_df = MagicMock()
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = mock_df
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=mock_df) as mock_jdbc,
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = read_from_postgres(spark, "daily_active_users")
+            result = read_from_postgres(mock_spark, "daily_active_users")
 
-        mock_jdbc.assert_called_once_with(
+        mock_spark.read.jdbc.assert_called_once_with(
             url=FAKE_JDBC_URL, table="daily_active_users", properties=FAKE_PROPS
         )
         assert result is mock_df
 
-    def test_partitioned_read_calls_jdbc_with_partition_args(self, spark):
+    def test_partitioned_read_calls_jdbc_with_partition_args(self):
         """
         GIVEN: All partition parameters provided
         WHEN: read_from_postgres() is called with partition_column
@@ -48,17 +47,16 @@ class TestReadFromPostgres:
         """
         from src.config.postgres.reader import read_from_postgres
 
-        mock_df = spark.createDataFrame([(1,)], ["id"])
+        mock_df = MagicMock()
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = mock_df
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=mock_df) as mock_jdbc,
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
             result = read_from_postgres(
-                spark,
+                mock_spark,
                 "user_interactions",
                 partition_column="interaction_id",
                 num_partitions=8,
@@ -66,7 +64,7 @@ class TestReadFromPostgres:
                 upper_bound=10_000_000,
             )
 
-        mock_jdbc.assert_called_once_with(
+        mock_spark.read.jdbc.assert_called_once_with(
             url=FAKE_JDBC_URL,
             table="user_interactions",
             column="interaction_id",
@@ -77,7 +75,7 @@ class TestReadFromPostgres:
         )
         assert result is mock_df
 
-    def test_predicate_pushdown_calls_jdbc_with_predicates(self, spark):
+    def test_predicate_pushdown_calls_jdbc_with_predicates(self):
         """
         GIVEN: A predicate_pushdown filter string
         WHEN: read_from_postgres() is called
@@ -85,19 +83,20 @@ class TestReadFromPostgres:
         """
         from src.config.postgres.reader import read_from_postgres
 
-        mock_df = spark.createDataFrame([(1,)], ["id"])
+        mock_df = MagicMock()
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = mock_df
         predicate = "date >= '2023-01-01'"
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=mock_df) as mock_jdbc,
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = read_from_postgres(spark, "daily_active_users", predicate_pushdown=predicate)
+            result = read_from_postgres(
+                mock_spark, "daily_active_users", predicate_pushdown=predicate
+            )
 
-        mock_jdbc.assert_called_once_with(
+        mock_spark.read.jdbc.assert_called_once_with(
             url=FAKE_JDBC_URL,
             table="daily_active_users",
             predicates=[predicate],
@@ -105,7 +104,7 @@ class TestReadFromPostgres:
         )
         assert result is mock_df
 
-    def test_raises_when_partition_column_given_without_bounds(self, spark):
+    def test_raises_when_partition_column_given_without_bounds(self):
         """
         GIVEN: partition_column provided but num_partitions/lower_bound/upper_bound are missing
         WHEN: read_from_postgres() is called
@@ -113,19 +112,18 @@ class TestReadFromPostgres:
         """
         from src.config.postgres.reader import read_from_postgres
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc") as mock_jdbc,
-            pytest.raises(ValueError, match="partitioned reads"),
+        mock_spark = MagicMock()
+
+        with patch(  # noqa: SIM117 — nested form prevents ruff-format from collapsing to py310-only parenthesized syntax
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            read_from_postgres(spark, "user_interactions", partition_column="id")
+            with pytest.raises(ValueError, match="partitioned reads"):
+                read_from_postgres(mock_spark, "user_interactions", partition_column="id")
 
-        mock_jdbc.assert_not_called()
+        mock_spark.read.jdbc.assert_not_called()
 
-    def test_raises_when_partition_column_given_without_upper_bound(self, spark):
+    def test_raises_when_partition_column_given_without_upper_bound(self):
         """
         GIVEN: partition_column + num_partitions + lower_bound but no upper_bound
         WHEN: read_from_postgres() is called
@@ -133,26 +131,26 @@ class TestReadFromPostgres:
         """
         from src.config.postgres.reader import read_from_postgres
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            pytest.raises(ValueError, match="partitioned reads"),
+        mock_spark = MagicMock()
+
+        with patch(  # noqa: SIM117
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            read_from_postgres(
-                spark,
-                "user_interactions",
-                partition_column="id",
-                num_partitions=4,
-                lower_bound=0,
-            )
+            with pytest.raises(ValueError, match="partitioned reads"):
+                read_from_postgres(
+                    mock_spark,
+                    "user_interactions",
+                    partition_column="id",
+                    num_partitions=4,
+                    lower_bound=0,
+                )
 
 
 class TestExecuteSql:
     """Tests for execute_sql() function."""
 
-    def test_wraps_query_as_subquery_in_jdbc_call(self, spark):
+    def test_wraps_query_as_subquery_in_jdbc_call(self):
         """
         GIVEN: A SQL query string
         WHEN: execute_sql() is called
@@ -160,19 +158,18 @@ class TestExecuteSql:
         """
         from src.config.postgres.reader import execute_sql
 
-        mock_df = spark.createDataFrame([(5,)], ["cnt"])
+        mock_df = MagicMock()
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = mock_df
         sql = "SELECT COUNT(*) as cnt FROM bounce_rates"
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=mock_df) as mock_jdbc,
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = execute_sql(spark, sql)
+            result = execute_sql(mock_spark, sql)
 
-        mock_jdbc.assert_called_once_with(
+        mock_spark.read.jdbc.assert_called_once_with(
             url=FAKE_JDBC_URL,
             table=f"({sql}) as query",
             properties=FAKE_PROPS,
@@ -192,15 +189,14 @@ class TestGetTableRowCount:
         from src.config.postgres.reader import get_table_row_count
 
         count_df = spark.createDataFrame([(42,)], ["count"])
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = count_df
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=count_df),
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = get_table_row_count(spark, "daily_active_users")
+            result = get_table_row_count(mock_spark, "daily_active_users")
 
         assert result == 42
 
@@ -213,19 +209,18 @@ class TestGetTableRowCount:
         from src.config.postgres.reader import get_table_row_count
 
         empty_df = spark.createDataFrame([], spark.createDataFrame([(0,)], ["count"]).schema)
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = empty_df
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=empty_df),
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = get_table_row_count(spark, "daily_active_users")
+            result = get_table_row_count(mock_spark, "daily_active_users")
 
         assert result == 0
 
-    def test_raises_for_invalid_table_name(self, spark):
+    def test_raises_for_invalid_table_name(self):
         """
         GIVEN: A table name containing SQL-injection-style characters
         WHEN: get_table_row_count() is called
@@ -233,19 +228,18 @@ class TestGetTableRowCount:
         """
         from src.config.postgres.reader import get_table_row_count
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc") as mock_jdbc,
-            pytest.raises(ValueError, match="Invalid table name"),
+        mock_spark = MagicMock()
+
+        with patch(  # noqa: SIM117
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            get_table_row_count(spark, "users; DROP TABLE users--")
+            with pytest.raises(ValueError, match="Invalid table name"):
+                get_table_row_count(mock_spark, "users; DROP TABLE users--")
 
-        mock_jdbc.assert_not_called()
+        mock_spark.read.jdbc.assert_not_called()
 
-    def test_raises_for_table_name_starting_with_digit(self, spark):
+    def test_raises_for_table_name_starting_with_digit(self):
         """
         GIVEN: A table name starting with a digit
         WHEN: get_table_row_count() is called
@@ -253,14 +247,14 @@ class TestGetTableRowCount:
         """
         from src.config.postgres.reader import get_table_row_count
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            pytest.raises(ValueError, match="Invalid table name"),
+        mock_spark = MagicMock()
+
+        with patch(  # noqa: SIM117
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            get_table_row_count(spark, "123table")
+            with pytest.raises(ValueError, match="Invalid table name"):
+                get_table_row_count(mock_spark, "123table")
 
     @pytest.mark.parametrize(
         "valid_name",
@@ -275,14 +269,13 @@ class TestGetTableRowCount:
         from src.config.postgres.reader import get_table_row_count
 
         count_df = spark.createDataFrame([(0,)], ["count"])
+        mock_spark = MagicMock()
+        mock_spark.read.jdbc.return_value = count_df
 
-        with (
-            patch(
-                "src.config.postgres.reader.get_postgres_connection_props",
-                return_value=(FAKE_JDBC_URL, FAKE_PROPS),
-            ),
-            patch.object(spark.read, "jdbc", return_value=count_df),
+        with patch(
+            "src.config.postgres.reader.get_postgres_connection_props",
+            return_value=(FAKE_JDBC_URL, FAKE_PROPS),
         ):
-            result = get_table_row_count(spark, valid_name)
+            result = get_table_row_count(mock_spark, valid_name)
 
         assert result == 0
