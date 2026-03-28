@@ -30,7 +30,11 @@ import sys
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from src.config.constants import HOT_KEY_THRESHOLD_PERCENTILE
+from src.config.constants import (
+    HOT_KEY_THRESHOLD_PERCENTILE,
+    TABLE_USER_INTERACTIONS,
+    TABLE_USER_METADATA,
+)
 from src.jobs.base_job import BaseAnalyticsJob
 from src.schemas import INTERACTIONS_SCHEMA, METADATA_SCHEMA
 from src.schemas.columns import (
@@ -62,6 +66,9 @@ class DataProcessingJob(BaseAnalyticsJob):
         parser.add_argument("--metadata-path", required=True, help="Path to metadata CSV")
         parser.add_argument("--output-path", required=True, help="Path to write enriched data")
         parser.add_argument("--skip-validation", action="store_true", help="Skip data validation")
+        parser.add_argument(
+            "--write-to-db", action="store_true", help="Write raw tables to PostgreSQL"
+        )
         parser.add_argument(
             "--dev-mode", action="store_true", help="Enable development mode with summary stats"
         )
@@ -154,7 +161,11 @@ class DataProcessingJob(BaseAnalyticsJob):
         # Add date partition column for downstream partitioned writes
         enriched_df = enriched_df.withColumn(COL_DATE, F.to_date(COL_TIMESTAMP))
 
-        return {"enriched_interactions": enriched_df}
+        return {
+            "enriched_interactions": enriched_df,
+            "user_metadata": metadata_df,
+            "user_interactions": interactions_df,
+        }
 
     def print_summary(self, metrics: dict[str, DataFrame]) -> None:
         """Print summary statistics of enriched data."""
@@ -192,9 +203,21 @@ class DataProcessingJob(BaseAnalyticsJob):
         finally:
             enriched_df.unpersist()
 
-    def get_table_mapping(self) -> dict[str, str] | None:
-        """This job writes to Parquet, not database."""
-        return None
+    def get_table_mapping(self) -> dict[str, str]:
+        """Map staging DataFrames to their PostgreSQL tables."""
+        return {
+            "user_metadata": TABLE_USER_METADATA,
+            "user_interactions": TABLE_USER_INTERACTIONS,
+        }
+
+    def write_to_parquet(self, metrics, output_path, partition_by=None, coalesce_partitions=None):
+        """Write only enriched_interactions to Parquet; staging tables go to PostgreSQL only."""
+        super().write_to_parquet(
+            {"enriched_interactions": metrics["enriched_interactions"]},
+            output_path,
+            partition_by=partition_by,
+            coalesce_partitions=coalesce_partitions,
+        )
 
 
 def main():

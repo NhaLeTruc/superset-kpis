@@ -1,7 +1,7 @@
 # GoodNote Analytics Platform - Makefile
 # All commands run via Docker containers (no virtual environment required)
 
-.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks superset-setup superset-setup-dry superset-setup-wait jupyter-up jupyter-url jupyter-logs jupyter-shell
+.PHONY: help quickstart setup test clean status logs lint format check fix typecheck security quality install-hooks pre-commit-all update-hooks superset-setup superset-setup-dry superset-setup-wait jupyter-up jupyter-url jupyter-logs jupyter-shell load-staging-tables
 
 # Include environment variables from .env
 -include .env
@@ -45,6 +45,7 @@ help:
 	@echo "  make run-job-2      - Run User Engagement job only"
 	@echo "  make run-job-3      - Run Performance Metrics job only"
 	@echo "  make run-job-4      - Run Session Analysis job only"
+	@echo "  make load-staging-tables - Load user_metadata + user_interactions from raw CSVs"
 	@echo ""
 	@echo "Docker Management:"
 	@echo "  make up             - Start Docker services"
@@ -225,7 +226,8 @@ run-job-1:
         /opt/spark-apps/src/jobs/01_data_processing.py \
         --interactions-path /app/data/raw/user_interactions.csv \
         --metadata-path /app/data/raw/user_metadata.csv \
-        --output-path /app/data/processed/enriched_interactions.parquet'
+        --output-path /app/data/processed/enriched_interactions.parquet \
+        --write-to-db'
 	@echo "Data Processing job completed"
 
 run-job-2:
@@ -254,6 +256,16 @@ run-job-4:
         --enriched-path /app/data/processed/enriched_interactions.parquet \
         --write-to-db'
 	@echo "Session Analysis job completed"
+
+load-staging-tables:
+	@echo "Loading staging tables from raw CSVs..."
+	@echo "  → user_metadata"
+	@tail -n +2 data/raw/user_metadata.csv | docker exec -i $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) \
+		-c "TRUNCATE user_metadata; COPY user_metadata (user_id, device_type, country, subscription_type, registration_date) FROM STDIN WITH (FORMAT csv);"
+	@echo "  → user_interactions"
+	@tail -n +2 data/raw/user_interactions.csv | docker exec -i $(POSTGRES) psql -U $(DB_USER) -d $(DB_NAME) \
+		-c "TRUNCATE user_interactions; COPY user_interactions (user_id, timestamp, action_type, page_id, duration_ms, app_version) FROM STDIN WITH (FORMAT csv);"
+	@echo "Staging tables loaded"
 
 # ============================================================================
 # Database Management

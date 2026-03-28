@@ -34,7 +34,7 @@ make help              # Show all 50+ commands
 **Access Points:**
 
 - Spark Master UI: <http://localhost:8080>
-- Spark App UI: <http://localhost:4040>
+- Spark History UI: <http://localhost:18080>
 - Superset: <http://localhost:8088> (see credentials in `.env` file)
 - Jupyter: <http://localhost:8888>
 - PostgreSQL: localhost:5432 (see credentials in `.env` file)

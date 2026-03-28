@@ -139,8 +139,13 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-analytics}
       - POSTGRES_USER=${POSTGRES_USER:-analytics_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-analytics_pass}
-      # Spark cluster connection
-      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
+      # Jupyter uses local mode: the pyspark-notebook image runs Python 3.11 while
+      # the Spark workers use Python 3.8; PySpark requires matching minor versions
+      # for cluster mode, so local[*] avoids the version mismatch entirely.
+      - SPARK_MASTER_URL=local[*]
+      # PySpark lives inside the Spark binary distribution, not in the conda env.
+      # PYTHONPATH makes it importable by the Jupyter kernel and by nbconvert.
+      - PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.9.7-src.zip
     volumes:
       - ./src:/home/jovyan/work/src
       - ./data:/home/jovyan/work/data
